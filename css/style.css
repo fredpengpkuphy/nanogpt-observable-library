@@ -534,6 +534,14 @@ button {
   display: flex;
 }
 
+.chart-overlay[hidden] {
+  display: none;
+}
+
+.chart-overlay.visible[hidden] {
+  display: flex;
+}
+
 .chart-modal {
   display: flex;
   flex-direction: column;

@@ -648,6 +648,7 @@ function openFullscreen() {
   if (!spec) return;
   fullOverlayOpen = true;
   const overlay = document.getElementById("chartOverlay");
+  overlay.hidden = false;
   overlay.classList.add("visible");
   overlay.setAttribute("aria-hidden", "false");
   renderFullChart(spec);
@@ -658,6 +659,7 @@ function closeFullscreen() {
   const overlay = document.getElementById("chartOverlay");
   overlay.classList.remove("visible");
   overlay.setAttribute("aria-hidden", "true");
+  overlay.hidden = true;
   if (fullChart) {
     fullChart.destroy();
     fullChart = null;
