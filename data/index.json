@@ -1,0 +1,16 @@
+{
+  "runs": [
+    {
+      "run_id": "run_20260704_184808",
+      "label": "run_20260704_184808",
+      "n_specs": 411,
+      "n_curves": 411,
+      "n_series": 411,
+      "provenance": {
+        "commit": "unknown",
+        "torch": "2.5.1+cu121",
+        "python": "3.10.20"
+      }
+    }
+  ]
+}

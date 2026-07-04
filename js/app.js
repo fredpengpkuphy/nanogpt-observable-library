@@ -38,6 +38,7 @@ const LAYER_COLORS = [
 ];
 
 let manifest = null;
+let runId = null;
 let specById = new Map();
 let specsByModule = new Map();
 let specsByFamily = new Map();
@@ -49,12 +50,17 @@ let selectedLayers = new Set();
 let chart = null;
 
 async function boot() {
+  runId = new URLSearchParams(location.search).get("run");
+  if (!runId) {
+    window.location.href = "index.html";
+    return;
+  }
+
   try {
     if (window.Chart && window.ChartZoom) {
       try { Chart.register(window.ChartZoom); } catch (_) { /* already registered */ }
     }
-    const latest = await fetchJson("data/latest.json");
-    manifest = await fetchJson(`data/${latest.run_id}/manifest.json`);
+    manifest = await fetchJson(`data/${runId}/manifest.json`);
     specById = new Map(manifest.specs.map((s) => [s.id, s]));
     specsByModule = groupSpecsByModule(manifest.specs);
     specsByFamily = groupSpecsByFamily(manifest.specs);
@@ -102,7 +108,8 @@ async function boot() {
   } catch (err) {
     document.getElementById("architecture").innerHTML =
       `<div class="error">Failed to load viewer data: ${escapeHtml(err.message)}<br><br>` +
-      `Run <code>python3 viewer/scripts/build_viewer_data.py</code> first.</div>`;
+      `Run <code>python3 viewer/scripts/build_viewer_data.py --clean</code> or ` +
+      `<a href="index.html">choose another dataset</a>.</div>`;
   }
 }
 
@@ -602,7 +609,7 @@ function renderChart(spec) {
     image.onerror = () => {
       infoEl.textContent = "PNG curve not found yet — training may still be running.";
     };
-    image.src = `data/${manifest.run_id}/${spec.curve_png}`;
+    image.src = `data/${runId}/${spec.curve_png}`;
     return;
   }
 

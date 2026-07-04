@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>nanoGPT Observable Explorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=4">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>nanoGPT Observable Explorer</h1>
+      <p id="runSubtitle">Loading run metadata…</p>
+    </div>
+    <div class="header-actions">
+      <a class="header-link" href="index.html">← 切换数据集</a>
+      <div class="badge" id="runBadge">—</div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Model Architecture</h2>
+        <span class="badge" id="layerBadge">Block 0</span>
+      </div>
+      <div class="layer-tabs" id="layerTabs"></div>
+      <div class="architecture" id="architecture"></div>
+    </section>
+
+    <section class="panel detail-panel">
+      <div class="panel-head">
+        <h2>Observables</h2>
+      </div>
+      <div class="detail-empty" id="detailEmpty">
+        <div>
+          <p>点击左侧模型模块查看观测量</p>
+          <p style="font-size:0.85rem;margin-top:0.5rem;">支持 weight / grad / update / activation 曲线</p>
+        </div>
+      </div>
+      <div class="detail-content" id="detailContent">
+        <div class="detail-header">
+          <h3 id="moduleTitle">—</h3>
+          <p id="modulePath">—</p>
+        </div>
+        <div class="spec-groups" id="specGroups"></div>
+        <div class="chart-wrap">
+          <div class="chart-meta">
+            <div class="chart-meta-text">
+              <span id="chartTitle">Select an observable</span>
+              <span id="chartInfo"></span>
+            </div>
+            <div class="chart-actions">
+              <button type="button" class="chart-btn" id="resetZoomBtn" hidden title="重置缩放">重置缩放</button>
+              <button type="button" class="chart-btn" id="expandBtn" hidden title="放大查看">⤢ 放大</button>
+              <label class="compare-toggle" id="compareToggleWrap" hidden>
+                <input type="checkbox" id="compareLayers" />
+                <span>叠加各层对比</span>
+              </label>
+            </div>
+          </div>
+          <div class="layer-pick" id="layerPickWrap" hidden>
+            <div class="layer-pick-head">
+              <span>选择对比层</span>
+              <div class="layer-pick-presets">
+                <button type="button" class="chart-btn" id="pickCurrentLayer">仅当前层</button>
+                <button type="button" class="chart-btn" id="pickAllLayers">全选</button>
+                <button type="button" class="chart-btn" id="pickClearLayers">清空</button>
+              </div>
+            </div>
+            <div class="layer-pick-list" id="layerPickList"></div>
+          </div>
+          <canvas id="curveChart"></canvas>
+          <p class="chart-hint" id="chartHint">滚轮缩放 · 按住拖拽平移 · 双击重置</p>
+          <img id="curveImage" alt="Observable curve" hidden>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="chart-overlay" id="chartOverlay" aria-hidden="true" hidden>
+    <div class="chart-modal" role="dialog" aria-modal="true">
+      <div class="chart-modal-head">
+        <div class="chart-meta-text">
+          <span id="fullChartTitle">—</span>
+          <span id="fullChartInfo"></span>
+        </div>
+        <div class="chart-actions">
+          <button type="button" class="chart-btn" id="fullResetZoomBtn" title="重置缩放">重置缩放</button>
+          <button type="button" class="chart-btn" id="fullCloseBtn" title="关闭">✕ 关闭</button>
+        </div>
+      </div>
+      <div class="chart-modal-body">
+        <canvas id="curveChartFull"></canvas>
+      </div>
+      <p class="chart-hint">滚轮缩放 · 按住拖拽平移 · 双击重置 · Esc 关闭</p>
+    </div>
+  </div>
+
+  <script src="js/app.js?v=4"></script>
+</body>
+</html>
