@@ -43,4 +43,7 @@ Open http://localhost:8080
 
 
 
-git push -u origin main --force
+
+git add .
+git commit -m "Add chart zoom and layer picker"
+git push

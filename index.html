@@ -55,6 +55,7 @@
             </div>
             <div class="chart-actions">
               <button type="button" class="chart-btn" id="resetZoomBtn" hidden title="重置缩放">重置缩放</button>
+              <button type="button" class="chart-btn" id="expandBtn" hidden title="放大查看">⤢ 放大</button>
               <label class="compare-toggle" id="compareToggleWrap" hidden>
                 <input type="checkbox" id="compareLayers" />
                 <span>叠加各层对比</span>
@@ -79,6 +80,25 @@
       </div>
     </section>
   </main>
+
+  <div class="chart-overlay" id="chartOverlay" aria-hidden="true">
+    <div class="chart-modal" role="dialog" aria-modal="true">
+      <div class="chart-modal-head">
+        <div class="chart-meta-text">
+          <span id="fullChartTitle">—</span>
+          <span id="fullChartInfo"></span>
+        </div>
+        <div class="chart-actions">
+          <button type="button" class="chart-btn" id="fullResetZoomBtn" title="重置缩放">重置缩放</button>
+          <button type="button" class="chart-btn" id="fullCloseBtn" title="关闭">✕ 关闭</button>
+        </div>
+      </div>
+      <div class="chart-modal-body">
+        <canvas id="curveChartFull"></canvas>
+      </div>
+      <p class="chart-hint">滚轮缩放 · 按住拖拽平移 · 双击重置 · Esc 关闭</p>
+    </div>
+  </div>
 
   <script src="js/app.js"></script>
 </body>

@@ -65,6 +65,15 @@ async function boot() {
       if (spec) renderChart(spec);
     });
     document.getElementById("resetZoomBtn").addEventListener("click", resetChartZoom);
+    document.getElementById("expandBtn").addEventListener("click", openFullscreen);
+    document.getElementById("fullCloseBtn").addEventListener("click", closeFullscreen);
+    document.getElementById("fullResetZoomBtn").addEventListener("click", () => fullChart?.resetZoom?.());
+    document.getElementById("chartOverlay").addEventListener("click", (e) => {
+      if (e.target.id === "chartOverlay") closeFullscreen();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && fullOverlayOpen) closeFullscreen();
+    });
     document.getElementById("pickCurrentLayer").addEventListener("click", () => {
       const spec = activeSpecId ? specById.get(activeSpecId) : null;
       if (!spec) return;
@@ -474,10 +483,61 @@ function resetChartZoom() {
 function setChartChrome(hasSeriesChart) {
   document.getElementById("resetZoomBtn").hidden = !hasSeriesChart;
   document.getElementById("chartHint").hidden = !hasSeriesChart;
+  document.getElementById("expandBtn").hidden = !hasSeriesChart;
 }
 
 function pointsFromSeries(series) {
   return series.steps.map((step, i) => ({ x: step, y: series.values[i] }));
+}
+
+// Build the Chart.js datasets for the currently selected spec/state.
+// Returns { datasets, legend } for a line chart, { empty:true } when compare
+// mode has no layers selected, or null when there is no plottable series.
+function buildLineDatasets(spec) {
+  if (compareLayers && canCompareLayers(spec)) {
+    const members = familyMembers(spec)
+      .filter((m) => selectedLayers.has(m.layer))
+      .sort((a, b) => a.layer - b.layer);
+    if (!members.length) return { empty: true };
+    return {
+      legend: true,
+      datasets: members.map((m) => {
+        const color = LAYER_COLORS[m.layer % LAYER_COLORS.length];
+        return {
+          label: `L${m.layer}`,
+          data: pointsFromSeries(m.series),
+          borderColor: color,
+          backgroundColor: `${color}22`,
+          borderWidth: m.layer === activeLayer ? 2.5 : 1.5,
+          pointRadius: 0,
+          tension: 0.2,
+          fill: false,
+        };
+      }),
+    };
+  }
+  if (spec.series?.steps?.length) {
+    const color = SOURCE_COLORS[spec.source_kind] || "#2563eb";
+    return {
+      legend: false,
+      datasets: [{
+        label: spec.label,
+        data: pointsFromSeries(spec.series),
+        borderColor: color,
+        backgroundColor: `${color}22`,
+        borderWidth: 2,
+        pointRadius: 2,
+        tension: 0.25,
+        fill: true,
+      }],
+    };
+  }
+  return null;
+}
+
+function chartTitleFor(spec) {
+  if (compareLayers && canCompareLayers(spec)) return `${spec.label} · 层对比`;
+  return spec.label;
 }
 
 function renderChart(spec) {
@@ -501,69 +561,36 @@ function renderChart(spec) {
 
   destroyChart();
 
-  // Overlay only the user-selected layers that share the same observable family.
+  // Titles/subtitles.
   if (compareLayers && canCompareLayers(spec)) {
-    const members = familyMembers(spec)
+    const selected = familyMembers(spec)
       .filter((m) => selectedLayers.has(m.layer))
       .sort((a, b) => a.layer - b.layer);
-    const labels = members.map((m) => `L${m.layer}`).join(", ") || "未选层";
-    titleEl.textContent = `${spec.label} · 层对比`;
-    infoEl.textContent =
-      `${spec.role} · ${labels} · every ${spec.every} steps`;
+    const labels = selected.map((m) => `L${m.layer}`).join(", ") || "未选层";
+    titleEl.textContent = chartTitleFor(spec);
+    infoEl.textContent = `${spec.role} · ${labels} · every ${spec.every} steps`;
+  } else {
+    titleEl.textContent = spec.label;
+    infoEl.textContent = `${spec.selector} · every ${spec.every} steps`;
+  }
 
-    if (!members.length) {
-      setChartChrome(false);
-      infoEl.textContent = "请在上方勾选要对比的层";
-      return;
-    }
+  const lineData = buildLineDatasets(spec);
 
-    chart = new Chart(canvas, {
-      type: "line",
-      data: {
-        datasets: members.map((m) => {
-          const color = LAYER_COLORS[m.layer % LAYER_COLORS.length];
-          return {
-            label: `L${m.layer}`,
-            data: pointsFromSeries(m.series),
-            borderColor: color,
-            backgroundColor: `${color}22`,
-            borderWidth: m.layer === activeLayer ? 2.5 : 1.5,
-            pointRadius: 0,
-            tension: 0.2,
-            fill: false,
-          };
-        }),
-      },
-      options: chartCommonOptions({ legend: true }),
-    });
-    attachDoubleClickReset(canvas);
-    setChartChrome(true);
+  if (lineData?.empty) {
+    setChartChrome(false);
+    infoEl.textContent = "请在上方勾选要对比的层";
     return;
   }
 
-  titleEl.textContent = spec.label;
-  infoEl.textContent = `${spec.selector} · every ${spec.every} steps`;
-
-  if (spec.series?.steps?.length) {
-    const color = SOURCE_COLORS[spec.source_kind] || "#2563eb";
+  if (lineData) {
     chart = new Chart(canvas, {
       type: "line",
-      data: {
-        datasets: [{
-          label: spec.label,
-          data: pointsFromSeries(spec.series),
-          borderColor: color,
-          backgroundColor: `${color}22`,
-          borderWidth: 2,
-          pointRadius: 2,
-          tension: 0.25,
-          fill: true,
-        }],
-      },
-      options: chartCommonOptions({ legend: false }),
+      data: { datasets: lineData.datasets },
+      options: chartCommonOptions({ legend: lineData.legend }),
     });
     attachDoubleClickReset(canvas);
     setChartChrome(true);
+    if (fullOverlayOpen) renderFullChart(spec);
     return;
   }
 
@@ -580,6 +607,61 @@ function renderChart(spec) {
   }
 
   infoEl.textContent = "No curve data yet.";
+}
+
+let fullChart = null;
+let fullOverlayOpen = false;
+
+function renderFullChart(spec) {
+  const canvas = document.getElementById("curveChartFull");
+  const titleEl = document.getElementById("fullChartTitle");
+  const infoEl = document.getElementById("fullChartInfo");
+  if (fullChart) {
+    fullChart.destroy();
+    fullChart = null;
+  }
+  const lineData = buildLineDatasets(spec);
+  titleEl.textContent = chartTitleFor(spec);
+  if (compareLayers && canCompareLayers(spec)) {
+    const labels = familyMembers(spec)
+      .filter((m) => selectedLayers.has(m.layer))
+      .sort((a, b) => a.layer - b.layer)
+      .map((m) => `L${m.layer}`).join(", ") || "未选层";
+    infoEl.textContent = `${spec.role} · ${labels} · every ${spec.every} steps`;
+  } else {
+    infoEl.textContent = `${spec.selector} · every ${spec.every} steps`;
+  }
+  if (!lineData || lineData.empty) {
+    infoEl.textContent = lineData?.empty ? "请在上方勾选要对比的层" : "No curve data yet.";
+    return;
+  }
+  fullChart = new Chart(canvas, {
+    type: "line",
+    data: { datasets: lineData.datasets },
+    options: chartCommonOptions({ legend: lineData.legend }),
+  });
+  canvas.ondblclick = () => fullChart?.resetZoom?.();
+}
+
+function openFullscreen() {
+  const spec = activeSpecId ? specById.get(activeSpecId) : null;
+  if (!spec) return;
+  fullOverlayOpen = true;
+  const overlay = document.getElementById("chartOverlay");
+  overlay.classList.add("visible");
+  overlay.setAttribute("aria-hidden", "false");
+  renderFullChart(spec);
+}
+
+function closeFullscreen() {
+  fullOverlayOpen = false;
+  const overlay = document.getElementById("chartOverlay");
+  overlay.classList.remove("visible");
+  overlay.setAttribute("aria-hidden", "true");
+  if (fullChart) {
+    fullChart.destroy();
+    fullChart = null;
+  }
 }
 
 function destroyChart() {
@@ -599,6 +681,7 @@ function clearSelection() {
   document.getElementById("compareToggleWrap").hidden = true;
   document.getElementById("layerPickWrap").hidden = true;
   setChartChrome(false);
+  closeFullscreen();
   document.getElementById("detailEmpty").style.display = "grid";
   document.getElementById("detailContent").classList.remove("visible");
   destroyChart();
