@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>nanoGPT Observable Explorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>nanoGPT Observable Explorer</h1>
+      <p id="runSubtitle">Loading run metadata…</p>
+    </div>
+    <div class="badge" id="runBadge">—</div>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Model Architecture</h2>
+        <span class="badge" id="layerBadge">Block 0</span>
+      </div>
+      <div class="layer-tabs" id="layerTabs"></div>
+      <div class="architecture" id="architecture"></div>
+    </section>
+
+    <section class="panel detail-panel">
+      <div class="panel-head">
+        <h2>Observables</h2>
+      </div>
+      <div class="detail-empty" id="detailEmpty">
+        <div>
+          <p>点击左侧模型模块查看观测量</p>
+          <p style="font-size:0.85rem;margin-top:0.5rem;">支持 weight / grad / update / activation 曲线</p>
+        </div>
+      </div>
+      <div class="detail-content" id="detailContent">
+        <div class="detail-header">
+          <h3 id="moduleTitle">—</h3>
+          <p id="modulePath">—</p>
+        </div>
+        <div class="spec-groups" id="specGroups"></div>
+        <div class="chart-wrap">
+          <div class="chart-meta">
+            <div class="chart-meta-text">
+              <span id="chartTitle">Select an observable</span>
+              <span id="chartInfo"></span>
+            </div>
+            <label class="compare-toggle" id="compareToggleWrap" hidden>
+              <input type="checkbox" id="compareLayers" />
+              <span>叠加各层对比</span>
+            </label>
+          </div>
+          <canvas id="curveChart"></canvas>
+          <img id="curveImage" alt="Observable curve" hidden>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
