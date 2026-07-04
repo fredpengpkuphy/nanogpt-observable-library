@@ -40,6 +40,7 @@ const LAYER_COLORS = [
 let manifest = null;
 let specById = new Map();
 let specsByModule = new Map();
+let specsByFamily = new Map();
 let activeLayer = 0;
 let activeModuleId = null;
 let activeSpecId = null;
@@ -49,10 +50,14 @@ let chart = null;
 
 async function boot() {
   try {
+    if (window.Chart && window.ChartZoom) {
+      try { Chart.register(window.ChartZoom); } catch (_) { /* already registered */ }
+    }
     const latest = await fetchJson("data/latest.json");
     manifest = await fetchJson(`data/${latest.run_id}/manifest.json`);
     specById = new Map(manifest.specs.map((s) => [s.id, s]));
     specsByModule = groupSpecsByModule(manifest.specs);
+    specsByFamily = groupSpecsByFamily(manifest.specs);
     document.getElementById("compareLayers").addEventListener("change", (e) => {
       compareLayers = e.target.checked;
       const spec = activeSpecId ? specById.get(activeSpecId) : null;
@@ -103,6 +108,16 @@ function groupSpecsByModule(specs) {
   for (const spec of specs) {
     if (!map.has(spec.ui_module)) map.set(spec.ui_module, []);
     map.get(spec.ui_module).push(spec);
+  }
+  return map;
+}
+
+function groupSpecsByFamily(specs) {
+  const map = new Map();
+  for (const spec of specs) {
+    if (!spec.family_id) continue;
+    if (!map.has(spec.family_id)) map.set(spec.family_id, []);
+    map.get(spec.family_id).push(spec);
   }
   return map;
 }
@@ -319,12 +334,11 @@ function selectSpec(spec) {
 }
 
 function familyMembers(spec) {
-  if (!spec?.family_id || !manifest.families) return [];
-  const family = manifest.families[spec.family_id];
-  if (!family) return [];
-  return family.spec_ids
-    .map((id) => specById.get(id))
-    .filter((s) => s && s.series?.steps?.length);
+  if (!spec?.family_id) return [];
+  const members = specsByFamily.get(spec.family_id) || [];
+  return members.filter(
+    (s) => s.layer !== null && s.layer !== undefined && s.series?.steps?.length
+  );
 }
 
 function canCompareLayers(spec) {
