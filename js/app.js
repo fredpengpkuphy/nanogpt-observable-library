@@ -44,6 +44,7 @@ let activeLayer = 0;
 let activeModuleId = null;
 let activeSpecId = null;
 let compareLayers = false;
+let selectedLayers = new Set();
 let chart = null;
 
 async function boot() {
@@ -55,7 +56,31 @@ async function boot() {
     document.getElementById("compareLayers").addEventListener("change", (e) => {
       compareLayers = e.target.checked;
       const spec = activeSpecId ? specById.get(activeSpecId) : null;
+      if (compareLayers && spec) ensureDefaultSelectedLayers(spec);
       if (spec) renderChart(spec);
+    });
+    document.getElementById("resetZoomBtn").addEventListener("click", resetChartZoom);
+    document.getElementById("pickCurrentLayer").addEventListener("click", () => {
+      const spec = activeSpecId ? specById.get(activeSpecId) : null;
+      if (!spec) return;
+      selectedLayers = new Set([activeLayer]);
+      renderLayerPicker(spec);
+      renderChart(spec);
+    });
+    document.getElementById("pickAllLayers").addEventListener("click", () => {
+      const spec = activeSpecId ? specById.get(activeSpecId) : null;
+      if (!spec) return;
+      selectedLayers = new Set(familyMembers(spec).map((m) => m.layer));
+      renderLayerPicker(spec);
+      renderChart(spec);
+    });
+    document.getElementById("pickClearLayers").addEventListener("click", () => {
+      const spec = activeSpecId ? specById.get(activeSpecId) : null;
+      selectedLayers = new Set();
+      if (spec) {
+        renderLayerPicker(spec);
+        renderChart(spec);
+      }
     });
     renderHeader();
     renderLayerTabs();
@@ -306,16 +331,61 @@ function canCompareLayers(spec) {
   return familyMembers(spec).length >= 2;
 }
 
+function availableLayers(spec) {
+  return familyMembers(spec).map((m) => m.layer).sort((a, b) => a - b);
+}
+
+function ensureDefaultSelectedLayers(spec) {
+  const available = new Set(availableLayers(spec));
+  selectedLayers = new Set([...selectedLayers].filter((l) => available.has(l)));
+  if (selectedLayers.size === 0) {
+    if (available.has(activeLayer)) selectedLayers.add(activeLayer);
+    else if (available.size) selectedLayers.add([...available][0]);
+  }
+}
+
 function updateCompareToggle(spec) {
   const wrap = document.getElementById("compareToggleWrap");
   const input = document.getElementById("compareLayers");
+  const pickWrap = document.getElementById("layerPickWrap");
   const ok = canCompareLayers(spec);
   wrap.hidden = !ok;
   if (!ok) {
     compareLayers = false;
     input.checked = false;
+    pickWrap.hidden = true;
+    return;
+  }
+  input.checked = compareLayers;
+  if (compareLayers) {
+    ensureDefaultSelectedLayers(spec);
+    renderLayerPicker(spec);
+    pickWrap.hidden = false;
   } else {
-    input.checked = compareLayers;
+    pickWrap.hidden = true;
+  }
+}
+
+function renderLayerPicker(spec) {
+  const list = document.getElementById("layerPickList");
+  list.innerHTML = "";
+  for (const layer of availableLayers(spec)) {
+    const color = LAYER_COLORS[layer % LAYER_COLORS.length];
+    const label = document.createElement("label");
+    label.className = `layer-pick-chip${selectedLayers.has(layer) ? " active" : ""}`;
+    label.style.setProperty("--chip-color", color);
+    label.innerHTML = `
+      <input type="checkbox" ${selectedLayers.has(layer) ? "checked" : ""} />
+      <span class="layer-pick-dot"></span>
+      <span>L${layer}</span>
+    `;
+    label.querySelector("input").addEventListener("change", (e) => {
+      if (e.target.checked) selectedLayers.add(layer);
+      else selectedLayers.delete(layer);
+      renderLayerPicker(spec);
+      renderChart(spec);
+    });
+    list.appendChild(label);
   }
 }
 
@@ -333,6 +403,63 @@ function chartScaleOptions() {
       grid: { color: "rgba(30,64,128,0.08)" },
     },
   };
+}
+
+function zoomPluginOptions() {
+  return {
+    zoom: {
+      wheel: { enabled: true, speed: 0.1 },
+      pinch: { enabled: true },
+      mode: "xy",
+      drag: { enabled: false },
+    },
+    pan: {
+      enabled: true,
+      mode: "xy",
+      modifierKey: null,
+    },
+    limits: {
+      x: { min: "original", max: "original" },
+      y: { min: "original", max: "original" },
+    },
+  };
+}
+
+function chartCommonOptions({ legend = false } = {}) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: "nearest", intersect: false },
+    plugins: {
+      legend: legend
+        ? {
+            display: true,
+            position: "bottom",
+            labels: { boxWidth: 12, color: "#475569", usePointStyle: true },
+          }
+        : { display: false },
+      tooltip: {
+        callbacks: {
+          title: (items) => (items.length ? `step ${items[0].parsed.x}` : ""),
+        },
+      },
+      zoom: zoomPluginOptions(),
+    },
+    scales: chartScaleOptions(),
+  };
+}
+
+function attachDoubleClickReset(canvas) {
+  canvas.ondblclick = () => resetChartZoom();
+}
+
+function resetChartZoom() {
+  if (chart?.resetZoom) chart.resetZoom();
+}
+
+function setChartChrome(hasSeriesChart) {
+  document.getElementById("resetZoomBtn").hidden = !hasSeriesChart;
+  document.getElementById("chartHint").hidden = !hasSeriesChart;
 }
 
 function pointsFromSeries(series) {
@@ -353,18 +480,29 @@ function renderChart(spec) {
   if (!spec) {
     titleEl.textContent = "Select an observable";
     infoEl.textContent = "";
+    setChartChrome(false);
     destroyChart();
     return;
   }
 
   destroyChart();
 
-  // Overlay all layers that share the same nature (source/role/reduction/transforms).
+  // Overlay only the user-selected layers that share the same observable family.
   if (compareLayers && canCompareLayers(spec)) {
-    const members = familyMembers(spec);
-    titleEl.textContent = `${spec.label} · 各层叠加`;
+    const members = familyMembers(spec)
+      .filter((m) => selectedLayers.has(m.layer))
+      .sort((a, b) => a.layer - b.layer);
+    const labels = members.map((m) => `L${m.layer}`).join(", ") || "未选层";
+    titleEl.textContent = `${spec.label} · 层对比`;
     infoEl.textContent =
-      `${spec.role} · ${members.length} layers · every ${spec.every} steps`;
+      `${spec.role} · ${labels} · every ${spec.every} steps`;
+
+    if (!members.length) {
+      setChartChrome(false);
+      infoEl.textContent = "请在上方勾选要对比的层";
+      return;
+    }
+
     chart = new Chart(canvas, {
       type: "line",
       data: {
@@ -382,25 +520,10 @@ function renderChart(spec) {
           };
         }),
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: "nearest", intersect: false },
-        plugins: {
-          legend: {
-            display: true,
-            position: "bottom",
-            labels: { boxWidth: 12, color: "#475569", usePointStyle: true },
-          },
-          tooltip: {
-            callbacks: {
-              title: (items) => (items.length ? `step ${items[0].parsed.x}` : ""),
-            },
-          },
-        },
-        scales: chartScaleOptions(),
-      },
+      options: chartCommonOptions({ legend: true }),
     });
+    attachDoubleClickReset(canvas);
+    setChartChrome(true);
     return;
   }
 
@@ -423,17 +546,14 @@ function renderChart(spec) {
           fill: true,
         }],
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-        },
-        scales: chartScaleOptions(),
-      },
+      options: chartCommonOptions({ legend: false }),
     });
+    attachDoubleClickReset(canvas);
+    setChartChrome(true);
     return;
   }
+
+  setChartChrome(false);
 
   if (spec.curve_png) {
     canvas.hidden = true;
@@ -459,9 +579,12 @@ function clearSelection() {
   activeModuleId = null;
   activeSpecId = null;
   compareLayers = false;
+  selectedLayers = new Set();
   const input = document.getElementById("compareLayers");
   if (input) input.checked = false;
   document.getElementById("compareToggleWrap").hidden = true;
+  document.getElementById("layerPickWrap").hidden = true;
+  setChartChrome(false);
   document.getElementById("detailEmpty").style.display = "grid";
   document.getElementById("detailContent").classList.remove("visible");
   destroyChart();

@@ -40,3 +40,7 @@ Open http://localhost:8080
 - Click a chip to plot the curve (from CSV series now, PNG when training finishes).
 - For block modules (`h.N.*`), enable **叠加各层对比** to overlay the same observable
   (same source / role / reduction / transforms) across all layers on one chart.
+
+
+
+git push -u origin main --force
