@@ -214,20 +214,46 @@ def build_run(obs_dir: Path, run_id: str) -> dict:
     with (dest / "manifest.json").open("w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
 
-    n_series = sum(1 for s in manifest["specs"] if s.get("series"))
-    return {
-        "run_id": run_id,
-        "label": run_id,
-        "n_specs": manifest["n_specs"],
-        "n_curves": len(curve_paths),
-        "n_series": n_series,
-        "provenance": manifest.get("provenance", {}),
-    }
+    meta = meta_from_manifest(run_id, manifest)
+    meta["n_curves"] = len(curve_paths)
+    return meta
 
 
 def write_index(run_metas: list[dict]):
     with (VIEWER_DATA / "index.json").open("w", encoding="utf-8") as f:
         json.dump({"runs": run_metas}, f, indent=2)
+
+
+def meta_from_manifest(run_id: str, manifest: dict) -> dict:
+    n_series = sum(1 for s in manifest["specs"] if s.get("series"))
+    n_curves = sum(1 for s in manifest["specs"] if s.get("curve_png"))
+    return {
+        "run_id": run_id,
+        "label": run_id,
+        "n_specs": manifest["n_specs"],
+        "n_curves": n_curves,
+        "n_series": n_series,
+        "provenance": manifest.get("provenance", {}),
+    }
+
+
+def rebuild_index(built_metas: list[dict]) -> list[dict]:
+    """Merge newly built runs with any existing run dirs under viewer/data."""
+    by_id = {m["run_id"]: m for m in built_metas}
+    if VIEWER_DATA.exists():
+        for run_dir in sorted(VIEWER_DATA.glob("run_*")):
+            if not run_dir.is_dir():
+                continue
+            run_id = run_dir.name
+            if run_id in by_id:
+                continue
+            manifest_path = run_dir / "manifest.json"
+            if not manifest_path.exists():
+                continue
+            with manifest_path.open(encoding="utf-8") as f:
+                manifest = json.load(f)
+            by_id[run_id] = meta_from_manifest(run_id, manifest)
+    return sorted(by_id.values(), key=lambda m: m["run_id"], reverse=True)
 
 
 def main():
@@ -256,8 +282,9 @@ def main():
             f"series={meta['n_series']}, tree curves={meta['n_curves']}"
         )
 
-    write_index(metas)
-    print(f"Wrote {VIEWER_DATA / 'index.json'} ({len(metas)} run(s))")
+    index_metas = rebuild_index(metas)
+    write_index(index_metas)
+    print(f"Wrote {VIEWER_DATA / 'index.json'} ({len(index_metas)} run(s))")
 
 
 if __name__ == "__main__":
