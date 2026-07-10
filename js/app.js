@@ -71,6 +71,7 @@ let selectedLayers = new Set();
 let chart = null;
 let lossChart = null;
 let lossLog = null;
+let lossViewMode = "both";
 
 async function boot() {
   runId = new URLSearchParams(location.search).get("run");
@@ -95,6 +96,10 @@ async function boot() {
     });
     document.getElementById("resetZoomBtn").addEventListener("click", resetChartZoom);
     document.getElementById("lossResetZoomBtn").addEventListener("click", () => lossChart?.resetZoom?.());
+    document.getElementById("lossExpandBtn").addEventListener("click", openLossFullscreen);
+    document.querySelectorAll(".loss-view-btn").forEach((btn) => {
+      btn.addEventListener("click", () => setLossViewMode(btn.dataset.mode));
+    });
     document.getElementById("expandBtn").addEventListener("click", openFullscreen);
     document.getElementById("fullCloseBtn").addEventListener("click", closeFullscreen);
     document.getElementById("fullResetZoomBtn").addEventListener("click", () => fullChart?.resetZoom?.());
@@ -180,8 +185,10 @@ function parseLossCsv(text) {
 
 async function loadLossLog() {
   const text = await fetchText(`data/${runId}/eval_loss_log.csv`);
-  if (!text) return null;
-  return parseLossCsv(text);
+  if (!text) return { error: true };
+  const parsed = parseLossCsv(text);
+  if (!parsed) return { error: true };
+  return parsed;
 }
 
 function destroyLossChart() {
@@ -191,56 +198,101 @@ function destroyLossChart() {
   }
 }
 
+function lossInfoText() {
+  if (!lossLog || lossLog.error) return "";
+  const lastTrain = lossLog.train.at(-1);
+  const lastVal = lossLog.val.at(-1);
+  const maxStep = Math.max(lastTrain?.x ?? 0, lastVal?.x ?? 0);
+  const modeLabel = lossViewMode === "both" ? "train + val" : lossViewMode;
+  return (
+    `${modeLabel} · ${lossLog.train.length} train · ${lossLog.val.length} val · step 0–${maxStep}` +
+    (lastTrain ? ` · train=${lastTrain.y.toFixed(4)}` : "") +
+    (lastVal ? ` · val=${lastVal.y.toFixed(4)}` : "")
+  );
+}
+
+function buildLossDatasets() {
+  if (!lossLog || lossLog.error) return null;
+  const datasets = [];
+  if (lossViewMode === "both" || lossViewMode === "train") {
+    datasets.push({
+      label: "Train loss",
+      data: lossLog.train,
+      borderColor: "#2563eb",
+      backgroundColor: "rgba(37, 99, 235, 0.12)",
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.2,
+      fill: false,
+    });
+  }
+  if (lossViewMode === "both" || lossViewMode === "val") {
+    datasets.push({
+      label: "Val loss",
+      data: lossLog.val,
+      borderColor: "#dc2626",
+      backgroundColor: "rgba(220, 38, 38, 0.12)",
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.2,
+      fill: false,
+    });
+  }
+  return datasets.length ? datasets : null;
+}
+
+function createLossChart(canvas) {
+  const datasets = buildLossDatasets();
+  if (!datasets) return null;
+  return new Chart(canvas, {
+    type: "line",
+    data: { datasets },
+    options: chartCommonOptions({ legend: true }),
+  });
+}
+
+function updateLossViewButtons() {
+  document.querySelectorAll(".loss-view-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.mode === lossViewMode);
+  });
+}
+
+function setLossOverlayChrome(show) {
+  const el = document.getElementById("lossViewToggleFull");
+  if (el) el.hidden = !show;
+}
+
+function setLossViewMode(mode) {
+  if (!["both", "train", "val"].includes(mode)) return;
+  lossViewMode = mode;
+  updateLossViewButtons();
+  renderLossChart();
+  if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
+}
+
 function renderLossChart() {
   const section = document.getElementById("lossSection");
   const infoEl = document.getElementById("lossInfo");
   const canvas = document.getElementById("lossChart");
   destroyLossChart();
+  updateLossViewButtons();
+
+  if (lossLog?.error) {
+    section.hidden = false;
+    infoEl.textContent = "未找到 eval_loss_log.csv（请确认该文件已 push 到仓库）";
+    return;
+  }
 
   if (!lossLog) {
     section.hidden = true;
-    infoEl.textContent = "未找到 eval_loss_log.csv（请确认已 git add 并 push 该文件）";
     return;
   }
 
   section.hidden = false;
-  const lastTrain = lossLog.train.at(-1);
-  const lastVal = lossLog.val.at(-1);
-  const maxStep = Math.max(lastTrain?.x ?? 0, lastVal?.x ?? 0);
-  infoEl.textContent =
-    `${lossLog.train.length} train · ${lossLog.val.length} val points · step 0–${maxStep}` +
-    (lastTrain ? ` · train=${lastTrain.y.toFixed(4)}` : "") +
-    (lastVal ? ` · val=${lastVal.y.toFixed(4)}` : "");
+  infoEl.textContent = lossInfoText();
 
-  lossChart = new Chart(canvas, {
-    type: "line",
-    data: {
-      datasets: [
-        {
-          label: "Train loss",
-          data: lossLog.train,
-          borderColor: "#2563eb",
-          backgroundColor: "rgba(37, 99, 235, 0.12)",
-          borderWidth: 2,
-          pointRadius: 0,
-          tension: 0.2,
-          fill: false,
-        },
-        {
-          label: "Val loss",
-          data: lossLog.val,
-          borderColor: "#dc2626",
-          backgroundColor: "rgba(220, 38, 38, 0.12)",
-          borderWidth: 2,
-          pointRadius: 0,
-          tension: 0.2,
-          fill: false,
-        },
-      ],
-    },
-    options: chartCommonOptions({ legend: true }),
-  });
-  canvas.ondblclick = () => lossChart?.resetZoom?.();
+  lossChart = createLossChart(canvas);
+  if (lossChart) canvas.ondblclick = () => lossChart?.resetZoom?.();
 }
 
 function groupSpecsByModule(specs) {
@@ -759,6 +811,21 @@ function renderChart(spec) {
 
 let fullChart = null;
 let fullOverlayOpen = false;
+let fullOverlayMode = null;
+
+function renderFullLossChart() {
+  const canvas = document.getElementById("curveChartFull");
+  const titleEl = document.getElementById("fullChartTitle");
+  const infoEl = document.getElementById("fullChartInfo");
+  if (fullChart) {
+    fullChart.destroy();
+    fullChart = null;
+  }
+  titleEl.textContent = "Training Loss";
+  infoEl.textContent = lossInfoText();
+  fullChart = createLossChart(canvas);
+  if (fullChart) canvas.ondblclick = () => fullChart?.resetZoom?.();
+}
 
 function renderFullChart(spec) {
   const canvas = document.getElementById("curveChartFull");
@@ -791,10 +858,24 @@ function renderFullChart(spec) {
   canvas.ondblclick = () => fullChart?.resetZoom?.();
 }
 
+function openLossFullscreen() {
+  if (!lossLog || lossLog.error || !buildLossDatasets()) return;
+  fullOverlayMode = "loss";
+  fullOverlayOpen = true;
+  setLossOverlayChrome(true);
+  const overlay = document.getElementById("chartOverlay");
+  overlay.hidden = false;
+  overlay.classList.add("visible");
+  overlay.setAttribute("aria-hidden", "false");
+  renderFullLossChart();
+}
+
 function openFullscreen() {
   const spec = activeSpecId ? specById.get(activeSpecId) : null;
   if (!spec) return;
+  fullOverlayMode = "spec";
   fullOverlayOpen = true;
+  setLossOverlayChrome(false);
   const overlay = document.getElementById("chartOverlay");
   overlay.hidden = false;
   overlay.classList.add("visible");
@@ -804,6 +885,8 @@ function openFullscreen() {
 
 function closeFullscreen() {
   fullOverlayOpen = false;
+  fullOverlayMode = null;
+  setLossOverlayChrome(false);
   const overlay = document.getElementById("chartOverlay");
   overlay.classList.remove("visible");
   overlay.setAttribute("aria-hidden", "true");

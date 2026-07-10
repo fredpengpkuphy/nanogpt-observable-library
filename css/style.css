@@ -179,6 +179,21 @@ button {
   font-size: 0.68rem;
 }
 
+.loss-view-toggle {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.12rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-card);
+}
+
+.loss-view-btn.active {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.16);
+  color: var(--text);
+}
+
 .flow {
   display: flex;
   flex-direction: column;

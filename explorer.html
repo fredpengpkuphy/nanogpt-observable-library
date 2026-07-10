@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=5">
+  <link rel="stylesheet" href="css/style.css?v=6">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
@@ -36,7 +36,15 @@
             <span class="loss-section-title">Training Loss</span>
             <span class="loss-section-info" id="lossInfo"></span>
           </div>
-          <button type="button" class="chart-btn" id="lossResetZoomBtn" title="重置缩放">重置缩放</button>
+          <div class="chart-actions">
+            <div class="loss-view-toggle" id="lossViewToggle">
+              <button type="button" class="chart-btn loss-view-btn active" data-mode="both">Both</button>
+              <button type="button" class="chart-btn loss-view-btn" data-mode="train">Train</button>
+              <button type="button" class="chart-btn loss-view-btn" data-mode="val">Val</button>
+            </div>
+            <button type="button" class="chart-btn" id="lossResetZoomBtn" title="重置缩放">重置缩放</button>
+            <button type="button" class="chart-btn" id="lossExpandBtn" title="放大查看">⤢ 放大</button>
+          </div>
         </div>
         <div class="loss-chart-wrap">
           <canvas id="lossChart"></canvas>
@@ -105,6 +113,11 @@
           <span id="fullChartInfo"></span>
         </div>
         <div class="chart-actions">
+          <div class="loss-view-toggle" id="lossViewToggleFull" hidden>
+            <button type="button" class="chart-btn loss-view-btn" data-mode="both">Both</button>
+            <button type="button" class="chart-btn loss-view-btn" data-mode="train">Train</button>
+            <button type="button" class="chart-btn loss-view-btn" data-mode="val">Val</button>
+          </div>
           <button type="button" class="chart-btn" id="fullResetZoomBtn" title="重置缩放">重置缩放</button>
           <button type="button" class="chart-btn" id="fullCloseBtn" title="关闭">✕ 关闭</button>
         </div>
@@ -116,6 +129,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=7"></script>
+  <script src="js/app.js?v=8"></script>
 </body>
 </html>
