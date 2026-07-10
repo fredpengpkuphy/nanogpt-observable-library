@@ -62,12 +62,20 @@ def module_label(ui_module: str) -> str:
     m = re.match(r"h\.(\d+)\.attn\.c_proj$", ui_module)
     if m:
         return f"Block {m.group(1)} · Attention Output Projection"
+    m = re.match(r"h\.(\d+)\.attn$", ui_module)
+    if m:
+        return f"Block {m.group(1)} · Attention (entropy / sink)"
     m = re.match(r"h\.(\d+)\.mlp\.c_fc$", ui_module)
     if m:
         return f"Block {m.group(1)} · MLP Up-Projection (c_fc)"
+    m = re.match(r"h\.(\d+)\.mlp\.gelu$", ui_module)
+    if m:
+        return f"Block {m.group(1)} · MLP GELU (massive activation)"
     m = re.match(r"h\.(\d+)\.mlp\.c_proj$", ui_module)
     if m:
         return f"Block {m.group(1)} · MLP Down-Projection"
+    if ui_module == "lm_head":
+        return "LM Head (logits)"
     return ui_module
 
 

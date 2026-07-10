@@ -3,6 +3,10 @@ const SOURCE_LABELS = {
   grad: "Gradient",
   update: "Update",
   activation: "Activation",
+  preactivation: "Pre-Activation",
+  gelu_activation: "GELU / Massive Act",
+  attention: "Attention",
+  logits: "Logits",
 };
 
 const SOURCE_COLORS = {
@@ -10,7 +14,22 @@ const SOURCE_COLORS = {
   grad: "#16a34a",
   update: "#d97706",
   activation: "#e11d48",
+  preactivation: "#be185d",
+  gelu_activation: "#c026d3",
+  attention: "#0f766e",
+  logits: "#4338ca",
 };
+
+const SOURCE_KIND_ORDER = [
+  "weight",
+  "grad",
+  "update",
+  "activation",
+  "preactivation",
+  "gelu_activation",
+  "attention",
+  "logits",
+];
 
 const ARCH_NODES = {
   embeddings: [
@@ -20,9 +39,11 @@ const ARCH_NODES = {
   block: [
     { id: "ln_1", suffix: "ln_1", title: "LayerNorm", subtitle: "ln_1", path: "ln_1" },
     { id: "c_attn", suffix: "attn.c_attn", title: "QKV Proj", subtitle: "attn.c_attn", path: "attn.c_attn" },
+    { id: "attn", suffix: "attn", title: "Attention", subtitle: "attn · entropy", path: "attn" },
     { id: "c_proj_attn", suffix: "attn.c_proj", title: "Attn Out", subtitle: "attn.c_proj", path: "attn.c_proj" },
     { id: "ln_2", suffix: "ln_2", title: "LayerNorm", subtitle: "ln_2", path: "ln_2" },
     { id: "c_fc", suffix: "mlp.c_fc", title: "MLP Up", subtitle: "mlp.c_fc", path: "mlp.c_fc" },
+    { id: "gelu", suffix: "mlp.gelu", title: "GELU", subtitle: "mlp.gelu · massive", path: "mlp.gelu" },
     { id: "c_proj_mlp", suffix: "mlp.c_proj", title: "MLP Down", subtitle: "mlp.c_proj", path: "mlp.c_proj" },
   ],
   head: [
@@ -192,11 +213,13 @@ function renderArchitecture() {
   const attnCol = section("Attention");
   attnCol.appendChild(createModuleNode(moduleIdForBlock("ln_1"), "LayerNorm", "ln_1", moduleIdForBlock("ln_1")));
   attnCol.appendChild(createModuleNode(moduleIdForBlock("attn.c_attn"), "QKV Proj", "c_attn", moduleIdForBlock("attn.c_attn")));
+  attnCol.appendChild(createModuleNode(moduleIdForBlock("attn"), "Attention", "attn · entropy", moduleIdForBlock("attn")));
   attnCol.appendChild(createModuleNode(moduleIdForBlock("attn.c_proj"), "Attn Out", "c_proj", moduleIdForBlock("attn.c_proj")));
 
   const mlpCol = section("MLP");
   mlpCol.appendChild(createModuleNode(moduleIdForBlock("ln_2"), "LayerNorm", "ln_2", moduleIdForBlock("ln_2")));
   mlpCol.appendChild(createModuleNode(moduleIdForBlock("mlp.c_fc"), "MLP Up", "c_fc", moduleIdForBlock("mlp.c_fc")));
+  mlpCol.appendChild(createModuleNode(moduleIdForBlock("mlp.gelu"), "GELU", "gelu · massive", moduleIdForBlock("mlp.gelu")));
   mlpCol.appendChild(createModuleNode(moduleIdForBlock("mlp.c_proj"), "MLP Down", "c_proj", moduleIdForBlock("mlp.c_proj")));
 
   const sideCol = section("Residual");
@@ -294,12 +317,23 @@ function selectModule(moduleKey, title, subtitle) {
   const detail = document.getElementById("detailContent");
   detail.classList.add("visible");
 
-  document.getElementById("moduleTitle").textContent = manifest.modules[moduleKey]?.label || title;
+  document.getElementById("moduleTitle").textContent = friendlyModuleLabel(moduleKey, title);
   const exampleSelector = specs[0]?.selector || `transformer.${moduleKey}`;
   document.getElementById("modulePath").textContent = exampleSelector;
 
   renderSpecGroups(specs);
   renderChart(null);
+}
+
+function friendlyModuleLabel(moduleKey, fallback) {
+  const raw = manifest.modules[moduleKey]?.label;
+  if (raw && raw !== moduleKey) return raw;
+  const mAttn = /^h\.(\d+)\.attn$/.exec(moduleKey);
+  if (mAttn) return `Block ${mAttn[1]} · Attention (entropy / sink)`;
+  const mGelu = /^h\.(\d+)\.mlp\.gelu$/.exec(moduleKey);
+  if (mGelu) return `Block ${mGelu[1]} · MLP GELU (massive activation)`;
+  if (moduleKey === "lm_head") return "LM Head (logits)";
+  return raw || fallback || moduleKey;
 }
 
 function renderSpecGroups(specs) {
@@ -312,7 +346,11 @@ function renderSpecGroups(specs) {
   const container = document.getElementById("specGroups");
   container.innerHTML = "";
 
-  for (const kind of ["weight", "grad", "update", "activation"]) {
+  const kinds = [
+    ...SOURCE_KIND_ORDER,
+    ...Object.keys(groups).filter((k) => !SOURCE_KIND_ORDER.includes(k)),
+  ];
+  for (const kind of kinds) {
     const items = groups[kind];
     if (!items?.length) continue;
 
