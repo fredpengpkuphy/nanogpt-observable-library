@@ -200,6 +200,20 @@ def clean_viewer_data():
     VIEWER_DATA.mkdir(parents=True)
 
 
+def copy_loss_log(obs_dir: Path, run_id: str, dest: Path) -> bool:
+    candidates = [
+        obs_dir / "eval_loss_log.csv",
+        obs_dir / f"{run_id}_eval_loss_log.csv",
+        obs_dir.parent / "eval_loss_log.csv",
+        dest / "eval_loss_log.csv",
+    ]
+    for src in candidates:
+        if src.is_file():
+            shutil.copy2(src, dest / "eval_loss_log.csv")
+            return True
+    return False
+
+
 def build_run(obs_dir: Path, run_id: str) -> dict:
     specs_path = obs_dir / f"{run_id}_specs.json"
     if not specs_path.exists():
@@ -222,8 +236,11 @@ def build_run(obs_dir: Path, run_id: str) -> dict:
     with (dest / "manifest.json").open("w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
 
+    has_loss = copy_loss_log(obs_dir, run_id, dest)
+
     meta = meta_from_manifest(run_id, manifest)
     meta["n_curves"] = len(curve_paths)
+    meta["has_loss"] = has_loss
     return meta
 
 
@@ -260,7 +277,9 @@ def rebuild_index(built_metas: list[dict]) -> list[dict]:
                 continue
             with manifest_path.open(encoding="utf-8") as f:
                 manifest = json.load(f)
-            by_id[run_id] = meta_from_manifest(run_id, manifest)
+            meta = meta_from_manifest(run_id, manifest)
+            meta["has_loss"] = (run_dir / "eval_loss_log.csv").is_file()
+            by_id[run_id] = meta
     return sorted(by_id.values(), key=lambda m: m["run_id"], reverse=True)
 
 

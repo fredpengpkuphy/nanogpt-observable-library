@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=4">
+  <link rel="stylesheet" href="css/style.css?v=5">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
@@ -29,6 +29,19 @@
       <div class="panel-head">
         <h2>Model Architecture</h2>
         <span class="badge" id="layerBadge">Block 0</span>
+      </div>
+      <div class="loss-section" id="lossSection" hidden>
+        <div class="loss-section-head">
+          <div class="loss-section-text">
+            <span class="loss-section-title">Training Loss</span>
+            <span class="loss-section-info" id="lossInfo"></span>
+          </div>
+          <button type="button" class="chart-btn" id="lossResetZoomBtn" title="重置缩放">重置缩放</button>
+        </div>
+        <div class="loss-chart-wrap">
+          <canvas id="lossChart"></canvas>
+        </div>
+        <p class="chart-hint">train / val loss · 滚轮缩放 · 拖拽平移 · 双击重置</p>
       </div>
       <div class="layer-tabs" id="layerTabs"></div>
       <div class="architecture" id="architecture"></div>
@@ -103,6 +116,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=5"></script>
+  <script src="js/app.js?v=6"></script>
 </body>
 </html>

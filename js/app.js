@@ -69,6 +69,8 @@ let activeSpecId = null;
 let compareLayers = false;
 let selectedLayers = new Set();
 let chart = null;
+let lossChart = null;
+let lossLog = null;
 
 async function boot() {
   runId = new URLSearchParams(location.search).get("run");
@@ -92,6 +94,7 @@ async function boot() {
       if (spec) renderChart(spec);
     });
     document.getElementById("resetZoomBtn").addEventListener("click", resetChartZoom);
+    document.getElementById("lossResetZoomBtn").addEventListener("click", () => lossChart?.resetZoom?.());
     document.getElementById("expandBtn").addEventListener("click", openFullscreen);
     document.getElementById("fullCloseBtn").addEventListener("click", closeFullscreen);
     document.getElementById("fullResetZoomBtn").addEventListener("click", () => fullChart?.resetZoom?.());
@@ -124,6 +127,8 @@ async function boot() {
       }
     });
     renderHeader();
+    lossLog = await loadLossLog();
+    renderLossChart();
     renderLayerTabs();
     renderArchitecture();
   } catch (err) {
@@ -138,6 +143,101 @@ async function fetchJson(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url} (${res.status})`);
   return res.json();
+}
+
+async function fetchText(url) {
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  return res.text();
+}
+
+function parseLossCsv(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return null;
+
+  const headers = lines[0].split(",").map((h) => h.trim());
+  const col = (name) => headers.indexOf(name);
+  const iterIdx = col("iter");
+  const trainIdx = col("train_loss");
+  const valIdx = col("val_loss");
+  if (iterIdx < 0 || trainIdx < 0 || valIdx < 0) return null;
+
+  const train = [];
+  const val = [];
+  for (let i = 1; i < lines.length; i += 1) {
+    const cols = lines[i].split(",");
+    const x = Number(cols[iterIdx]);
+    const yt = Number(cols[trainIdx]);
+    const yv = Number(cols[valIdx]);
+    if (Number.isFinite(x) && Number.isFinite(yt)) train.push({ x, y: yt });
+    if (Number.isFinite(x) && Number.isFinite(yv)) val.push({ x, y: yv });
+  }
+  if (!train.length && !val.length) return null;
+  return { train, val };
+}
+
+async function loadLossLog() {
+  const text = await fetchText(`data/${runId}/eval_loss_log.csv`);
+  if (!text) return null;
+  return parseLossCsv(text);
+}
+
+function destroyLossChart() {
+  if (lossChart) {
+    lossChart.destroy();
+    lossChart = null;
+  }
+}
+
+function renderLossChart() {
+  const section = document.getElementById("lossSection");
+  const infoEl = document.getElementById("lossInfo");
+  const canvas = document.getElementById("lossChart");
+  destroyLossChart();
+
+  if (!lossLog) {
+    section.hidden = true;
+    return;
+  }
+
+  section.hidden = false;
+  const lastTrain = lossLog.train.at(-1);
+  const lastVal = lossLog.val.at(-1);
+  const maxStep = Math.max(lastTrain?.x ?? 0, lastVal?.x ?? 0);
+  infoEl.textContent =
+    `${lossLog.train.length} train · ${lossLog.val.length} val points · step 0–${maxStep}` +
+    (lastTrain ? ` · train=${lastTrain.y.toFixed(4)}` : "") +
+    (lastVal ? ` · val=${lastVal.y.toFixed(4)}` : "");
+
+  lossChart = new Chart(canvas, {
+    type: "line",
+    data: {
+      datasets: [
+        {
+          label: "Train loss",
+          data: lossLog.train,
+          borderColor: "#2563eb",
+          backgroundColor: "rgba(37, 99, 235, 0.12)",
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.2,
+          fill: false,
+        },
+        {
+          label: "Val loss",
+          data: lossLog.val,
+          borderColor: "#dc2626",
+          backgroundColor: "rgba(220, 38, 38, 0.12)",
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.2,
+          fill: false,
+        },
+      ],
+    },
+    options: chartCommonOptions({ legend: true }),
+  });
+  canvas.ondblclick = () => lossChart?.resetZoom?.();
 }
 
 function groupSpecsByModule(specs) {

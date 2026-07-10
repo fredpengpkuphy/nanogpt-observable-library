@@ -133,6 +133,52 @@ button {
   padding: 1rem 1.25rem 1.5rem;
 }
 
+.loss-section {
+  border-bottom: 1px solid var(--border);
+  padding: 0.85rem 1rem 0.75rem;
+}
+
+.loss-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+}
+
+.loss-section-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.loss-section-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.loss-section-info {
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.loss-chart-wrap {
+  position: relative;
+  height: 220px;
+}
+
+.loss-chart-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.loss-section .chart-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.68rem;
+}
+
 .flow {
   display: flex;
   flex-direction: column;
