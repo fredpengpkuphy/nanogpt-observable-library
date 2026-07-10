@@ -140,13 +140,15 @@ async function boot() {
 }
 
 async function fetchJson(url) {
-  const res = await fetch(url);
+  const sep = url.includes("?") ? "&" : "?";
+  const res = await fetch(`${url}${sep}t=${Date.now()}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`${url} (${res.status})`);
   return res.json();
 }
 
 async function fetchText(url) {
-  const res = await fetch(url);
+  const sep = url.includes("?") ? "&" : "?";
+  const res = await fetch(`${url}${sep}t=${Date.now()}`, { cache: "no-store" });
   if (!res.ok) return null;
   return res.text();
 }
@@ -197,6 +199,7 @@ function renderLossChart() {
 
   if (!lossLog) {
     section.hidden = true;
+    infoEl.textContent = "未找到 eval_loss_log.csv（请确认已 git add 并 push 该文件）";
     return;
   }
 
