@@ -54,7 +54,7 @@ function updateNotesHint() {
   if (!fullOverlayOpen) return;
   const n = notesForCurrentChart().length;
   const base =
-    "单击某 step 留言 · 滚轮缩放 · 拖拽平移 · 双击重置视图 · Esc 关闭";
+    "单击曲线留言 · 滚轮缩放 · Alt+拖拽平移 · 双击重置 · Esc 关闭";
   hint.textContent = n
     ? `${base} · 本曲线 ${n} 条公开留言`
     : base;
@@ -176,41 +176,48 @@ function cancelPendingNoteClick() {
 function detachFullscreenNoteHandlers(chart) {
   cancelPendingNoteClick();
   const canvas = chart?.canvas || noteClickBoundCanvas;
-  if (canvas) {
-    canvas.onclick = null;
-    canvas.style.cursor = "";
-  }
+  if (canvas) canvas.style.cursor = "";
   noteClickBoundCanvas = null;
+}
+
+/**
+ * Chart.js onClick path (preferred over canvas.onclick — survives hammer/zoom pan).
+ * evt is a ChartEvent; native MouseEvent is on evt.native.
+ */
+function handleFullscreenChartClick(evt, chart) {
+  if (!fullOverlayOpen || !chartIsAlive(chart)) return;
+  if (typeof isNoteModalOpen === "function" && isNoteModalOpen()) return;
+  const native = evt?.native || evt;
+  if (!native) return;
+  // Double-click: detail >= 2 — cancel note; canvas.ondblclick resets zoom.
+  if (native.detail > 1) {
+    cancelPendingNoteClick();
+    return;
+  }
+  let pixelX = null;
+  if (typeof evt?.x === "number" && Number.isFinite(evt.x)) {
+    pixelX = evt.x;
+  } else if (native.clientX != null && chart.canvas) {
+    const rect = chart.canvas.getBoundingClientRect();
+    pixelX = native.clientX - rect.left;
+  }
+  if (pixelX == null) return;
+  const step = nearestStep(chart, pixelX);
+  if (step == null) return;
+  cancelPendingNoteClick();
+  noteClickTimer = setTimeout(() => {
+    noteClickTimer = null;
+    if (!fullOverlayOpen || !chartIsAlive(fullChart)) return;
+    if (typeof isNoteModalOpen === "function" && isNoteModalOpen()) return;
+    openNoteModal(step);
+  }, 280);
 }
 
 function attachFullscreenNoteHandlers(chart) {
   if (!chartIsAlive(chart)) return;
   applyNoteAnnotations(chart);
-  const canvas = chart.canvas;
-  // Replacing onclick avoids stacking handlers across re-renders.
-  noteClickBoundCanvas = canvas;
-  canvas.style.cursor = "crosshair";
-  canvas.onclick = (evt) => {
-    if (!fullOverlayOpen || !chartIsAlive(chart)) return;
-    if (typeof isNoteModalOpen === "function" && isNoteModalOpen()) return;
-    // Double-click: detail becomes 2 — cancel pending note open; dblclick resets view.
-    if (evt.detail > 1) {
-      cancelPendingNoteClick();
-      return;
-    }
-    const rect = canvas.getBoundingClientRect();
-    const x = evt.clientX - rect.left;
-    const step = nearestStep(chart, x);
-    if (step == null) return;
-    cancelPendingNoteClick();
-    // Wait so a real double-click does not open the note modal.
-    noteClickTimer = setTimeout(() => {
-      noteClickTimer = null;
-      if (!fullOverlayOpen || !chartIsAlive(fullChart)) return;
-      if (typeof isNoteModalOpen === "function" && isNoteModalOpen()) return;
-      openNoteModal(step);
-    }, 280);
-  };
+  noteClickBoundCanvas = chart.canvas;
+  chart.canvas.style.cursor = "crosshair";
 }
 
 function openNoteModal(step, { viewOnly = false } = {}) {

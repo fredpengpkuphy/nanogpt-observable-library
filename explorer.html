@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=17">
+  <link rel="stylesheet" href="css/style.css?v=18">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
@@ -69,7 +69,7 @@
         <div class="loss-chart-wrap">
           <canvas id="lossChart"></canvas>
         </div>
-        <p class="chart-hint">train / val · 指定 step 范围 · 滚轮缩放 · 拖拽平移 · 双击重置</p>
+        <p class="chart-hint">train / val · 指定 step 范围 · 滚轮缩放 · Alt+拖拽平移 · 双击重置</p>
       </div>
       <div class="layer-tabs" id="layerTabs"></div>
       <div class="architecture" id="architecture"></div>
@@ -139,7 +139,7 @@
             <canvas id="curveChart"></canvas>
             <img id="curveImage" alt="Observable curve" hidden>
           </div>
-          <p class="chart-hint" id="chartHint">滚轮缩放 · 按住拖拽平移 · 双击重置</p>
+          <p class="chart-hint" id="chartHint">滚轮缩放 · Alt+拖拽平移 · 双击重置</p>
         </div>
       </div>
     </section>
@@ -180,7 +180,7 @@
           <p class="notes-rail-empty">Loading notes…</p>
         </aside>
       </div>
-      <p class="chart-hint" id="fullChartHint">Click any step to leave a public note · scroll zoom · drag pan · double-click reset · Esc close</p>
+      <p class="chart-hint" id="fullChartHint">单击曲线留言 · 滚轮缩放 · Alt+拖拽平移 · 双击重置 · Esc 关闭</p>
     </div>
   </div>
 
@@ -215,8 +215,8 @@
 
   <script src="js/notes-config.js?v=1"></script>
   <script src="js/notes-store.js?v=2"></script>
-  <script src="js/notes-ui.js?v=3"></script>
+  <script src="js/notes-ui.js?v=4"></script>
   <script src="js/observable_defs.js?v=4"></script>
-  <script src="js/app.js?v=18"></script>
+  <script src="js/app.js?v=19"></script>
 </body>
 </html>

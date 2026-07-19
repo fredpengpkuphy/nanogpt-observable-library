@@ -784,14 +784,15 @@ function zoomPluginOptions() {
       pinch: { enabled: true },
       mode: "xy",
       drag: { enabled: false },
-      // We handle double-click ourselves via safe chart re-render.
-      // Leaving plugin double-click on can fight note-clicks / corrupt scales.
     },
     pan: {
       enabled: true,
       mode: "xy",
-      modifierKey: null,
+      // Require Alt to pan so normal clicks open the note modal.
+      modifierKey: "alt",
+      threshold: 10,
     },
+    // Disable plugin double-click reset — it can blank scales; we reset ourselves.
     limits: {
       x: { min: "original", max: "original", minRange: 1 },
       y: { min: "original", max: "original", minRange: 1e-12 },
@@ -799,8 +800,8 @@ function zoomPluginOptions() {
   };
 }
 
-function chartCommonOptions({ legend = false } = {}) {
-  return {
+function chartCommonOptions({ legend = false, onClick = null } = {}) {
+  const opts = {
     responsive: true,
     maintainAspectRatio: false,
     interaction: { mode: "nearest", intersect: false },
@@ -821,6 +822,38 @@ function chartCommonOptions({ legend = false } = {}) {
     },
     scales: chartScaleOptions(),
   };
+  if (typeof onClick === "function") opts.onClick = onClick;
+  return opts;
+}
+
+/** Restore axis range from data without destroying the Chart instance. */
+function fitChartScalesToData(chart) {
+  if (!chart?.data?.datasets?.length) return false;
+  const xs = [];
+  const ys = [];
+  for (const ds of chart.data.datasets) {
+    for (const p of ds.data || []) {
+      if (p && Number.isFinite(p.x)) xs.push(p.x);
+      if (p && Number.isFinite(p.y)) ys.push(p.y);
+    }
+  }
+  if (!xs.length || !ys.length) return false;
+  const xMin = Math.min(...xs);
+  const xMax = Math.max(...xs);
+  const yMin = Math.min(...ys);
+  const yMax = Math.max(...ys);
+  const yPad = (yMax - yMin) * 0.06 || Math.max(Math.abs(yMax) * 0.05, 1e-6);
+  const xPad = (xMax - xMin) * 0.01 || 1;
+  chart.options.scales.x.min = xMin - xPad;
+  chart.options.scales.x.max = xMax + xPad;
+  chart.options.scales.y.min = yMin - yPad;
+  chart.options.scales.y.max = yMax + yPad;
+  try {
+    chart.update("none");
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 function attachDoubleClickReset(canvas) {
@@ -849,20 +882,30 @@ function isNoteModalOpen() {
   return !!(modal && !modal.hidden);
 }
 
-/** Rebuild the fullscreen chart from source data (safe zoom reset). */
-function rerenderFullscreenChart() {
-  if (!fullOverlayOpen) return;
-  if (fullOverlayMode === "loss") {
-    renderFullLossChart();
-    return;
-  }
-  const spec = activeSpec();
-  if (spec) renderFullChart(spec);
-}
-
+/** Safe zoom reset: fit scales in-place. Avoid destroy/recreate (can blank the canvas). */
 function safeResetFullChartZoom() {
   if (isNoteModalOpen()) return;
-  rerenderFullscreenChart();
+  if (!fullChart) {
+    if (fullOverlayMode === "loss") renderFullLossChart();
+    else {
+      const spec = activeSpec();
+      if (spec) renderFullChart(spec);
+    }
+    return;
+  }
+  try {
+    fullChart.resetZoom?.();
+  } catch (_) {
+    /* ignore */
+  }
+  if (!fitChartScalesToData(fullChart)) {
+    // Last resort: rebuild once
+    if (fullOverlayMode === "loss") renderFullLossChart();
+    else {
+      const spec = activeSpec();
+      if (spec) renderFullChart(spec);
+    }
+  }
 }
 
 function setChartChrome(hasSeriesChart) {
@@ -1388,7 +1431,14 @@ function destroyFullChart() {
   fullChart = null;
 }
 
+function fullscreenNoteClickHandler(evt, _elements, chartInstance) {
+  if (typeof handleFullscreenChartClick === "function") {
+    handleFullscreenChartClick(evt, chartInstance || fullChart);
+  }
+}
+
 function bindFullscreenCanvasInteractions(canvas) {
+  // Double-click only resets zoom in-place (never destroys the chart).
   canvas.ondblclick = (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
@@ -1412,8 +1462,15 @@ function renderFullLossChart() {
     return;
   }
   destroyFullChart();
-  fullChart = createLossChart(canvas);
-  if (fullChart) bindFullscreenCanvasInteractions(canvas);
+  fullChart = new Chart(canvas, {
+    type: "line",
+    data: { datasets },
+    options: chartCommonOptions({
+      legend: true,
+      onClick: fullscreenNoteClickHandler,
+    }),
+  });
+  bindFullscreenCanvasInteractions(canvas);
 }
 
 function renderFullChart(spec) {
@@ -1431,10 +1488,18 @@ function renderFullChart(spec) {
     return;
   }
   destroyFullChart();
+  // Clear Chart.js-mutated canvas attrs that can leave a blank surface after destroy.
+  canvas.removeAttribute("width");
+  canvas.removeAttribute("height");
+  canvas.style.width = "";
+  canvas.style.height = "";
   fullChart = new Chart(canvas, {
     type: "line",
     data: { datasets: lineData.datasets },
-    options: chartCommonOptions({ legend: lineData.legend }),
+    options: chartCommonOptions({
+      legend: lineData.legend,
+      onClick: fullscreenNoteClickHandler,
+    }),
   });
   bindFullscreenCanvasInteractions(canvas);
 }

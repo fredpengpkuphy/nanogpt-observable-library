@@ -157,9 +157,9 @@ h1, h2, h3,
 }
 
 .layer-tab {
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
   border-radius: 8px;
   padding: 0.32rem 0.6rem;
   font-size: 0.8rem;
@@ -176,7 +176,23 @@ h1, h2, h3,
 
 .architecture {
   padding: 1rem 1.25rem 1.5rem;
+  color: #ffffff;
 }
+
+.architecture .flow-label,
+.architecture .block-section-label,
+.architecture .module-node,
+.architecture .module-node .title,
+.architecture .module-node .subtitle,
+.architecture .module-node .count,
+.architecture .residual {
+  color: #ffffff;
+}
+
+.architecture .module-node .subtitle {
+  color: rgba(255, 255, 255, 0.82);
+}
+
 
 .loss-section {
   border-bottom: 1px solid var(--border);
@@ -288,7 +304,7 @@ h1, h2, h3,
   font-size: 0.74rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.7);
+  color: #ffffff;
   font-weight: 700;
 }
 
@@ -329,9 +345,16 @@ h1, h2, h3,
 }
 
 .module-node.disabled {
-  opacity: 0.4;
+  opacity: 1;
   cursor: not-allowed;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.72);
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.module-node.disabled .title,
+.module-node.disabled .subtitle {
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .module-node .title {
@@ -385,7 +408,7 @@ h1, h2, h3,
   text-align: center;
   font-size: 0.74rem;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.75);
+  color: #ffffff;
   margin-bottom: 0.15rem;
   font-family: var(--font-ui);
 }
@@ -1311,11 +1334,16 @@ h1, h2, h3,
 .note-modal {
   position: fixed;
   inset: 0;
-  z-index: 60;
-  display: grid;
+  /* Must sit above .chart-overlay (z-index: 100), otherwise the form is invisible. */
+  z-index: 200;
+  display: none;
   place-items: center;
   padding: 1rem;
-  background: rgba(8, 12, 16, 0.72);
+  background: rgba(8, 12, 16, 0.78);
+}
+
+.note-modal.visible {
+  display: grid;
 }
 
 .note-modal[hidden] {
@@ -1326,11 +1354,18 @@ h1, h2, h3,
   width: min(480px, 100%);
   max-height: min(86vh, 720px);
   overflow: auto;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
+  background: #152028;
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 14px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
   padding: 1rem 1.1rem 1.15rem;
+  color: #ffffff;
+}
+
+.note-dialog-head h3,
+.note-dialog-step,
+.note-modal-form label {
+  color: #ffffff;
 }
 
 .note-dialog-head {
