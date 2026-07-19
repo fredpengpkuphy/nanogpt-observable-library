@@ -1335,7 +1335,7 @@ h1, h2, h3,
   position: fixed;
   inset: 0;
   /* Must sit above .chart-overlay (z-index: 100), otherwise the form is invisible. */
-  z-index: 200;
+  z-index: 9999;
   display: none;
   place-items: center;
   padding: 1rem;
@@ -1343,11 +1343,17 @@ h1, h2, h3,
 }
 
 .note-modal.visible {
-  display: grid;
+  display: grid !important;
 }
 
 .note-modal[hidden] {
   display: none !important;
+}
+
+#fullAddNoteBtn {
+  border-color: rgba(232, 200, 136, 0.55);
+  background: rgba(232, 200, 136, 0.16);
+  color: #ffffff;
 }
 
 .note-dialog {

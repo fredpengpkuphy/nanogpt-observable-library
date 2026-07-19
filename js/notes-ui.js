@@ -54,7 +54,7 @@ function updateNotesHint() {
   if (!fullOverlayOpen) return;
   const n = notesForCurrentChart().length;
   const base =
-    "单击曲线留言 · 滚轮缩放 · Alt+拖拽平移 · 双击重置 · Esc 关闭";
+    "单击曲线留言 · 或点「留言」· 滚轮缩放 · 双击重置 · Esc 关闭";
   hint.textContent = n
     ? `${base} · 本曲线 ${n} 条公开留言`
     : base;
@@ -173,37 +173,20 @@ function cancelPendingNoteClick() {
   }
 }
 
-function detachFullscreenNoteHandlers(chart) {
-  cancelPendingNoteClick();
-  const canvas = chart?.canvas || noteClickBoundCanvas;
-  if (canvas) canvas.style.cursor = "";
-  noteClickBoundCanvas = null;
+let notePointerDown = null;
+let noteCanvasClickBound = null;
+
+function canvasCssPixelX(chart, clientX) {
+  const canvas = chart?.canvas;
+  if (!canvas) return null;
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width) return null;
+  // Match Chart.js getRelativePosition: CSS pixels in chart coordinate space.
+  return ((clientX - rect.left) / rect.width) * chart.width;
 }
 
-/**
- * Chart.js onClick path (preferred over canvas.onclick — survives hammer/zoom pan).
- * evt is a ChartEvent; native MouseEvent is on evt.native.
- */
-function handleFullscreenChartClick(evt, chart) {
-  if (!fullOverlayOpen || !chartIsAlive(chart)) return;
-  if (typeof isNoteModalOpen === "function" && isNoteModalOpen()) return;
-  const native = evt?.native || evt;
-  if (!native) return;
-  // Double-click: detail >= 2 — cancel note; canvas.ondblclick resets zoom.
-  if (native.detail > 1) {
-    cancelPendingNoteClick();
-    return;
-  }
-  let pixelX = null;
-  if (typeof evt?.x === "number" && Number.isFinite(evt.x)) {
-    pixelX = evt.x;
-  } else if (native.clientX != null && chart.canvas) {
-    const rect = chart.canvas.getBoundingClientRect();
-    pixelX = native.clientX - rect.left;
-  }
-  if (pixelX == null) return;
-  const step = nearestStep(chart, pixelX);
-  if (step == null) return;
+function scheduleOpenNoteAtStep(step) {
+  if (step == null || !Number.isFinite(step)) return;
   cancelPendingNoteClick();
   noteClickTimer = setTimeout(() => {
     noteClickTimer = null;
@@ -213,34 +196,131 @@ function handleFullscreenChartClick(evt, chart) {
   }, 280);
 }
 
+function onFullscreenCanvasPointerDown(evt) {
+  if (evt.button != null && evt.button !== 0) return;
+  notePointerDown = { x: evt.clientX, y: evt.clientY, t: Date.now() };
+}
+
+/**
+ * Native canvas click — does NOT use Chart.js onClick.
+ * Chart.js only invokes onClick when the pointer is inside chartArea, and
+ * zoom/Hammer can swallow clicks; both made the note modal appear "broken".
+ */
+function onFullscreenCanvasClick(evt) {
+  if (!fullOverlayOpen || !chartIsAlive(fullChart)) return;
+  if (typeof isNoteModalOpen === "function" && isNoteModalOpen()) return;
+  if (evt.detail > 1) {
+    cancelPendingNoteClick();
+    return;
+  }
+  if (notePointerDown) {
+    const dx = evt.clientX - notePointerDown.x;
+    const dy = evt.clientY - notePointerDown.y;
+    if (Math.hypot(dx, dy) > 10) {
+      notePointerDown = null;
+      return;
+    }
+  }
+  notePointerDown = null;
+  const pixelX = canvasCssPixelX(fullChart, evt.clientX);
+  if (pixelX == null) return;
+  const step = nearestStep(fullChart, pixelX);
+  if (step == null) return;
+  scheduleOpenNoteAtStep(step);
+}
+
+/** Open note at midpoint step (toolbar fallback when click path fails). */
+function openNoteModalAtChartCenter() {
+  if (!chartIsAlive(fullChart)) return;
+  const steps = collectChartSteps(fullChart);
+  let step;
+  if (steps.length) {
+    step = steps[Math.floor(steps.length / 2)];
+  } else {
+    const xScale = fullChart.scales?.x;
+    step = xScale ? Math.round((xScale.min + xScale.max) / 2) : 0;
+  }
+  openNoteModal(step);
+}
+
+function detachFullscreenNoteHandlers(chart) {
+  cancelPendingNoteClick();
+  notePointerDown = null;
+  const canvas = noteCanvasClickBound || chart?.canvas || noteClickBoundCanvas;
+  if (canvas && noteCanvasClickBound) {
+    canvas.removeEventListener("pointerdown", onFullscreenCanvasPointerDown);
+    canvas.removeEventListener("click", onFullscreenCanvasClick);
+    canvas.style.cursor = "";
+  }
+  noteCanvasClickBound = null;
+  noteClickBoundCanvas = null;
+}
+
+/** Kept for app.js Chart onClick wiring (secondary path). */
+function handleFullscreenChartClick(evt, chart) {
+  if (!fullOverlayOpen || !chartIsAlive(chart)) return;
+  if (typeof isNoteModalOpen === "function" && isNoteModalOpen()) return;
+  const native = evt?.native || evt;
+  if (native?.detail > 1) {
+    cancelPendingNoteClick();
+    return;
+  }
+  let pixelX = null;
+  if (typeof evt?.x === "number" && Number.isFinite(evt.x)) {
+    pixelX = evt.x;
+  } else if (native?.clientX != null) {
+    pixelX = canvasCssPixelX(chart, native.clientX);
+  }
+  if (pixelX == null) return;
+  const step = nearestStep(chart, pixelX);
+  scheduleOpenNoteAtStep(step);
+}
+
 function attachFullscreenNoteHandlers(chart) {
   if (!chartIsAlive(chart)) return;
   applyNoteAnnotations(chart);
-  noteClickBoundCanvas = chart.canvas;
-  chart.canvas.style.cursor = "crosshair";
+  const canvas = chart.canvas;
+  // Re-bind cleanly across re-renders.
+  if (noteCanvasClickBound && noteCanvasClickBound !== canvas) {
+    noteCanvasClickBound.removeEventListener("pointerdown", onFullscreenCanvasPointerDown);
+    noteCanvasClickBound.removeEventListener("click", onFullscreenCanvasClick);
+  }
+  canvas.removeEventListener("pointerdown", onFullscreenCanvasPointerDown);
+  canvas.removeEventListener("click", onFullscreenCanvasClick);
+  canvas.addEventListener("pointerdown", onFullscreenCanvasPointerDown);
+  canvas.addEventListener("click", onFullscreenCanvasClick);
+  noteCanvasClickBound = canvas;
+  noteClickBoundCanvas = canvas;
+  canvas.style.cursor = "crosshair";
 }
 
 function openNoteModal(step, { viewOnly = false } = {}) {
   pendingNoteStep = step;
   const modal = document.getElementById("noteModal");
+  if (!modal) {
+    console.error("noteModal element missing");
+    return;
+  }
   const stepEl = document.getElementById("noteModalStep");
   const listEl = document.getElementById("noteModalExisting");
   const form = document.getElementById("noteModalForm");
   const status = document.getElementById("noteModalStatus");
-  if (!modal) return;
 
-  stepEl.textContent = `step ${step}`;
-  status.textContent = "";
-  status.hidden = true;
+  if (stepEl) stepEl.textContent = `step ${step}`;
+  if (status) {
+    status.textContent = "";
+    status.hidden = true;
+  }
 
   const existing = notesForCurrentChart().filter((n) => n.step === step);
-  if (existing.length) {
-    listEl.hidden = false;
-    listEl.innerHTML =
-      `<h4>Public notes at this step</h4>` +
-      existing
-        .map(
-          (n) => `
+  if (listEl) {
+    if (existing.length) {
+      listEl.hidden = false;
+      listEl.innerHTML =
+        `<h4>Public notes at this step</h4>` +
+        existing
+          .map(
+            (n) => `
         <article class="note-card">
           <header>
             <span class="note-author">${escapeHtml(n.author)}</span>
@@ -248,27 +328,32 @@ function openNoteModal(step, { viewOnly = false } = {}) {
           </header>
           <p>${escapeHtml(n.text)}</p>
         </article>`
-        )
-        .join("");
-  } else {
-    listEl.hidden = true;
-    listEl.innerHTML = "";
+          )
+          .join("");
+    } else {
+      listEl.hidden = true;
+      listEl.innerHTML = "";
+    }
   }
 
-  form.hidden = viewOnly;
-  document.getElementById("noteAuthor").value =
-    localStorage.getItem("noteAuthor") || "";
-  document.getElementById("noteText").value = "";
+  if (form) form.hidden = viewOnly;
+  const authorEl = document.getElementById("noteAuthor");
+  const textEl = document.getElementById("noteText");
+  if (authorEl) authorEl.value = localStorage.getItem("noteAuthor") || "";
+  if (textEl) textEl.value = "";
 
   const tokenHint = document.getElementById("noteTokenHint");
   if (tokenHint) {
     tokenHint.hidden = NotesStore.hasWriteToken();
   }
 
+  modal.removeAttribute("hidden");
   modal.hidden = false;
   modal.classList.add("visible");
   modal.setAttribute("aria-hidden", "false");
-  if (!viewOnly) document.getElementById("noteText")?.focus();
+  modal.style.display = "grid";
+  modal.style.zIndex = "9999";
+  if (!viewOnly) textEl?.focus();
 }
 
 function closeNoteModal() {
@@ -277,6 +362,8 @@ function closeNoteModal() {
   modal.classList.remove("visible");
   modal.setAttribute("aria-hidden", "true");
   modal.hidden = true;
+  modal.setAttribute("hidden", "");
+  modal.style.display = "";
   pendingNoteStep = null;
 }
 
@@ -335,6 +422,12 @@ function wireNotesUi() {
   document.getElementById("noteModalForm")?.addEventListener("submit", submitNote);
   document.getElementById("notesRefreshBtn")?.addEventListener("click", () => {
     refreshNotes();
+  });
+  document.getElementById("fullAddNoteBtn")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!fullOverlayOpen) return;
+    openNoteModalAtChartCenter();
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {

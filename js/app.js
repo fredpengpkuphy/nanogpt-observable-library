@@ -777,7 +777,7 @@ function chartScaleOptions() {
   };
 }
 
-function zoomPluginOptions() {
+function zoomPluginOptions({ enablePan = true } = {}) {
   return {
     zoom: {
       wheel: { enabled: true, speed: 0.1 },
@@ -786,13 +786,12 @@ function zoomPluginOptions() {
       drag: { enabled: false },
     },
     pan: {
-      enabled: true,
+      // Fullscreen charts disable pan so Hammer does not interfere with note clicks.
+      enabled: enablePan,
       mode: "xy",
-      // Require Alt to pan so normal clicks open the note modal.
-      modifierKey: "alt",
+      modifierKey: enablePan ? "alt" : null,
       threshold: 10,
     },
-    // Disable plugin double-click reset — it can blank scales; we reset ourselves.
     limits: {
       x: { min: "original", max: "original", minRange: 1 },
       y: { min: "original", max: "original", minRange: 1e-12 },
@@ -800,7 +799,7 @@ function zoomPluginOptions() {
   };
 }
 
-function chartCommonOptions({ legend = false, onClick = null } = {}) {
+function chartCommonOptions({ legend = false, onClick = null, enablePan = true } = {}) {
   const opts = {
     responsive: true,
     maintainAspectRatio: false,
@@ -818,7 +817,7 @@ function chartCommonOptions({ legend = false, onClick = null } = {}) {
           title: (items) => (items.length ? `step ${items[0].parsed.x}` : ""),
         },
       },
-      zoom: zoomPluginOptions(),
+      zoom: zoomPluginOptions({ enablePan }),
     },
     scales: chartScaleOptions(),
   };
@@ -1468,6 +1467,7 @@ function renderFullLossChart() {
     options: chartCommonOptions({
       legend: true,
       onClick: fullscreenNoteClickHandler,
+      enablePan: false,
     }),
   });
   bindFullscreenCanvasInteractions(canvas);
@@ -1499,6 +1499,7 @@ function renderFullChart(spec) {
     options: chartCommonOptions({
       legend: lineData.legend,
       onClick: fullscreenNoteClickHandler,
+      enablePan: false,
     }),
   });
   bindFullscreenCanvasInteractions(canvas);
