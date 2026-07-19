@@ -158,7 +158,9 @@ function wireEvents() {
   document.getElementById("resetZoomBtn").addEventListener("click", resetChartZoom);
   document.getElementById("expandBtn").addEventListener("click", openFullscreen);
   document.getElementById("fullCloseBtn").addEventListener("click", closeFullscreen);
-  document.getElementById("fullResetZoomBtn").addEventListener("click", () => fullChart?.resetZoom?.());
+  document.getElementById("fullResetZoomBtn").addEventListener("click", () => {
+    safeResetFullChartZoom();
+  });
   document.getElementById("chartOverlay").addEventListener("click", (e) => {
     if (e.target.id === "chartOverlay") closeFullscreen();
   });
@@ -191,7 +193,10 @@ function wireEvents() {
     }
   });
 
-  document.getElementById("lossResetZoomBtn")?.addEventListener("click", () => lossChart?.resetZoom?.());
+  document.getElementById("lossResetZoomBtn")?.addEventListener("click", () => {
+    renderLossChart();
+    if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
+  });
   document.getElementById("lossExpandBtn")?.addEventListener("click", openLossFullscreen);
   document.getElementById("compareLossRuns")?.addEventListener("change", async (e) => {
     await setCompareLossRuns(e.target.checked);
@@ -779,6 +784,8 @@ function zoomPluginOptions() {
       pinch: { enabled: true },
       mode: "xy",
       drag: { enabled: false },
+      // We handle double-click ourselves via safe chart re-render.
+      // Leaving plugin double-click on can fight note-clicks / corrupt scales.
     },
     pan: {
       enabled: true,
@@ -786,8 +793,8 @@ function zoomPluginOptions() {
       modifierKey: null,
     },
     limits: {
-      x: { min: "original", max: "original" },
-      y: { min: "original", max: "original" },
+      x: { min: "original", max: "original", minRange: 1 },
+      y: { min: "original", max: "original", minRange: 1e-12 },
     },
   };
 }
@@ -817,11 +824,45 @@ function chartCommonOptions({ legend = false } = {}) {
 }
 
 function attachDoubleClickReset(canvas) {
-  canvas.ondblclick = () => resetChartZoom();
+  canvas.ondblclick = (evt) => {
+    evt.preventDefault();
+    resetChartZoom();
+  };
 }
 
+/** Prefer rebuilding from data — resetZoom can leave linear scales in a dead state. */
 function resetChartZoom() {
-  if (chart?.resetZoom) chart.resetZoom();
+  const spec = activeSpec();
+  if (spec) {
+    renderChart(spec);
+    return;
+  }
+  try {
+    chart?.resetZoom?.();
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+function isNoteModalOpen() {
+  const modal = document.getElementById("noteModal");
+  return !!(modal && !modal.hidden);
+}
+
+/** Rebuild the fullscreen chart from source data (safe zoom reset). */
+function rerenderFullscreenChart() {
+  if (!fullOverlayOpen) return;
+  if (fullOverlayMode === "loss") {
+    renderFullLossChart();
+    return;
+  }
+  const spec = activeSpec();
+  if (spec) renderFullChart(spec);
+}
+
+function safeResetFullChartZoom() {
+  if (isNoteModalOpen()) return;
+  rerenderFullscreenChart();
 }
 
 function setChartChrome(hasSeriesChart) {
@@ -1326,36 +1367,59 @@ function renderLossChart() {
   section.hidden = false;
   infoEl.textContent = lossInfoText();
   lossChart = createLossChart(canvas);
-  if (lossChart) canvas.ondblclick = () => lossChart?.resetZoom?.();
+  if (lossChart) {
+    canvas.ondblclick = (evt) => {
+      evt.preventDefault();
+      renderLossChart();
+    };
+  }
+}
+
+function destroyFullChart() {
+  if (!fullChart) return;
+  try {
+    if (typeof detachFullscreenNoteHandlers === "function") {
+      detachFullscreenNoteHandlers(fullChart);
+    }
+    fullChart.destroy();
+  } catch (_) {
+    /* ignore */
+  }
+  fullChart = null;
+}
+
+function bindFullscreenCanvasInteractions(canvas) {
+  canvas.ondblclick = (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    if (typeof cancelPendingNoteClick === "function") cancelPendingNoteClick();
+    safeResetFullChartZoom();
+  };
+  if (typeof attachFullscreenNoteHandlers === "function") {
+    attachFullscreenNoteHandlers(fullChart);
+  }
 }
 
 function renderFullLossChart() {
   const canvas = document.getElementById("curveChartFull");
   const titleEl = document.getElementById("fullChartTitle");
   const infoEl = document.getElementById("fullChartInfo");
-  if (fullChart) {
-    fullChart.destroy();
-    fullChart = null;
-  }
+  const datasets = buildLossDatasets();
   titleEl.textContent = "Training Loss";
   infoEl.textContent = lossInfoText();
-  fullChart = createLossChart(canvas);
-  if (fullChart) {
-    canvas.ondblclick = () => fullChart?.resetZoom?.();
-    if (typeof attachFullscreenNoteHandlers === "function") {
-      attachFullscreenNoteHandlers(fullChart);
-    }
+  if (!datasets) {
+    infoEl.textContent = "No loss data to display.";
+    return;
   }
+  destroyFullChart();
+  fullChart = createLossChart(canvas);
+  if (fullChart) bindFullscreenCanvasInteractions(canvas);
 }
 
 function renderFullChart(spec) {
   const canvas = document.getElementById("curveChartFull");
   const titleEl = document.getElementById("fullChartTitle");
   const infoEl = document.getElementById("fullChartInfo");
-  if (fullChart) {
-    fullChart.destroy();
-    fullChart = null;
-  }
   const lineData = buildLineDatasets(spec);
   titleEl.textContent = chartTitleFor(spec);
   infoEl.textContent = chartInfoFor(spec, lineData);
@@ -1363,17 +1427,16 @@ function renderFullChart(spec) {
     infoEl.textContent = lineData?.empty
       ? (lineData.emptyMessage || "请在上方勾选要对比的层")
       : "No curve data yet.";
+    // Do not destroy an existing healthy chart when a transient empty state appears.
     return;
   }
+  destroyFullChart();
   fullChart = new Chart(canvas, {
     type: "line",
     data: { datasets: lineData.datasets },
     options: chartCommonOptions({ legend: lineData.legend }),
   });
-  canvas.ondblclick = () => fullChart?.resetZoom?.();
-  if (typeof attachFullscreenNoteHandlers === "function") {
-    attachFullscreenNoteHandlers(fullChart);
-  }
+  bindFullscreenCanvasInteractions(canvas);
 }
 
 function openLossFullscreen() {
@@ -1404,6 +1467,7 @@ function openFullscreen() {
 }
 
 function closeFullscreen() {
+  if (typeof cancelPendingNoteClick === "function") cancelPendingNoteClick();
   if (typeof closeNoteModal === "function") closeNoteModal();
   fullOverlayOpen = false;
   fullOverlayMode = null;
@@ -1412,10 +1476,7 @@ function closeFullscreen() {
   overlay.classList.remove("visible");
   overlay.setAttribute("aria-hidden", "true");
   overlay.hidden = true;
-  if (fullChart) {
-    fullChart.destroy();
-    fullChart = null;
-  }
+  destroyFullChart();
 }
 
 function destroyChart() {
