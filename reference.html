@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Observable Reference — nanoGPT Explorer</title>
+  <title>Observable Formulas — nanoGPT Explorer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=5">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=15">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 </head>
 <body class="ref-page">
   <header class="app-header">
     <div>
-      <h1>Observable Reference</h1>
-      <p>观测量定义参考 · 对应 <code>observable_lib.py</code></p>
+      <h1>Observable Formulas</h1>
+      <p id="refSubtitle">1821 条观测量 · 每条一个直接公式</p>
     </div>
     <div class="header-actions">
       <a class="header-link" href="index.html">← Home</a>
@@ -23,198 +23,42 @@
   </header>
 
   <main class="ref-shell">
-    <section class="ref-intro panel">
-      <h2>Pipeline</h2>
-      <p>每条观测量按以下流水线计算（与 <code>ObservableEngine._run_spec</code> 一致）：</p>
-      <div class="ref-formula-block">
-        $$\text{obs}_t = \mathcal{T}^{(k)} \circ \cdots \circ \mathcal{T}^{(1)} \circ \mathcal{R}\!\left(x_t\right)$$
+    <section class="panel ref-toolbar">
+      <div class="ref-toolbar-row">
+        <label class="ref-search">
+          <span class="ref-search-label">搜索</span>
+          <input type="search" id="refSearch" placeholder="selector / reduction / module / id…" autocomplete="off" />
+        </label>
+        <label class="ref-filter">
+          <span>Source</span>
+          <select id="refSourceFilter">
+            <option value="">All</option>
+          </select>
+        </label>
+        <label class="ref-filter">
+          <span>Reduction</span>
+          <select id="refReductionFilter">
+            <option value="">All</option>
+          </select>
+        </label>
       </div>
-      <ul class="ref-list">
-        <li><strong>Source</strong>：从模型抓取 typed tensor $x_t$（weight / grad / activation 等）</li>
-        <li><strong>Transform</strong>：逐次作用于 tensor（可选，默认 <code>identity</code>）</li>
-        <li><strong>Reduction</strong>：tensor → 标量 $s_t$</li>
-        <li><strong>Temporal</strong>：对标量序列做时序算子（可选，如 EMA / delta）</li>
-      </ul>
-      <p class="ref-note">记号：$x$ 为当前 batch 上的张量；$\bar{x}$ 表示均值；$\|x\|_p$ 为 $p$-范数；$\mathrm{RMS}(x)=\sqrt{\mathbb{E}[x^2]}$。</p>
-    </section>
-
-    <nav class="ref-toc panel">
-      <h2>目录</h2>
-      <div class="ref-toc-grid">
-        <a href="#sources">Tensor Sources</a>
-        <a href="#transforms">Transforms</a>
-        <a href="#reductions-basic">Reductions · 基础</a>
-        <a href="#reductions-matrix">Reductions · 矩阵</a>
-        <a href="#reductions-attention">Reductions · Attention</a>
-        <a href="#reductions-activation">Reductions · Activation</a>
-        <a href="#temporals">Temporal Operators</a>
-        <a href="#loss">Loss</a>
-      </div>
-    </nav>
-
-    <section class="ref-section panel" id="sources">
-      <h2>Tensor Sources</h2>
-      <p class="ref-section-desc">训练轨迹上的观测对象（<code>SourceRegistry.fetch</code>）。</p>
-      <div class="ref-grid">
-        <article class="ref-item"><h3><code>weight</code></h3><p>参数 $\theta_t$</p></article>
-        <article class="ref-item"><h3><code>grad</code></h3><p>梯度 $g_t = \nabla_\theta \mathcal{L}$</p></article>
-        <article class="ref-item"><h3><code>update</code></h3><p>参数更新量 $u_t = \theta_t - \theta_{t-1}$（相邻两次 update 观测步之间）</p></article>
-        <article class="ref-item"><h3><code>opt_m</code></h3><p>Adam 一阶矩 $\hat{m}_t$（<code>exp_avg</code>）</p></article>
-        <article class="ref-item"><h3><code>opt_v</code></h3><p>Adam 二阶矩 $\hat{v}_t$（<code>exp_avg_sq</code>）</p></article>
-        <article class="ref-item"><h3><code>activation</code></h3><p>Linear 输出激活 $a_t$，shape $(B,T,F)$ 或 $(B,F)$</p></article>
-        <article class="ref-item"><h3><code>preactivation</code></h3><p>Linear 输入（激活前）$\tilde{a}_t$</p></article>
-        <article class="ref-item"><h3><code>logits</code></h3><p>LM head 输出 $z_t$，shape $(B,T,C)$</p></article>
-        <article class="ref-item"><h3><code>attention</code></h3><p>Causal softmax 注意力 $A_t$，shape $(B,H,T,T)$</p></article>
-        <article class="ref-item"><h3><code>gelu_activation</code></h3><p>MLP GELU 后隐层，shape $(B,T,F)$</p></article>
+      <div class="ref-toolbar-meta">
+        <span id="refCount">—</span>
+        <div class="ref-pager">
+          <button type="button" class="chart-btn" id="refPrevPage">上一页</button>
+          <span id="refPageLabel">—</span>
+          <button type="button" class="chart-btn" id="refNextPage">下一页</button>
+        </div>
       </div>
     </section>
 
-    <section class="ref-section panel" id="transforms">
-      <h2>Transforms</h2>
-      <p class="ref-section-desc">$\mathcal{T}: \text{TypedTensor} \to \text{TypedTensor}$，按 spec 顺序依次应用。</p>
-      <div class="ref-grid">
-        <article class="ref-item">
-          <h3><code>identity</code></h3>
-          <div class="ref-formula">$$\mathcal{T}(x) = x$$</div>
-        </article>
-        <article class="ref-item">
-          <h3><code>center</code></h3>
-          <div class="ref-formula">$$\mathcal{T}(x) = x - \bar{x}_{\text{sample}} \quad \text{（沿 batch 维；无 batch 则整体去均值）}$$</div>
-        </article>
-        <article class="ref-item">
-          <h3><code>abs</code></h3>
-          <div class="ref-formula">$$\mathcal{T}(x) = |x|$$</div>
-        </article>
-        <article class="ref-item">
-          <h3><code>normalize</code></h3>
-          <div class="ref-formula">$$\mathcal{T}(x) = \dfrac{x}{\|x\|_2 + \varepsilon} \quad \text{（沿 feature 维；无 feature 则整体归一化）}$$</div>
-        </article>
-        <article class="ref-item">
-          <h3><code>square</code></h3>
-          <div class="ref-formula">$$\mathcal{T}(x) = x^2$$</div>
-        </article>
-      </div>
+    <section class="panel ref-catalog" id="refCatalog" aria-live="polite">
+      <p class="ref-loading" id="refLoading">Loading formulas…</p>
     </section>
-
-    <section class="ref-section panel" id="reductions-basic">
-      <h2>Reductions · 基础</h2>
-      <p class="ref-section-desc">$\mathcal{R}: \text{TypedTensor} \to \mathbb{R}$，对 tensor 所有元素或指定轴聚合。</p>
-      <div class="ref-grid">
-        <article class="ref-item"><h3><code>mean</code></h3><div class="ref-formula">$$\mathcal{R}(x) = \mathbb{E}[x]$$</div></article>
-        <article class="ref-item"><h3><code>std</code></h3><div class="ref-formula">$$\mathcal{R}(x) = \mathrm{Std}(x)$$</div></article>
-        <article class="ref-item"><h3><code>min</code></h3><div class="ref-formula">$$\mathcal{R}(x) = \min x$$</div></article>
-        <article class="ref-item"><h3><code>max</code></h3><div class="ref-formula">$$\mathcal{R}(x) = \max x$$</div></article>
-        <article class="ref-item"><h3><code>l1_norm</code></h3><div class="ref-formula">$$\mathcal{R}(x) = \|x\|_1 = \sum_i |x_i|$$</div></article>
-        <article class="ref-item"><h3><code>l2_norm</code></h3><div class="ref-formula">$$\mathcal{R}(x) = \|x\|_2 = \sqrt{\sum_i x_i^2}$$</div></article>
-        <article class="ref-item"><h3><code>rms</code></h3><div class="ref-formula">$$\mathcal{R}(x) = \mathrm{RMS}(x) = \sqrt{\mathbb{E}[x^2]}$$</div></article>
-        <article class="ref-item"><h3><code>max_abs</code></h3><div class="ref-formula">$$\mathcal{R}(x) = \max_i |x_i|$$</div></article>
-        <article class="ref-item"><h3><code>sparsity</code></h3><div class="ref-formula">$$\mathcal{R}(x) = \dfrac{1}{N}\sum_i \mathbf{1}[|x_i| < 10^{-6}]$$</div></article>
-        <article class="ref-item"><h3><code>positive_fraction</code></h3><div class="ref-formula">$$\mathcal{R}(x) = \dfrac{1}{N}\sum_i \mathbf{1}[x_i > 0]$$</div></article>
-        <article class="ref-item"><h3><code>entropy</code></h3><div class="ref-formula">$$p_i = \dfrac{|x_i|}{\sum_j |x_j|},\quad \mathcal{R}(x) = -\sum_i p_i \log p_i$$</div></article>
-      </div>
-    </section>
-
-    <section class="ref-section panel" id="reductions-matrix">
-      <h2>Reductions · 矩阵 / 谱</h2>
-      <p class="ref-section-desc">主要用于 2D 权重矩阵；非方阵或维度不符时返回 NaN。</p>
-      <div class="ref-grid">
-        <article class="ref-item"><h3><code>spectral_norm</code> / <code>top_singular_value</code></h3><div class="ref-formula">$$\mathcal{R}(W) = \sigma_{\max}(W)$$</div></article>
-        <article class="ref-item"><h3><code>trace</code></h3><div class="ref-formula">$$\mathcal{R}(W) = \mathrm{tr}(W) \quad \text{（要求方阵）}$$</div></article>
-        <article class="ref-item"><h3><code>row_std_mean</code></h3><div class="ref-formula">$$\mathcal{R}(W) = \dfrac{1}{r}\sum_{i=1}^{r} \mathrm{Std}(W_{i,:})$$</div></article>
-        <article class="ref-item"><h3><code>col_std_mean</code></h3><div class="ref-formula">$$\mathcal{R}(W) = \dfrac{1}{c}\sum_{j=1}^{c} \mathrm{Std}(W_{:,j})$$</div></article>
-        <article class="ref-item">
-          <h3><code>effective_rank</code></h3>
-          <div class="ref-formula">
-            $$X \in \mathbb{R}^{N \times F},\; \tilde{X} = X - \bar{X},\; \lambda_k = \sigma_k(\tilde{X})^2$$
-            $$p_k = \dfrac{\lambda_k}{\sum_j \lambda_j},\quad \mathcal{R} = \exp\!\left(-\sum_k p_k \log p_k\right)$$
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <section class="ref-section panel" id="reductions-attention">
-      <h2>Reductions · Attention</h2>
-      <p class="ref-section-desc">输入为 causal softmax 注意力 $A \in \mathbb{R}^{B \times H \times T \times T}$，$A_{b,h,q,k}$ 为 query $q$ 对 key $k$ 的质量。</p>
-      <div class="ref-grid">
-        <article class="ref-item">
-          <h3><code>attention_entropy_mean</code></h3>
-          <div class="ref-formula">
-            $$H_{b,h,q} = -\sum_k A_{b,h,q,k}\log A_{b,h,q,k},\quad \mathcal{R} = \mathbb{E}_{b,h,q}[H_{b,h,q}]$$
-          </div>
-        </article>
-        <article class="ref-item">
-          <h3><code>attention_entropy_min</code></h3>
-          <div class="ref-formula">$$\mathcal{R} = \min_{b,h,q} H_{b,h,q}$$</div>
-        </article>
-        <article class="ref-item">
-          <h3><code>attention_sink_first_token</code></h3>
-          <div class="ref-formula">$$\mathcal{R} = \mathbb{E}_{b,h,q \ge 1}[A_{b,h,q,0}] \quad \text{（非首 token query 对 key=0 的平均质量）}$$</div>
-        </article>
-        <article class="ref-item">
-          <h3><code>attention_sink_domination</code></h3>
-          <div class="ref-formula">$$\bar{A}_k = \mathbb{E}_{b,h,q}[A_{b,h,q,k}],\quad \mathcal{R} = \max_k \bar{A}_k$$</div>
-        </article>
-        <article class="ref-item">
-          <h3><code>attention_sink_ratio</code></h3>
-          <div class="ref-formula">$$\mathcal{R} = T \cdot \mathbb{E}_{b,h,q \ge 1}[A_{b,h,q,0}] \quad \text{（相对均匀分布 } 1/T \text{ 的倍数）}$$</div>
-        </article>
-      </div>
-    </section>
-
-    <section class="ref-section panel" id="reductions-activation">
-      <h2>Reductions · Activation / GELU</h2>
-      <p class="ref-section-desc">主要用于 post-GELU MLP 隐层 $x \in \mathbb{R}^{B \times T \times F}$。</p>
-      <div class="ref-grid">
-        <article class="ref-item">
-          <h3><code>activation_rate</code></h3>
-          <div class="ref-formula">$$\mathcal{R}(x) = \dfrac{1}{N}\sum_i \mathbf{1}[x_i > 0] \quad \text{（GELU 后 firing rate）}$$</div>
-        </article>
-        <article class="ref-item">
-          <h3><code>massive_activation_peak_ratio</code></h3>
-          <div class="ref-formula">$$\mathcal{R}(x) = \dfrac{\max |x|}{\mathrm{RMS}(x)}$$</div>
-        </article>
-        <article class="ref-item">
-          <h3><code>massive_activation_outlier_fraction</code></h3>
-          <div class="ref-formula">$$\mathcal{R}(x) = \dfrac{1}{N}\sum_i \mathbf{1}[|x_i| > 3\,\mathrm{RMS}(x)]$$</div>
-        </article>
-        <article class="ref-item">
-          <h3><code>massive_neuron_fraction</code></h3>
-          <div class="ref-formula">
-            $$p_f = \max_{b,t}|x_{b,t,f}|,\quad \mathcal{R} = \dfrac{1}{F}\sum_f \mathbf{1}[p_f > 3\,\mathrm{RMS}(x)]$$
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <section class="ref-section panel" id="temporals">
-      <h2>Temporal Operators</h2>
-      <p class="ref-section-desc">对标量观测序列 $\{s_t\}$ 做时序变换；按 spec 顺序链式应用，各自维护内部状态。</p>
-      <div class="ref-grid">
-        <article class="ref-item"><h3><code>identity</code></h3><div class="ref-formula">$$y_t = s_t$$</div></article>
-        <article class="ref-item"><h3><code>delta</code></h3><div class="ref-formula">$$y_t = s_t - s_{t-1} \quad \text{（首步为 NaN）}$$</div></article>
-        <article class="ref-item"><h3><code>ema</code></h3><div class="ref-formula">$$y_t = \alpha\, y_{t-1} + (1-\alpha)\, s_t \quad \text{（默认 } \alpha=0.9 \text{）}$$</div></article>
-        <article class="ref-item"><h3><code>slope</code></h3><div class="ref-formula">$$y_t = \text{OLS slope of } \{s_{t-w+1},\ldots,s_t\} \text{ vs. time index} \quad \text{（默认 } w=5 \text{）}$$</div></article>
-        <article class="ref-item"><h3><code>rolling_std</code></h3><div class="ref-formula">$$y_t = \mathrm{Std}(s_{t-w+1},\ldots,s_t) \quad \text{（默认 } w=5 \text{）}$$</div></article>
-        <article class="ref-item"><h3><code>curvature</code></h3><div class="ref-formula">$$y_t = s_t - 2s_{t-1} + s_{t-2} \quad \text{（三点二阶差分）}$$</div></article>
-      </div>
-    </section>
-
-    <section class="ref-section panel" id="loss">
-      <h2>Loss</h2>
-      <p class="ref-section-desc">内置观测量，无需注册 spec；每步由 <code>observe(step, loss=...)</code> 写入。</p>
-      <article class="ref-item ref-item-wide">
-        <h3><code>loss::train</code></h3>
-        <div class="ref-formula">$$\mathcal{R}(\ell_t) = \ell_t \quad \text{（当前 step 的 cross-entropy training loss）}$$</div>
-      </article>
-    </section>
-
-    <footer class="ref-footer">
-      <p>定义来源：<code>activation_function_bias/observables/observable_lib.py</code> · Transforms / Reductions / Temporals 注册表与 Pack 展开规则</p>
-    </footer>
   </main>
 
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-  <script defer src="js/reference.js?v=1"></script>
+  <script defer src="js/observable_defs.js?v=4"></script>
+  <script defer src="js/reference.js?v=3"></script>
 </body>
 </html>

@@ -368,6 +368,13 @@ def main():
     write_index(index_metas)
     print(f"Wrote {VIEWER_DATA / 'index.json'} ({len(index_metas)} run(s))")
 
+    try:
+        from build_reference_catalog import build_catalog
+
+        build_catalog()
+    except Exception as exc:  # noqa: BLE001 — catalog is optional for training rebuilds
+        print(f"Warning: reference catalog not rebuilt ({exc})")
+
 
 if __name__ == "__main__":
     main()

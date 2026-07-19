@@ -10,14 +10,14 @@ const SOURCE_LABELS = {
 };
 
 const SOURCE_COLORS = {
-  weight: "#2563eb",
-  grad: "#16a34a",
-  update: "#d97706",
-  activation: "#e11d48",
-  preactivation: "#be185d",
-  gelu_activation: "#c026d3",
-  attention: "#0f766e",
-  logits: "#4338ca",
+  weight: "#7eb8c9",
+  grad: "#6fbf8a",
+  update: "#c4a574",
+  activation: "#d4788a",
+  preactivation: "#c48aa0",
+  gelu_activation: "#9bb8d4",
+  attention: "#5fa8a0",
+  logits: "#a88858",
 };
 
 const SOURCE_KIND_ORDER = [
@@ -43,12 +43,12 @@ const ARCH_NODES = {
 };
 
 const LAYER_COLORS = [
-  "#2563eb", "#dc2626", "#16a34a", "#d97706", "#7c3aed", "#0891b2",
-  "#db2777", "#65a30d", "#ea580c", "#4f46e5", "#0d9488", "#b45309",
+  "#7eb8c9", "#d4788a", "#6fbf8a", "#c4a574", "#9bb8d4", "#5fa8a0",
+  "#c48aa0", "#a3c585", "#d4a85c", "#8eb4c9", "#7a9e98", "#b8956a",
 ];
 
 const RUN_COLORS = [
-  "#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#0891b2",
+  "#7eb8c9", "#c4a574", "#6fbf8a", "#d4788a", "#9bb8d4", "#5fa8a0",
 ];
 
 let manifest = null;
@@ -755,17 +755,19 @@ function renderLayerPicker(spec) {
 }
 
 function chartScaleOptions() {
+  const axis = "rgba(216, 224, 230, 0.55)";
+  const grid = "rgba(216, 224, 230, 0.08)";
   return {
     x: {
       type: "linear",
-      title: { display: true, text: "Step", color: "#64748b" },
-      ticks: { color: "#64748b" },
-      grid: { color: "rgba(30,64,128,0.08)" },
+      title: { display: true, text: "Step", color: axis },
+      ticks: { color: axis },
+      grid: { color: grid },
     },
     y: {
-      title: { display: true, text: "Value", color: "#64748b" },
-      ticks: { color: "#64748b" },
-      grid: { color: "rgba(30,64,128,0.08)" },
+      title: { display: true, text: "Value", color: axis },
+      ticks: { color: axis },
+      grid: { color: grid },
     },
   };
 }
@@ -800,7 +802,7 @@ function chartCommonOptions({ legend = false } = {}) {
         ? {
             display: true,
             position: "bottom",
-            labels: { boxWidth: 12, color: "#475569", usePointStyle: true },
+            labels: { boxWidth: 12, color: "rgba(216, 224, 230, 0.72)", usePointStyle: true },
           }
         : { display: false },
       tooltip: {
@@ -897,7 +899,7 @@ function buildLineDatasets(spec) {
     };
   }
   if (spec.series?.steps?.length) {
-    const color = SOURCE_COLORS[spec.source_kind] || "#2563eb";
+    const color = SOURCE_COLORS[spec.source_kind] || "#7eb8c9";
     return {
       legend: false,
       datasets: [{
@@ -948,42 +950,41 @@ function renderSpecDefinition(spec) {
     return;
   }
 
-  const pieces = typeof buildSpecDefinitionLatex === "function"
-    ? buildSpecDefinitionLatex(spec)
+  const direct = typeof buildSpecDirectFormula === "function"
+    ? buildSpecDirectFormula(spec)
     : null;
-  if (!pieces?.length) {
+  if (!direct?.tex) {
     el.hidden = true;
     el.innerHTML = "";
     return;
   }
 
-  const partsHtml = [];
-  partsHtml.push(`<span class="chart-def-label">定义</span>`);
-  for (let i = 0; i < pieces.length; i += 1) {
-    if (i > 0) partsHtml.push(`<span class="chart-def-sep">·</span>`);
-    let html;
-    if (window.katex) {
-      try {
-        html = katex.renderToString(pieces[i].tex, {
-          throwOnError: false,
-          displayMode: false,
-          output: "html",
-        });
-      } catch (_) {
-        html = `<code>${escapeHtml(pieces[i].name)}</code>`;
-      }
-    } else {
-      html = `<code>${escapeHtml(pieces[i].name)}</code>`;
+  let mathHtml;
+  if (window.katex) {
+    try {
+      mathHtml = katex.renderToString(direct.tex, {
+        throwOnError: false,
+        displayMode: false,
+        output: "html",
+      });
+    } catch (_) {
+      mathHtml = `<code>${escapeHtml(direct.tex)}</code>`;
     }
-    partsHtml.push(`<span class="chart-def-eq" title="${escapeHtml(pieces[i].name)}">${html}</span>`);
+  } else {
+    mathHtml = `<code>${escapeHtml(direct.tex)}</code>`;
   }
   const href = typeof referenceAnchorForSpec === "function"
     ? referenceAnchorForSpec(spec)
     : "reference.html";
-  partsHtml.push(
-    `<a class="chart-def-link" href="${href}" target="_blank" rel="noopener">参考全文</a>`
-  );
-  el.innerHTML = partsHtml.join("");
+  const desc =
+    direct.description ||
+    (typeof buildSpecPlainDescription === "function" ? buildSpecPlainDescription(spec) : "");
+  el.innerHTML = [
+    `<span class="chart-def-label">定义</span>`,
+    desc ? `<span class="chart-def-desc">${escapeHtml(desc)}</span>` : "",
+    `<span class="chart-def-eq" title="${escapeHtml(direct.title)}">${mathHtml}</span>`,
+    `<a class="chart-def-link" href="${href}" target="_blank" rel="noopener">全部公式</a>`,
+  ].filter(Boolean).join("");
   el.hidden = false;
 }
 
@@ -1247,8 +1248,8 @@ function buildLossDatasets() {
     datasets.push({
       label: "Train loss",
       data: filterLossPoints(item.log.train),
-      borderColor: "#2563eb",
-      backgroundColor: "rgba(37, 99, 235, 0.12)",
+      borderColor: "#7eb8c9",
+      backgroundColor: "rgba(126, 184, 201, 0.14)",
       borderWidth: 2,
       pointRadius: 0,
       tension: 0.2,
@@ -1259,8 +1260,8 @@ function buildLossDatasets() {
     datasets.push({
       label: "Val loss",
       data: filterLossPoints(item.log.val),
-      borderColor: "#dc2626",
-      backgroundColor: "rgba(220, 38, 38, 0.12)",
+      borderColor: "#c4a574",
+      backgroundColor: "rgba(196, 165, 116, 0.14)",
       borderWidth: 2,
       pointRadius: 0,
       tension: 0.2,
