@@ -10,14 +10,14 @@ const SOURCE_LABELS = {
 };
 
 const SOURCE_COLORS = {
-  weight: "#7eb8c9",
-  grad: "#6fbf8a",
-  update: "#c4a574",
-  activation: "#d4788a",
-  preactivation: "#c48aa0",
-  gelu_activation: "#9bb8d4",
-  attention: "#5fa8a0",
-  logits: "#a88858",
+  weight: "#9fd4e4",
+  grad: "#8fd9a4",
+  update: "#e8c888",
+  activation: "#f0a8b6",
+  preactivation: "#e0b0c4",
+  gelu_activation: "#b8d4f0",
+  attention: "#7ecfc4",
+  logits: "#e0c08a",
 };
 
 const SOURCE_KIND_ORDER = [
@@ -43,12 +43,12 @@ const ARCH_NODES = {
 };
 
 const LAYER_COLORS = [
-  "#7eb8c9", "#d4788a", "#6fbf8a", "#c4a574", "#9bb8d4", "#5fa8a0",
-  "#c48aa0", "#a3c585", "#d4a85c", "#8eb4c9", "#7a9e98", "#b8956a",
+  "#9fd4e4", "#f0a8b6", "#8fd9a4", "#e8c888", "#b8d4f0", "#7ecfc4",
+  "#e0b0c4", "#b8e08a", "#f0d080", "#a8d8f0", "#90d0c4", "#e0c08a",
 ];
 
 const RUN_COLORS = [
-  "#7eb8c9", "#c4a574", "#6fbf8a", "#d4788a", "#9bb8d4", "#5fa8a0",
+  "#9fd4e4", "#e8c888", "#8fd9a4", "#f0a8b6", "#b8d4f0", "#7ecfc4",
 ];
 
 let manifest = null;
@@ -755,8 +755,8 @@ function renderLayerPicker(spec) {
 }
 
 function chartScaleOptions() {
-  const axis = "rgba(216, 224, 230, 0.55)";
-  const grid = "rgba(216, 224, 230, 0.08)";
+  const axis = "rgba(255, 255, 255, 0.78)";
+  const grid = "rgba(255, 255, 255, 0.12)";
   return {
     x: {
       type: "linear",
@@ -802,7 +802,7 @@ function chartCommonOptions({ legend = false } = {}) {
         ? {
             display: true,
             position: "bottom",
-            labels: { boxWidth: 12, color: "rgba(216, 224, 230, 0.72)", usePointStyle: true },
+            labels: { boxWidth: 12, color: "rgba(255, 255, 255, 0.85)", usePointStyle: true },
           }
         : { display: false },
       tooltip: {
@@ -907,7 +907,7 @@ function buildLineDatasets(spec) {
         data: pointsFromSeries(spec.series),
         borderColor: color,
         backgroundColor: `${color}22`,
-        borderWidth: 2,
+        borderWidth: 2.75,
         pointRadius: 2,
         tension: 0.25,
         fill: true,
@@ -980,10 +980,10 @@ function renderSpecDefinition(spec) {
     direct.description ||
     (typeof buildSpecPlainDescription === "function" ? buildSpecPlainDescription(spec) : "");
   el.innerHTML = [
-    `<span class="chart-def-label">定义</span>`,
-    desc ? `<span class="chart-def-desc">${escapeHtml(desc)}</span>` : "",
-    `<span class="chart-def-eq" title="${escapeHtml(direct.title)}">${mathHtml}</span>`,
-    `<a class="chart-def-link" href="${href}" target="_blank" rel="noopener">全部公式</a>`,
+    `<div class="chart-def-row"><span class="chart-def-label">定义</span>` +
+      `<a class="chart-def-link" href="${href}" target="_blank" rel="noopener">全部公式</a></div>`,
+    desc ? `<p class="chart-def-desc">${escapeHtml(desc)}</p>` : "",
+    `<div class="chart-def-eq" title="${escapeHtml(direct.title)}">${mathHtml}</div>`,
   ].filter(Boolean).join("");
   el.hidden = false;
 }
@@ -1248,8 +1248,8 @@ function buildLossDatasets() {
     datasets.push({
       label: "Train loss",
       data: filterLossPoints(item.log.train),
-      borderColor: "#7eb8c9",
-      backgroundColor: "rgba(126, 184, 201, 0.14)",
+      borderColor: "#9fd4e4",
+      backgroundColor: "rgba(159, 212, 228, 0.2)",
       borderWidth: 2,
       pointRadius: 0,
       tension: 0.2,
@@ -1260,8 +1260,8 @@ function buildLossDatasets() {
     datasets.push({
       label: "Val loss",
       data: filterLossPoints(item.log.val),
-      borderColor: "#c4a574",
-      backgroundColor: "rgba(196, 165, 116, 0.14)",
+      borderColor: "#e8c888",
+      backgroundColor: "rgba(232, 200, 136, 0.2)",
       borderWidth: 2,
       pointRadius: 0,
       tension: 0.2,

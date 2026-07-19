@@ -1,26 +1,28 @@
 :root {
   --ink: #0e1419;
   --ink-soft: #1a242c;
-  --fog: #d8e0e6;
-  --sand: #c4a574;
-  --sand-deep: #a88858;
-  --ice: #7eb8c9;
+  --fog: #edf2f5;
+  --sand: #e0c08a;
+  --sand-deep: #c4a574;
+  --ice: #9fd4e4;
   --bg: #0a1014;
   --bg-panel: rgba(18, 26, 33, 0.92);
   --bg-card: #182229;
   --bg-hover: #223039;
-  --border: rgba(216, 224, 230, 0.12);
-  --text: #e8eef2;
-  --muted: rgba(216, 224, 230, 0.62);
+  --border: rgba(255, 255, 255, 0.14);
+  --text: #ffffff;
+  --muted: rgba(255, 255, 255, 0.72);
   --accent: var(--ice);
   --accent-2: var(--sand);
-  --green: #6fbf8a;
-  --amber: #d4a85c;
-  --rose: #d4788a;
+  --green: #8fd9a4;
+  --amber: #e8c07a;
+  --rose: #f0a8b6;
   --shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
   --radius: 12px;
-  --font-ui: "Syne", "Segoe UI", sans-serif;
-  --font-body: "Source Serif 4", Georgia, serif;
+  /* Serif for reading; soft humanist sans for chrome — less flat than Syne */
+  --font-ui: "Nunito", "Segoe UI", sans-serif;
+  --font-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-display: "Source Serif 4", Georgia, serif;
 }
 
 * {
@@ -47,16 +49,25 @@ button {
 
 h1, h2, h3,
 .panel-head h2,
+.select-header h1,
+.run-card-title,
+.detail-header h3,
+#chartTitle {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+}
+
 .loss-section-title,
 .flow-label,
 .spec-group-title,
 .ref-obs-title,
-.run-card-title,
 .module-node .title,
 .chart-btn,
 .layer-tab,
 .header-link,
-.badge {
+.badge,
+.spec-chip,
+.compare-toggle {
   font-family: var(--font-ui);
 }
 
@@ -76,17 +87,18 @@ h1, h2, h3,
 
 .app-header h1 {
   margin: 0;
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: #f2f5f7;
+  font-size: 1.28rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: #ffffff;
 }
 
 .app-header p {
   margin: 0.25rem 0 0;
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   font-family: var(--font-body);
+  line-height: 1.45;
 }
 
 .badge {
@@ -130,10 +142,10 @@ h1, h2, h3,
 
 .panel-head h2 {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  color: #f2f5f7;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #ffffff;
 }
 
 .layer-tabs {
@@ -415,20 +427,26 @@ h1, h2, h3,
 
 .detail-header h3 {
   margin: 0 0 0.35rem;
-  font-size: 1.05rem;
+  font-size: 1.12rem;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .detail-header p {
   margin: 0;
   color: var(--muted);
-  font-size: 0.86rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  word-break: break-all;
 }
 
 .spec-groups {
   padding: 0.75rem 1rem;
   overflow: auto;
-  flex: 0 0 auto;
-  max-height: 220px;
+  flex: 0 1 auto;
+  max-height: min(180px, 28vh);
 }
 
 .spec-group {
@@ -471,77 +489,124 @@ h1, h2, h3,
 }
 
 .chart-wrap {
-  flex: 1;
-  min-height: 320px;
-  padding: 0.75rem 1rem 1.25rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.85rem 1.1rem 1.15rem;
   border-top: 1px solid var(--border);
+  overflow: auto;
 }
 
 .chart-meta {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.5rem;
-  font-size: 0.78rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.55rem;
+  margin-bottom: 0;
+  font-size: 0.84rem;
   color: var(--muted);
+  flex-shrink: 0;
+}
+
+.chart-meta-top {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.55rem;
 }
 
 .chart-meta-text {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.28rem;
   min-width: 0;
+  flex: 1 1 auto;
+}
+
+#chartTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+#chartInfo {
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.45;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .chart-def {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem 0.55rem;
-  margin-top: 0.35rem;
-  padding: 0.45rem 0.55rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+  margin-top: 0;
+  padding: 0.65rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: rgba(126, 184, 201, 0.06);
-  font-size: 0.78rem;
-  line-height: 1.45;
-  color: var(--text);
-  overflow-x: auto;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: #ffffff;
+  overflow: visible;
 }
 
 .chart-def-desc {
-  flex: 1 1 100%;
+  flex: none;
+  width: 100%;
   margin: 0;
-  font-size: 0.78rem;
-  line-height: 1.45;
-  color: var(--text);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: #ffffff;
   font-weight: 400;
+  font-family: var(--font-body);
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .chart-def[hidden] {
   display: none;
 }
 
+.chart-def-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .chart-def-label {
   flex-shrink: 0;
-  font-size: 0.68rem;
-  font-weight: 600;
+  font-size: 0.7rem;
+  font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.55);
+  font-family: var(--font-ui);
 }
 
 .chart-def-eq {
-  display: inline-block;
+  display: block;
+  width: 100%;
   max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.15rem 0;
 }
 
 .chart-def-eq .katex,
 .ref-obs-formula .katex,
 .katex {
-  font-size: 1.05em;
-  color: var(--text);
+  font-size: 1.08em;
+  color: #ffffff;
 }
 
 .chart-def-sep {
@@ -551,11 +616,14 @@ h1, h2, h3,
 }
 
 .chart-def-link {
-  margin-left: auto;
+  align-self: flex-start;
+  margin-left: 0;
   flex-shrink: 0;
-  font-size: 0.7rem;
-  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--sand);
   text-decoration: none;
+  font-family: var(--font-ui);
 }
 
 .chart-def-link:hover {
@@ -566,9 +634,17 @@ h1, h2, h3,
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 0.4rem;
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  max-width: none;
+}
+
+.chart-canvas-box {
+  position: relative;
+  flex: 1 1 280px;
+  min-height: 280px;
+  height: clamp(280px, 36vh, 420px);
 }
 
 .chart-btn {
@@ -723,7 +799,7 @@ h1, h2, h3,
 
 #curveChart {
   width: 100% !important;
-  height: 320px !important;
+  height: 100% !important;
   cursor: grab;
 }
 
@@ -800,12 +876,14 @@ h1, h2, h3,
 
 #curveImage {
   display: none;
+  position: absolute;
+  inset: 0;
   width: 100%;
-  max-height: 360px;
+  height: 100%;
   object-fit: contain;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: rgba(126, 184, 201, 0.06);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 #curveImage.visible {
@@ -865,10 +943,10 @@ h1, h2, h3,
 
 .select-header h1 {
   margin: 0 0 0.5rem;
-  font-size: clamp(1.6rem, 3.5vw, 2.1rem);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: #f2f5f7;
+  font-size: clamp(1.7rem, 3.5vw, 2.25rem);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: #ffffff;
 }
 
 .select-header p {
@@ -1080,9 +1158,11 @@ h1, h2, h3,
 
 .ref-obs-desc {
   margin: 0 0 0.45rem;
-  font-size: 0.86rem;
-  line-height: 1.55;
-  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: #ffffff;
+  font-family: var(--font-body);
+  word-break: break-word;
 }
 
 .ref-obs-formula {
