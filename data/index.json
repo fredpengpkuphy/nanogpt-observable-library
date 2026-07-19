@@ -1,8 +1,8 @@
 {
   "runs": [
     {
-      "run_id": "run_20260709_031351",
-      "label": "run_20260709_031351",
+      "run_id": "baseline",
+      "label": "baseline",
       "n_specs": 1821,
       "n_curves": 1820,
       "n_series": 1820,
@@ -14,24 +14,11 @@
       }
     },
     {
-      "run_id": "run_20260705_113203",
-      "label": "run_20260705_113203",
-      "n_specs": 411,
-      "n_curves": 411,
-      "n_series": 411,
-      "has_loss": false,
-      "provenance": {
-        "commit": "unknown",
-        "torch": "2.5.1+cu121",
-        "python": "3.10.20"
-      }
-    },
-    {
-      "run_id": "run_20260704_184808",
-      "label": "run_20260704_184808",
-      "n_specs": 411,
-      "n_curves": 411,
-      "n_series": 411,
+      "run_id": "no_learning_rate_warmup",
+      "label": "no learning rate warmup",
+      "n_specs": 1821,
+      "n_curves": 1820,
+      "n_series": 1820,
       "has_loss": true,
       "provenance": {
         "commit": "unknown",

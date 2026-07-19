@@ -1,24 +1,47 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>nanoGPT Observable Explorer — Select Run</title>
+  <title>nanoGPT Observable Library</title>
+  <meta name="description" content="nanoGPT on OpenWebText, measured end to end. Observables for the science of AI.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=4">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/landing.css?v=1">
 </head>
-<body class="select-page">
-  <main class="select-shell">
-    <header class="select-header">
-      <h1>nanoGPT Observable Explorer</h1>
-      <p>选择一次训练 run，进入模型架构与观测量曲线浏览器</p>
-    </header>
-    <div id="selectLoading" class="select-loading">Loading datasets…</div>
-    <div id="selectError" class="select-error" hidden></div>
-    <div id="runGrid" class="run-grid" hidden></div>
+<body class="landing">
+  <div class="landing-stage" aria-hidden="true">
+    <svg class="landing-viz" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="curveGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#c4a574"/>
+          <stop offset="100%" stop-color="#7eb8c9"/>
+        </linearGradient>
+      </defs>
+      <path class="viz-curve viz-curve-a" d="M40 620 C 220 580, 320 420, 480 390 S 780 470, 920 280 S 1100 160, 1180 120" fill="none" stroke="url(#curveGrad)" stroke-width="2.2"/>
+      <path class="viz-curve viz-curve-b" d="M40 680 C 240 650, 360 520, 520 500 S 800 560, 960 380 S 1120 240, 1180 200" fill="none" stroke="rgba(126,184,201,0.45)" stroke-width="1.5"/>
+      <path class="viz-curve viz-curve-c" d="M40 540 C 200 500, 300 360, 460 340 S 760 400, 900 220 S 1080 100, 1180 70" fill="none" stroke="rgba(196,165,116,0.35)" stroke-width="1.4"/>
+      <g class="viz-grid">
+        <line x1="80" y1="80" x2="80" y2="720"/><line x1="280" y1="80" x2="280" y2="720"/>
+        <line x1="480" y1="80" x2="480" y2="720"/><line x1="680" y1="80" x2="680" y2="720"/>
+        <line x1="880" y1="80" x2="880" y2="720"/><line x1="1080" y1="80" x2="1080" y2="720"/>
+        <line x1="40" y1="200" x2="1180" y2="200"/><line x1="40" y1="400" x2="1180" y2="400"/>
+        <line x1="40" y1="600" x2="1180" y2="600"/>
+      </g>
+    </svg>
+  </div>
+
+  <main class="landing-hero">
+    <p class="landing-brand">nanoGPT Observable Library</p>
+    <h1 class="landing-headline">Measure training.<br>Unlock the science.</h1>
+    <p class="landing-lead">
+      We trained nanoGPT on OpenWebText under Karpathy’s exact setup—
+      and instrumented the run with observables that may open the door to the science of AI.
+    </p>
+    <div class="landing-cta">
+      <a class="landing-btn" href="select.html">Start Exploration</a>
+    </div>
   </main>
-  <script src="js/select.js?v=4"></script>
 </body>
 </html>

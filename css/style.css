@@ -164,6 +164,44 @@ button {
   color: var(--muted);
 }
 
+.loss-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.loss-range label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.loss-range input[type="number"] {
+  width: 5.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text);
+  padding: 0.28rem 0.4rem;
+  font-size: 0.74rem;
+}
+
+.loss-range-sep {
+  color: var(--muted);
+}
+
+.loss-range-compact {
+  margin: 0;
+}
+
+.loss-range-compact input[type="number"] {
+  width: 4.5rem;
+}
+
 .loss-chart-wrap {
   position: relative;
   height: 220px;
@@ -424,6 +462,62 @@ button {
   min-width: 0;
 }
 
+.chart-def {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin-top: 0.35rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(30, 64, 128, 0.04);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+.chart-def[hidden] {
+  display: none;
+}
+
+.chart-def-label {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.chart-def-eq {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.chart-def-eq .katex {
+  font-size: 1.05em;
+}
+
+.chart-def-sep {
+  color: var(--muted);
+  opacity: 0.7;
+  user-select: none;
+}
+
+.chart-def-link {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.chart-def-link:hover {
+  text-decoration: underline;
+}
+
 .chart-actions {
   display: flex;
   flex-wrap: wrap;
@@ -559,6 +653,20 @@ button {
   background: var(--chip-color, var(--accent));
 }
 
+.run-pick-status {
+  margin: 0.4rem 0 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.run-pick-status[hidden] {
+  display: none;
+}
+
+.run-pick-status.is-error {
+  color: #b91c1c;
+}
+
 .chart-hint {
   margin: 0.35rem 0 0;
   font-size: 0.7rem;
@@ -596,11 +704,7 @@ button {
 }
 
 .chart-overlay[hidden] {
-  display: none;
-}
-
-.chart-overlay.visible[hidden] {
-  display: flex;
+  display: none !important;
 }
 
 .chart-modal {
@@ -782,6 +886,333 @@ button {
   color: var(--muted);
 }
 
+.ref-page .ref-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.25rem 1.75rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.ref-intro p,
+.ref-section-desc,
+.ref-note,
+.ref-footer p {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.ref-list {
+  margin: 0.75rem 0 0;
+  padding-left: 1.25rem;
+  line-height: 1.6;
+}
+
+.ref-toc-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.ref-toc-grid a {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.ref-toc-grid a:hover {
+  background: var(--bg-hover);
+}
+
+.ref-section h2,
+.ref-intro h2,
+.ref-toc h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.ref-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.ref-item {
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+.ref-item-wide {
+  max-width: 720px;
+}
+
+.ref-item h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.ref-item h3 code {
+  font-size: 0.88rem;
+  color: var(--accent);
+}
+
+.ref-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.ref-formula,
+.ref-formula-block {
+  margin-top: 0.35rem;
+  overflow-x: auto;
+  font-size: 0.95rem;
+}
+
+.ref-formula-block {
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: rgba(59, 130, 246, 0.05);
+  border: 1px solid var(--border);
+}
+
+.ref-footer {
+  text-align: center;
+  padding-top: 0.5rem;
+}
+
+.select-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  text-align: left;
+}
+
+.select-header-row > div {
+  flex: 1;
+  min-width: 240px;
+}
+
+.select-header-row .header-link {
+  margin-top: 0.35rem;
+  white-space: nowrap;
+}
+
+.select-header-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.1rem;
+  align-items: center;
+}
+
+.chart-modal-body-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 260px);
+  gap: 0.75rem;
+  align-items: stretch;
+  min-height: 0;
+  flex: 1;
+}
+
+.chart-modal-canvas-wrap {
+  position: relative;
+  min-height: 320px;
+  min-width: 0;
+}
+
+.chart-modal-canvas-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.notes-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: min(70vh, 640px);
+  overflow: auto;
+  padding: 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+.notes-rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.notes-rail-empty {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.note-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.55rem;
+  background: var(--bg-panel);
+  cursor: pointer;
+}
+
+.note-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.note-card p {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.note-step {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.note-issue {
+  display: inline-block;
+  margin-top: 0.3rem;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.note-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.note-modal[hidden] {
+  display: none !important;
+}
+
+.note-dialog {
+  width: min(480px, 100%);
+  max-height: min(86vh, 720px);
+  overflow: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 1rem 1.1rem 1.15rem;
+}
+
+.note-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.note-dialog-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.note-dialog-step {
+  margin: 0.35rem 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.note-modal-existing {
+  margin-bottom: 0.85rem;
+}
+
+.note-modal-existing h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.note-modal-existing .note-card {
+  cursor: default;
+  margin-bottom: 0.4rem;
+}
+
+.note-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.note-modal-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.note-modal-form input,
+.note-modal-form textarea {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-card);
+}
+
+.note-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.note-submit {
+  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.note-token-hint,
+.note-modal-status {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.note-modal-status {
+  color: var(--amber);
+}
+
 @media (max-width: 1100px) {
   .layout {
     grid-template-columns: 1fr;
@@ -789,5 +1220,13 @@ button {
 
   .block-grid {
     grid-template-columns: 1fr;
+  }
+
+  .chart-modal-body-split {
+    grid-template-columns: 1fr;
+  }
+
+  .notes-rail {
+    max-height: 220px;
   }
 }

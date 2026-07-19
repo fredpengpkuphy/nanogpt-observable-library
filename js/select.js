@@ -4,7 +4,7 @@ async function bootSelect() {
   const grid = document.getElementById("runGrid");
 
   try {
-    const res = await fetch("data/index.json");
+    const res = await fetch(`data/index.json?t=${Date.now()}`, { cache: "no-store" });
     if (!res.ok) throw new Error(`data/index.json (${res.status})`);
     const data = await res.json();
     const runs = data.runs || [];
@@ -22,7 +22,7 @@ async function bootSelect() {
     errorEl.hidden = false;
     errorEl.innerHTML =
       `Failed to load datasets: ${escapeHtml(err.message)}<br><br>` +
-      `Run <code>python3 viewer/scripts/build_viewer_data.py --clean</code> first.`;
+      `From the viewer root, run <code>python scripts/build_viewer_data.py --clean</code> first.`;
   }
 }
 

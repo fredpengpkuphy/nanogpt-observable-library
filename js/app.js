@@ -36,30 +36,31 @@ const ARCH_NODES = {
     { id: "wte", title: "Token Embed", subtitle: "wte", path: "transformer.wte" },
     { id: "wpe", title: "Pos Embed", subtitle: "wpe", path: "transformer.wpe" },
   ],
-  block: [
-    { id: "ln_1", suffix: "ln_1", title: "LayerNorm", subtitle: "ln_1", path: "ln_1" },
-    { id: "c_attn", suffix: "attn.c_attn", title: "QKV Proj", subtitle: "attn.c_attn", path: "attn.c_attn" },
-    { id: "attn", suffix: "attn", title: "Attention", subtitle: "attn · entropy", path: "attn" },
-    { id: "c_proj_attn", suffix: "attn.c_proj", title: "Attn Out", subtitle: "attn.c_proj", path: "attn.c_proj" },
-    { id: "ln_2", suffix: "ln_2", title: "LayerNorm", subtitle: "ln_2", path: "ln_2" },
-    { id: "c_fc", suffix: "mlp.c_fc", title: "MLP Up", subtitle: "mlp.c_fc", path: "mlp.c_fc" },
-    { id: "gelu", suffix: "mlp.gelu", title: "GELU", subtitle: "mlp.gelu · massive", path: "mlp.gelu" },
-    { id: "c_proj_mlp", suffix: "mlp.c_proj", title: "MLP Down", subtitle: "mlp.c_proj", path: "mlp.c_proj" },
-  ],
   head: [
     { id: "ln_f", title: "Final LN", subtitle: "ln_f", path: "transformer.ln_f" },
     { id: "lm_head", title: "LM Head", subtitle: "lm_head", path: "lm_head", optional: true },
   ],
 };
 
-// Distinct hues for L0..L11 overlays (readable on white).
 const LAYER_COLORS = [
   "#2563eb", "#dc2626", "#16a34a", "#d97706", "#7c3aed", "#0891b2",
   "#db2777", "#65a30d", "#ea580c", "#4f46e5", "#0d9488", "#b45309",
 ];
 
+const RUN_COLORS = [
+  "#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#0891b2",
+];
+
 let manifest = null;
 let runId = null;
+let availableRuns = [];
+let manifestCache = new Map();
+let lossLogByRun = new Map();
+let compareRuns = false;
+let compareLossRuns = false;
+let selectedRuns = new Set();
+let runsLoading = false;
+let manifestLoadGen = 0;
 let specById = new Map();
 let specsByModule = new Map();
 let specsByFamily = new Map();
@@ -72,11 +73,16 @@ let chart = null;
 let lossChart = null;
 let lossLog = null;
 let lossViewMode = "both";
+let lossStepMin = null;
+let lossStepMax = null;
+let fullChart = null;
+let fullOverlayOpen = false;
+let fullOverlayMode = null;
 
 async function boot() {
   runId = new URLSearchParams(location.search).get("run");
   if (!runId) {
-    window.location.href = "index.html";
+    window.location.href = "select.html";
     return;
   }
 
@@ -84,64 +90,275 @@ async function boot() {
     if (window.Chart && window.ChartZoom) {
       try { Chart.register(window.ChartZoom); } catch (_) { /* already registered */ }
     }
+    const annPlugin =
+      window["chartjs-plugin-annotation"] ||
+      window.ChartAnnotation ||
+      window.annotationPlugin;
+    if (window.Chart && annPlugin) {
+      try { Chart.register(annPlugin); } catch (_) { /* already registered */ }
+    }
     manifest = await fetchJson(`data/${runId}/manifest.json`);
     specById = new Map(manifest.specs.map((s) => [s.id, s]));
     specsByModule = groupSpecsByModule(manifest.specs);
     specsByFamily = groupSpecsByFamily(manifest.specs);
-    document.getElementById("compareLayers").addEventListener("change", (e) => {
-      compareLayers = e.target.checked;
-      const spec = activeSpecId ? specById.get(activeSpecId) : null;
-      if (compareLayers && spec) ensureDefaultSelectedLayers(spec);
-      if (spec) renderChart(spec);
-    });
-    document.getElementById("resetZoomBtn").addEventListener("click", resetChartZoom);
-    document.getElementById("lossResetZoomBtn").addEventListener("click", () => lossChart?.resetZoom?.());
-    document.getElementById("lossExpandBtn").addEventListener("click", openLossFullscreen);
-    document.querySelectorAll(".loss-view-btn").forEach((btn) => {
-      btn.addEventListener("click", () => setLossViewMode(btn.dataset.mode));
-    });
-    document.getElementById("expandBtn").addEventListener("click", openFullscreen);
-    document.getElementById("fullCloseBtn").addEventListener("click", closeFullscreen);
-    document.getElementById("fullResetZoomBtn").addEventListener("click", () => fullChart?.resetZoom?.());
-    document.getElementById("chartOverlay").addEventListener("click", (e) => {
-      if (e.target.id === "chartOverlay") closeFullscreen();
-    });
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && fullOverlayOpen) closeFullscreen();
-    });
-    document.getElementById("pickCurrentLayer").addEventListener("click", () => {
-      const spec = activeSpecId ? specById.get(activeSpecId) : null;
-      if (!spec) return;
-      selectedLayers = new Set([activeLayer]);
-      renderLayerPicker(spec);
-      renderChart(spec);
-    });
-    document.getElementById("pickAllLayers").addEventListener("click", () => {
-      const spec = activeSpecId ? specById.get(activeSpecId) : null;
-      if (!spec) return;
-      selectedLayers = new Set(familyMembers(spec).map((m) => m.layer));
-      renderLayerPicker(spec);
-      renderChart(spec);
-    });
-    document.getElementById("pickClearLayers").addEventListener("click", () => {
-      const spec = activeSpecId ? specById.get(activeSpecId) : null;
-      selectedLayers = new Set();
-      if (spec) {
-        renderLayerPicker(spec);
-        renderChart(spec);
-      }
-    });
-    renderHeader();
+    manifestCache.set(runId, { specById, model: manifest.model });
+    await loadAvailableRuns();
+    wireEvents();
+    if (typeof wireNotesUi === "function") wireNotesUi();
+    await renderHeader();
     lossLog = await loadLossLog();
+    lossLogByRun.set(runId, lossLog);
+    syncLossRangeInputs();
+    updateLossCompareToggle();
     renderLossChart();
     renderLayerTabs();
     renderArchitecture();
+    if (typeof refreshNotes === "function") refreshNotes();
   } catch (err) {
     document.getElementById("architecture").innerHTML =
       `<div class="error">Failed to load viewer data: ${escapeHtml(err.message)}<br><br>` +
-      `Run <code>python3 viewer/scripts/build_viewer_data.py --clean</code> or ` +
-      `<a href="index.html">choose another dataset</a>.</div>`;
+      `Run <code>python3 scripts/build_viewer_data.py</code> or ` +
+      `<a href="select.html">choose another dataset</a>.</div>`;
   }
+}
+
+function wireEvents() {
+  document.getElementById("compareLayers").addEventListener("change", (e) => {
+    compareLayers = e.target.checked;
+    const spec = activeSpec();
+    if (compareLayers) {
+      compareRuns = false;
+      const runInput = document.getElementById("compareRuns");
+      if (runInput) runInput.checked = false;
+      if (spec) ensureDefaultSelectedLayers(spec);
+    }
+    if (spec) {
+      updateCompareToggle(spec);
+      renderChart(spec);
+    } else {
+      updateCompareToggle(null);
+    }
+  });
+  document.getElementById("compareRuns")?.addEventListener("change", async (e) => {
+    await setCompareRuns(e.target.checked);
+  });
+  document.getElementById("pickAllRuns")?.addEventListener("click", async () => {
+    selectedRuns = new Set(availableRuns.map((r) => r.run_id));
+    renderRunPicker();
+    await ensureSelectedRunManifests();
+    const spec = activeSpec();
+    if (spec) renderChart(spec);
+  });
+  document.getElementById("pickCurrentRun")?.addEventListener("click", () => {
+    selectedRuns = new Set([runId]);
+    renderRunPicker();
+    const spec = activeSpec();
+    if (spec) renderChart(spec);
+  });
+  document.getElementById("resetZoomBtn").addEventListener("click", resetChartZoom);
+  document.getElementById("expandBtn").addEventListener("click", openFullscreen);
+  document.getElementById("fullCloseBtn").addEventListener("click", closeFullscreen);
+  document.getElementById("fullResetZoomBtn").addEventListener("click", () => fullChart?.resetZoom?.());
+  document.getElementById("chartOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "chartOverlay") closeFullscreen();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !fullOverlayOpen) return;
+    const noteModal = document.getElementById("noteModal");
+    if (noteModal && !noteModal.hidden) return;
+    closeFullscreen();
+  });
+  document.getElementById("pickCurrentLayer").addEventListener("click", () => {
+    const spec = activeSpecId ? specById.get(activeSpecId) : null;
+    if (!spec) return;
+    selectedLayers = new Set([activeLayer]);
+    renderLayerPicker(spec);
+    renderChart(spec);
+  });
+  document.getElementById("pickAllLayers").addEventListener("click", () => {
+    const spec = activeSpecId ? specById.get(activeSpecId) : null;
+    if (!spec) return;
+    selectedLayers = new Set(familyMembers(spec).map((m) => m.layer));
+    renderLayerPicker(spec);
+    renderChart(spec);
+  });
+  document.getElementById("pickClearLayers").addEventListener("click", () => {
+    const spec = activeSpecId ? specById.get(activeSpecId) : null;
+    selectedLayers = new Set();
+    if (spec) {
+      renderLayerPicker(spec);
+      renderChart(spec);
+    }
+  });
+
+  document.getElementById("lossResetZoomBtn")?.addEventListener("click", () => lossChart?.resetZoom?.());
+  document.getElementById("lossExpandBtn")?.addEventListener("click", openLossFullscreen);
+  document.getElementById("compareLossRuns")?.addEventListener("change", async (e) => {
+    await setCompareLossRuns(e.target.checked);
+  });
+  document.querySelectorAll(".loss-view-btn").forEach((btn) => {
+    btn.addEventListener("click", () => setLossViewMode(btn.dataset.mode));
+  });
+  document.getElementById("lossApplyRangeBtn")?.addEventListener("click", applyLossStepRange);
+  document.getElementById("lossResetRangeBtn")?.addEventListener("click", resetLossStepRange);
+  document.getElementById("lossApplyRangeFullBtn")?.addEventListener("click", () => {
+    const minEl = document.getElementById("lossStepMinFull");
+    const maxEl = document.getElementById("lossStepMaxFull");
+    const mainMin = document.getElementById("lossStepMin");
+    const mainMax = document.getElementById("lossStepMax");
+    if (mainMin && minEl) mainMin.value = minEl.value;
+    if (mainMax && maxEl) mainMax.value = maxEl.value;
+    applyLossStepRange();
+  });
+  for (const id of ["lossStepMin", "lossStepMax", "lossStepMinFull", "lossStepMaxFull"]) {
+    document.getElementById(id)?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        if (id.endsWith("Full")) document.getElementById("lossApplyRangeFullBtn")?.click();
+        else applyLossStepRange();
+      }
+    });
+  }
+}
+
+async function loadAvailableRuns() {
+  try {
+    const data = await fetchJson("data/index.json");
+    availableRuns = Array.isArray(data.runs) ? data.runs : [];
+  } catch (_) {
+    availableRuns = [{ run_id: runId, label: runId }];
+  }
+  if (!availableRuns.some((r) => r.run_id === runId)) {
+    availableRuns = [{ run_id: runId, label: runId }, ...availableRuns];
+  }
+  selectedRuns = new Set(availableRuns.map((r) => r.run_id));
+}
+
+function canCompareRuns() {
+  return availableRuns.length >= 2;
+}
+
+function runLabel(rid) {
+  const found = availableRuns.find((r) => r.run_id === rid);
+  return found?.label || rid;
+}
+
+function runColor(rid) {
+  const idx = availableRuns.findIndex((r) => r.run_id === rid);
+  return RUN_COLORS[(idx >= 0 ? idx : 0) % RUN_COLORS.length];
+}
+
+function activeSpec() {
+  return activeSpecId ? specById.get(activeSpecId) : null;
+}
+
+async function ensureRunManifest(rid) {
+  const cached = manifestCache.get(rid);
+  if (cached && !cached.error) return cached;
+  try {
+    const m = await fetchJson(`data/${rid}/manifest.json`);
+    const map = new Map(m.specs.map((s) => [s.id, s]));
+    const entry = { specById: map, model: m.model };
+    manifestCache.set(rid, entry);
+    return entry;
+  } catch (err) {
+    // Do not sticky-cache failures — allow retry after rebuild / rename.
+    manifestCache.delete(rid);
+    throw err;
+  }
+}
+
+async function ensureSelectedRunManifests() {
+  const ids = [...selectedRuns].filter((rid) => rid !== runId);
+  if (!ids.length) return;
+  const gen = ++manifestLoadGen;
+  runsLoading = true;
+  setRunPickStatus("Loading other setups… (large manifests, may take a few seconds)");
+  try {
+    await Promise.all(ids.map((rid) => ensureRunManifest(rid)));
+    if (gen !== manifestLoadGen) return;
+    setRunPickStatus("");
+  } catch (err) {
+    if (gen !== manifestLoadGen) return;
+    setRunPickStatus(`Failed to load setup data: ${err.message}`, true);
+  } finally {
+    if (gen === manifestLoadGen) runsLoading = false;
+  }
+}
+
+function setRunPickStatus(text, isError = false) {
+  const el = document.getElementById("runPickStatus");
+  if (!el) return;
+  if (!text) {
+    el.hidden = true;
+    el.textContent = "";
+    el.classList.remove("is-error");
+    return;
+  }
+  el.hidden = false;
+  el.textContent = text;
+  el.classList.toggle("is-error", !!isError);
+}
+
+async function setCompareRuns(on) {
+  compareRuns = on;
+  if (on) {
+    compareLayers = false;
+    const layerInput = document.getElementById("compareLayers");
+    if (layerInput) layerInput.checked = false;
+    if (!selectedRuns.size) {
+      selectedRuns = new Set(availableRuns.map((r) => r.run_id));
+    }
+    await ensureSelectedRunManifests();
+  }
+  const spec = activeSpec();
+  updateCompareToggle(spec);
+  if (spec) renderChart(spec);
+}
+
+async function ensureLossLogForRun(rid) {
+  const cached = lossLogByRun.get(rid);
+  if (cached && !cached.error) return cached;
+  const text = await fetchText(`data/${rid}/eval_loss_log.csv`);
+  if (!text) {
+    lossLogByRun.delete(rid);
+    return { error: true };
+  }
+  const parsed = parseLossCsv(text);
+  if (!parsed) {
+    lossLogByRun.delete(rid);
+    return { error: true };
+  }
+  lossLogByRun.set(rid, parsed);
+  return parsed;
+}
+
+function selectedRunIds() {
+  return [...selectedRuns];
+}
+
+async function setCompareLossRuns(on) {
+  compareLossRuns = on;
+  if (on) {
+    await Promise.all(selectedRunIds().map((rid) => ensureLossLogForRun(rid)));
+  }
+  updateLossCompareToggle();
+  syncLossRangeInputs();
+  renderLossChart();
+  if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
+}
+
+function updateLossCompareToggle() {
+  const wrap = document.getElementById("compareLossRunsWrap");
+  const input = document.getElementById("compareLossRuns");
+  if (!wrap || !input) return;
+  const ok = canCompareRuns() && lossLog && !lossLog.error;
+  wrap.hidden = !ok;
+  if (!ok) {
+    compareLossRuns = false;
+    input.checked = false;
+    return;
+  }
+  input.checked = compareLossRuns;
 }
 
 async function fetchJson(url) {
@@ -156,143 +373,6 @@ async function fetchText(url) {
   const res = await fetch(`${url}${sep}t=${Date.now()}`, { cache: "no-store" });
   if (!res.ok) return null;
   return res.text();
-}
-
-function parseLossCsv(text) {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return null;
-
-  const headers = lines[0].split(",").map((h) => h.trim());
-  const col = (name) => headers.indexOf(name);
-  const iterIdx = col("iter");
-  const trainIdx = col("train_loss");
-  const valIdx = col("val_loss");
-  if (iterIdx < 0 || trainIdx < 0 || valIdx < 0) return null;
-
-  const train = [];
-  const val = [];
-  for (let i = 1; i < lines.length; i += 1) {
-    const cols = lines[i].split(",");
-    const x = Number(cols[iterIdx]);
-    const yt = Number(cols[trainIdx]);
-    const yv = Number(cols[valIdx]);
-    if (Number.isFinite(x) && Number.isFinite(yt)) train.push({ x, y: yt });
-    if (Number.isFinite(x) && Number.isFinite(yv)) val.push({ x, y: yv });
-  }
-  if (!train.length && !val.length) return null;
-  return { train, val };
-}
-
-async function loadLossLog() {
-  const text = await fetchText(`data/${runId}/eval_loss_log.csv`);
-  if (!text) return { error: true };
-  const parsed = parseLossCsv(text);
-  if (!parsed) return { error: true };
-  return parsed;
-}
-
-function destroyLossChart() {
-  if (lossChart) {
-    lossChart.destroy();
-    lossChart = null;
-  }
-}
-
-function lossInfoText() {
-  if (!lossLog || lossLog.error) return "";
-  const lastTrain = lossLog.train.at(-1);
-  const lastVal = lossLog.val.at(-1);
-  const maxStep = Math.max(lastTrain?.x ?? 0, lastVal?.x ?? 0);
-  const modeLabel = lossViewMode === "both" ? "train + val" : lossViewMode;
-  return (
-    `${modeLabel} · ${lossLog.train.length} train · ${lossLog.val.length} val · step 0–${maxStep}` +
-    (lastTrain ? ` · train=${lastTrain.y.toFixed(4)}` : "") +
-    (lastVal ? ` · val=${lastVal.y.toFixed(4)}` : "")
-  );
-}
-
-function buildLossDatasets() {
-  if (!lossLog || lossLog.error) return null;
-  const datasets = [];
-  if (lossViewMode === "both" || lossViewMode === "train") {
-    datasets.push({
-      label: "Train loss",
-      data: lossLog.train,
-      borderColor: "#2563eb",
-      backgroundColor: "rgba(37, 99, 235, 0.12)",
-      borderWidth: 2,
-      pointRadius: 0,
-      tension: 0.2,
-      fill: false,
-    });
-  }
-  if (lossViewMode === "both" || lossViewMode === "val") {
-    datasets.push({
-      label: "Val loss",
-      data: lossLog.val,
-      borderColor: "#dc2626",
-      backgroundColor: "rgba(220, 38, 38, 0.12)",
-      borderWidth: 2,
-      pointRadius: 0,
-      tension: 0.2,
-      fill: false,
-    });
-  }
-  return datasets.length ? datasets : null;
-}
-
-function createLossChart(canvas) {
-  const datasets = buildLossDatasets();
-  if (!datasets) return null;
-  return new Chart(canvas, {
-    type: "line",
-    data: { datasets },
-    options: chartCommonOptions({ legend: true }),
-  });
-}
-
-function updateLossViewButtons() {
-  document.querySelectorAll(".loss-view-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.mode === lossViewMode);
-  });
-}
-
-function setLossOverlayChrome(show) {
-  const el = document.getElementById("lossViewToggleFull");
-  if (el) el.hidden = !show;
-}
-
-function setLossViewMode(mode) {
-  if (!["both", "train", "val"].includes(mode)) return;
-  lossViewMode = mode;
-  updateLossViewButtons();
-  renderLossChart();
-  if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
-}
-
-function renderLossChart() {
-  const section = document.getElementById("lossSection");
-  const infoEl = document.getElementById("lossInfo");
-  const canvas = document.getElementById("lossChart");
-  destroyLossChart();
-  updateLossViewButtons();
-
-  if (lossLog?.error) {
-    section.hidden = false;
-    infoEl.textContent = "未找到 eval_loss_log.csv（请确认该文件已 push 到仓库）";
-    return;
-  }
-
-  if (!lossLog) {
-    section.hidden = true;
-    return;
-  }
-
-  section.hidden = false;
-  infoEl.textContent = lossInfoText();
-
-  lossChart = createLossChart(canvas);
-  if (lossChart) canvas.ondblclick = () => lossChart?.resetZoom?.();
 }
 
 function groupSpecsByModule(specs) {
@@ -314,11 +394,23 @@ function groupSpecsByFamily(specs) {
   return map;
 }
 
-function renderHeader() {
+async function resolveRunLabel() {
+  try {
+    const data = await fetchJson("data/index.json");
+    const run = (data.runs || []).find((r) => r.run_id === runId);
+    return run?.label || runId;
+  } catch (_) {
+    return runId;
+  }
+}
+
+async function renderHeader() {
   const m = manifest.model;
+  const label = await resolveRunLabel();
   document.getElementById("runSubtitle").textContent =
-    `${m.name} · ${m.n_layer} layers · ${m.n_embd} dim · ${manifest.n_specs} observables`;
-  document.getElementById("runBadge").textContent = manifest.run_id;
+    `${label} · ${m.name} · ${m.n_layer} layers · ${m.n_embd} dim · ${manifest.n_specs} observables`;
+  document.getElementById("runBadge").textContent = label;
+  document.title = `${label} · nanoGPT Observable Explorer`;
 }
 
 function renderLayerTabs() {
@@ -398,8 +490,7 @@ function renderArchitecture() {
   const headRow = document.createElement("div");
   headRow.className = "node-row";
   for (const node of ARCH_NODES.head) {
-    const uiId = node.id;
-    headRow.appendChild(createModuleNode(uiId, node.title, node.subtitle, uiId, node.optional));
+    headRow.appendChild(createModuleNode(node.id, node.title, node.subtitle, node.id, node.optional));
   }
   flow.appendChild(headRow);
 
@@ -449,9 +540,6 @@ function createModuleNode(uiModuleId, title, subtitle, moduleKey, optional = fal
   } else {
     el.classList.add("disabled");
     el.disabled = true;
-    if (optional) {
-      el.querySelector?.(".subtitle");
-    }
   }
 
   el.innerHTML = `
@@ -460,24 +548,6 @@ function createModuleNode(uiModuleId, title, subtitle, moduleKey, optional = fal
     <div class="subtitle">${escapeHtml(subtitle)}${count === 0 ? " · no data" : ""}</div>
   `;
   return el;
-}
-
-function selectModule(moduleKey, title, subtitle) {
-  activeModuleId = moduleKey;
-  activeSpecId = null;
-  renderArchitecture();
-
-  const specs = specsByModule.get(moduleKey) || [];
-  document.getElementById("detailEmpty").style.display = "none";
-  const detail = document.getElementById("detailContent");
-  detail.classList.add("visible");
-
-  document.getElementById("moduleTitle").textContent = friendlyModuleLabel(moduleKey, title);
-  const exampleSelector = specs[0]?.selector || `transformer.${moduleKey}`;
-  document.getElementById("modulePath").textContent = exampleSelector;
-
-  renderSpecGroups(specs);
-  renderChart(null);
 }
 
 function friendlyModuleLabel(moduleKey, fallback) {
@@ -489,6 +559,24 @@ function friendlyModuleLabel(moduleKey, fallback) {
   if (mGelu) return `Block ${mGelu[1]} · MLP GELU (massive activation)`;
   if (moduleKey === "lm_head") return "LM Head (logits)";
   return raw || fallback || moduleKey;
+}
+
+function selectModule(moduleKey, title, subtitle) {
+  activeModuleId = moduleKey;
+  activeSpecId = null;
+  renderArchitecture();
+
+  const specs = specsByModule.get(moduleKey) || [];
+  document.getElementById("detailEmpty").style.display = "none";
+  document.getElementById("detailContent").classList.add("visible");
+
+  document.getElementById("moduleTitle").textContent = friendlyModuleLabel(moduleKey, title);
+  const exampleSelector = specs[0]?.selector || `transformer.${moduleKey}`;
+  document.getElementById("modulePath").textContent = exampleSelector;
+
+  // Auto-selects first spec via renderSpecGroups → selectSpec → renderChart.
+  // Do not call renderChart(null) afterward (that blanked the chart).
+  renderSpecGroups(specs);
 }
 
 function renderSpecGroups(specs) {
@@ -568,24 +656,78 @@ function ensureDefaultSelectedLayers(spec) {
 }
 
 function updateCompareToggle(spec) {
-  const wrap = document.getElementById("compareToggleWrap");
-  const input = document.getElementById("compareLayers");
-  const pickWrap = document.getElementById("layerPickWrap");
-  const ok = canCompareLayers(spec);
-  wrap.hidden = !ok;
-  if (!ok) {
+  const layerWrap = document.getElementById("compareToggleWrap");
+  const layerInput = document.getElementById("compareLayers");
+  const layerPickWrap = document.getElementById("layerPickWrap");
+  const runWrap = document.getElementById("compareRunsWrap");
+  const runInput = document.getElementById("compareRuns");
+  const runPickWrap = document.getElementById("runPickWrap");
+
+  const canLayers = !!(spec && canCompareLayers(spec));
+  const canRunsGlobal = canCompareRuns();
+  const showRunToggle = !!(spec && canRunsGlobal);
+
+  // Hide toggles when no spec — but do NOT reset compareRuns / compareLayers.
+  if (runWrap) runWrap.hidden = !showRunToggle;
+  if (runInput) runInput.checked = compareRuns;
+  if (runPickWrap) {
+    if (showRunToggle && compareRuns) {
+      renderRunPicker();
+      runPickWrap.hidden = false;
+    } else {
+      runPickWrap.hidden = true;
+    }
+  }
+
+  if (compareRuns && compareLayers) {
     compareLayers = false;
-    input.checked = false;
-    pickWrap.hidden = true;
+  }
+
+  if (layerWrap) layerWrap.hidden = !canLayers || compareRuns;
+  if (!canLayers || compareRuns) {
+    if (layerInput) layerInput.checked = false;
+    if (layerPickWrap) layerPickWrap.hidden = true;
     return;
   }
-  input.checked = compareLayers;
+  if (layerInput) layerInput.checked = compareLayers;
   if (compareLayers) {
     ensureDefaultSelectedLayers(spec);
     renderLayerPicker(spec);
-    pickWrap.hidden = false;
-  } else {
-    pickWrap.hidden = true;
+    if (layerPickWrap) layerPickWrap.hidden = false;
+  } else if (layerPickWrap) {
+    layerPickWrap.hidden = true;
+  }
+}
+
+function renderRunPicker() {
+  const list = document.getElementById("runPickList");
+  if (!list) return;
+  list.innerHTML = "";
+  for (const run of availableRuns) {
+    const color = runColor(run.run_id);
+    const checked = selectedRuns.has(run.run_id);
+    const label = document.createElement("label");
+    label.className = `layer-pick-chip${checked ? " active" : ""}`;
+    label.style.setProperty("--chip-color", color);
+    const name = run.label || run.run_id;
+    const currentMark = run.run_id === runId ? " · current" : "";
+    label.innerHTML = `
+      <input type="checkbox" ${checked ? "checked" : ""} />
+      <span class="layer-pick-dot"></span>
+      <span>${escapeHtml(name)}${currentMark}</span>
+    `;
+    label.querySelector("input").addEventListener("change", async (e) => {
+      if (e.target.checked) selectedRuns.add(run.run_id);
+      else selectedRuns.delete(run.run_id);
+      renderRunPicker();
+      await ensureSelectedRunManifests();
+      const spec = activeSpec();
+      if (spec) renderChart(spec);
+      if (compareLossRuns) {
+        await setCompareLossRuns(true);
+      }
+    });
+    list.appendChild(label);
   }
 }
 
@@ -690,15 +832,53 @@ function pointsFromSeries(series) {
   return series.steps.map((step, i) => ({ x: step, y: series.values[i] }));
 }
 
-// Build the Chart.js datasets for the currently selected spec/state.
-// Returns { datasets, legend } for a line chart, { empty:true } when compare
-// mode has no layers selected, or null when there is no plottable series.
 function buildLineDatasets(spec) {
+  if (compareRuns && canCompareRuns()) {
+    const datasets = [];
+    const missing = [];
+    for (const run of availableRuns) {
+      if (!selectedRuns.has(run.run_id)) continue;
+      const cache = manifestCache.get(run.run_id);
+      const other = cache?.specById?.get(spec.id);
+      if (!other?.series?.steps?.length) {
+        missing.push(runLabel(run.run_id));
+        continue;
+      }
+      const color = runColor(run.run_id);
+      const isCurrent = run.run_id === runId;
+      datasets.push({
+        label: runLabel(run.run_id),
+        data: pointsFromSeries(other.series),
+        borderColor: color,
+        backgroundColor: `${color}22`,
+        borderWidth: isCurrent ? 2.5 : 1.75,
+        borderDash: isCurrent ? [] : [6, 3],
+        pointRadius: 0,
+        tension: 0.2,
+        fill: false,
+      });
+    }
+    if (!datasets.length) {
+      return {
+        empty: true,
+        emptyMessage: runsLoading
+          ? "Loading setup data…"
+          : missing.length
+            ? `No matching series for: ${missing.join(", ")}`
+            : "Select at least one setup above",
+      };
+    }
+    return {
+      legend: true,
+      datasets,
+      missingNote: missing.length ? `missing in ${missing.join(", ")}` : "",
+    };
+  }
   if (compareLayers && canCompareLayers(spec)) {
     const members = familyMembers(spec)
       .filter((m) => selectedLayers.has(m.layer))
       .sort((a, b) => a.layer - b.layer);
-    if (!members.length) return { empty: true };
+    if (!members.length) return { empty: true, emptyMessage: "请在上方勾选要对比的层" };
     return {
       legend: true,
       datasets: members.map((m) => {
@@ -736,8 +916,75 @@ function buildLineDatasets(spec) {
 }
 
 function chartTitleFor(spec) {
+  if (compareRuns && canCompareRuns()) return `${spec.label} · setup compare`;
   if (compareLayers && canCompareLayers(spec)) return `${spec.label} · 层对比`;
   return spec.label;
+}
+
+function chartInfoFor(spec, lineData = null) {
+  if (compareRuns && canCompareRuns()) {
+    const labels = availableRuns
+      .filter((r) => selectedRuns.has(r.run_id))
+      .map((r) => runLabel(r.run_id));
+    const base = `${spec.role} · ${labels.join(" vs ") || "no setup"} · every ${spec.every} steps`;
+    return lineData?.missingNote ? `${base} · ${lineData.missingNote}` : base;
+  }
+  if (compareLayers && canCompareLayers(spec)) {
+    const labels = familyMembers(spec)
+      .filter((m) => selectedLayers.has(m.layer))
+      .sort((a, b) => a.layer - b.layer)
+      .map((m) => `L${m.layer}`).join(", ") || "未选层";
+    return `${spec.role} · ${labels} · every ${spec.every} steps`;
+  }
+  return `${spec.selector} · every ${spec.every} steps`;
+}
+
+function renderSpecDefinition(spec) {
+  const el = document.getElementById("chartDef");
+  if (!el) return;
+  if (!spec) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
+  }
+
+  const pieces = typeof buildSpecDefinitionLatex === "function"
+    ? buildSpecDefinitionLatex(spec)
+    : null;
+  if (!pieces?.length) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
+  }
+
+  const partsHtml = [];
+  partsHtml.push(`<span class="chart-def-label">定义</span>`);
+  for (let i = 0; i < pieces.length; i += 1) {
+    if (i > 0) partsHtml.push(`<span class="chart-def-sep">·</span>`);
+    let html;
+    if (window.katex) {
+      try {
+        html = katex.renderToString(pieces[i].tex, {
+          throwOnError: false,
+          displayMode: false,
+          output: "html",
+        });
+      } catch (_) {
+        html = `<code>${escapeHtml(pieces[i].name)}</code>`;
+      }
+    } else {
+      html = `<code>${escapeHtml(pieces[i].name)}</code>`;
+    }
+    partsHtml.push(`<span class="chart-def-eq" title="${escapeHtml(pieces[i].name)}">${html}</span>`);
+  }
+  const href = typeof referenceAnchorForSpec === "function"
+    ? referenceAnchorForSpec(spec)
+    : "reference.html";
+  partsHtml.push(
+    `<a class="chart-def-link" href="${href}" target="_blank" rel="noopener">参考全文</a>`
+  );
+  el.innerHTML = partsHtml.join("");
+  el.hidden = false;
 }
 
 function renderChart(spec) {
@@ -747,9 +994,11 @@ function renderChart(spec) {
   const image = document.getElementById("curveImage");
 
   canvas.hidden = false;
+  image.hidden = true;
   image.classList.remove("visible");
   image.removeAttribute("src");
   updateCompareToggle(spec);
+  renderSpecDefinition(spec);
 
   if (!spec) {
     titleEl.textContent = "Select an observable";
@@ -761,24 +1010,14 @@ function renderChart(spec) {
 
   destroyChart();
 
-  // Titles/subtitles.
-  if (compareLayers && canCompareLayers(spec)) {
-    const selected = familyMembers(spec)
-      .filter((m) => selectedLayers.has(m.layer))
-      .sort((a, b) => a.layer - b.layer);
-    const labels = selected.map((m) => `L${m.layer}`).join(", ") || "未选层";
-    titleEl.textContent = chartTitleFor(spec);
-    infoEl.textContent = `${spec.role} · ${labels} · every ${spec.every} steps`;
-  } else {
-    titleEl.textContent = spec.label;
-    infoEl.textContent = `${spec.selector} · every ${spec.every} steps`;
-  }
-
   const lineData = buildLineDatasets(spec);
+  titleEl.textContent = chartTitleFor(spec);
+  infoEl.textContent = chartInfoFor(spec, lineData);
 
   if (lineData?.empty) {
     setChartChrome(false);
-    infoEl.textContent = "请在上方勾选要对比的层";
+    infoEl.textContent = lineData.emptyMessage || "请在上方勾选要对比的层";
+    if (fullOverlayOpen && fullOverlayMode === "spec") renderFullChart(spec);
     return;
   }
 
@@ -790,7 +1029,7 @@ function renderChart(spec) {
     });
     attachDoubleClickReset(canvas);
     setChartChrome(true);
-    if (fullOverlayOpen) renderFullChart(spec);
+    if (fullOverlayOpen && fullOverlayMode === "spec") renderFullChart(spec);
     return;
   }
 
@@ -798,20 +1037,296 @@ function renderChart(spec) {
 
   if (spec.curve_png) {
     canvas.hidden = true;
+    image.hidden = false;
     image.onload = () => image.classList.add("visible");
     image.onerror = () => {
       infoEl.textContent = "PNG curve not found yet — training may still be running.";
     };
-    image.src = `data/${runId}/${spec.curve_png}`;
+    image.src = `data/${runId}/${spec.curve_png}?t=${Date.now()}`;
     return;
   }
 
   infoEl.textContent = "No curve data yet.";
 }
 
-let fullChart = null;
-let fullOverlayOpen = false;
-let fullOverlayMode = null;
+/* ---------- Loss chart ---------- */
+
+function parseLossCsv(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return null;
+
+  const headers = lines[0].split(",").map((h) => h.trim());
+  const col = (name) => headers.indexOf(name);
+  const iterIdx = col("iter");
+  const trainIdx = col("train_loss");
+  const valIdx = col("val_loss");
+  if (iterIdx < 0 || trainIdx < 0 || valIdx < 0) return null;
+
+  const train = [];
+  const val = [];
+  for (let i = 1; i < lines.length; i += 1) {
+    const cols = lines[i].split(",");
+    const x = Number(cols[iterIdx]);
+    const yt = Number(cols[trainIdx]);
+    const yv = Number(cols[valIdx]);
+    if (Number.isFinite(x) && Number.isFinite(yt)) train.push({ x, y: yt });
+    if (Number.isFinite(x) && Number.isFinite(yv)) val.push({ x, y: yv });
+  }
+  if (!train.length && !val.length) return null;
+  return { train, val };
+}
+
+async function loadLossLog() {
+  const text = await fetchText(`data/${runId}/eval_loss_log.csv`);
+  if (!text) return { error: true };
+  const parsed = parseLossCsv(text);
+  if (!parsed) return { error: true };
+  return parsed;
+}
+
+function lossLogsForChart() {
+  if (compareLossRuns && canCompareRuns()) {
+    const want = new Set(selectedRunIds());
+    return availableRuns
+      .filter((r) => want.has(r.run_id))
+      .map((r) => ({ run_id: r.run_id, label: runLabel(r.run_id), log: lossLogByRun.get(r.run_id) }))
+      .filter((x) => x.log && !x.log.error);
+  }
+  if (!lossLog || lossLog.error) return [];
+  return [{ run_id: runId, label: runLabel(runId), log: lossLog }];
+}
+
+function lossDataBounds() {
+  const logs = lossLogsForChart();
+  const xs = [];
+  for (const item of logs) {
+    for (const p of [...item.log.train, ...item.log.val]) xs.push(p.x);
+  }
+  if (!xs.length) return { min: 0, max: 0 };
+  return { min: Math.min(...xs), max: Math.max(...xs) };
+}
+
+function syncLossRangeInputs() {
+  const bounds = lossDataBounds();
+  if (lossLog?.error) return;
+  for (const [minId, maxId] of [
+    ["lossStepMin", "lossStepMax"],
+    ["lossStepMinFull", "lossStepMaxFull"],
+  ]) {
+    const minEl = document.getElementById(minId);
+    const maxEl = document.getElementById(maxId);
+    if (!minEl || !maxEl) continue;
+    minEl.placeholder = String(bounds.min);
+    maxEl.placeholder = String(bounds.max);
+    minEl.value = lossStepMin == null ? "" : String(lossStepMin);
+    maxEl.value = lossStepMax == null ? "" : String(lossStepMax);
+  }
+}
+
+function applyLossStepRange() {
+  const minEl = document.getElementById("lossStepMin");
+  const maxEl = document.getElementById("lossStepMax");
+  const bounds = lossDataBounds();
+  let min = minEl.value === "" ? null : Number(minEl.value);
+  let max = maxEl.value === "" ? null : Number(maxEl.value);
+  if (min != null && !Number.isFinite(min)) min = null;
+  if (max != null && !Number.isFinite(max)) max = null;
+  if (min != null && max != null && min > max) [min, max] = [max, min];
+  if (min != null && min < bounds.min) min = bounds.min;
+  if (max != null && max > bounds.max) max = bounds.max;
+  lossStepMin = min;
+  lossStepMax = max;
+  syncLossRangeInputs();
+  renderLossChart();
+  if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
+}
+
+function resetLossStepRange() {
+  lossStepMin = null;
+  lossStepMax = null;
+  syncLossRangeInputs();
+  renderLossChart();
+  if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
+}
+
+function filterLossPoints(points) {
+  return points.filter((p) => {
+    if (lossStepMin != null && p.x < lossStepMin) return false;
+    if (lossStepMax != null && p.x > lossStepMax) return false;
+    return true;
+  });
+}
+
+function destroyLossChart() {
+  if (lossChart) {
+    lossChart.destroy();
+    lossChart = null;
+  }
+}
+
+function lossInfoText() {
+  const logs = lossLogsForChart();
+  const bounds = lossDataBounds();
+  const lo = lossStepMin ?? bounds.min;
+  const hi = lossStepMax ?? bounds.max;
+  const modeLabel = lossViewMode === "both" ? "train + val" : lossViewMode;
+  if (compareLossRuns && canCompareRuns()) {
+    const want = new Set(selectedRunIds());
+    const missing = availableRuns
+      .filter((r) => want.has(r.run_id))
+      .filter((r) => {
+        const log = lossLogByRun.get(r.run_id);
+        return !log || log.error;
+      })
+      .map((r) => runLabel(r.run_id));
+    if (!logs.length) {
+      return missing.length
+        ? `setup compare · no loss data (${missing.join(", ")})`
+        : "setup compare · no loss data";
+    }
+    const names = logs.map((x) => x.label).join(" vs ");
+    return (
+      `${modeLabel} · setup compare · ${names} · step ${lo}–${hi}` +
+      (missing.length ? ` · missing: ${missing.join(", ")}` : "")
+    );
+  }
+  if (!logs.length) return "";
+  const item = logs[0];
+  const train = filterLossPoints(item.log.train);
+  const val = filterLossPoints(item.log.val);
+  const lastTrain = train.at(-1);
+  const lastVal = val.at(-1);
+  return (
+    `${modeLabel} · step ${lo}–${hi} · ${train.length} train / ${val.length} val pts` +
+    (lastTrain ? ` · train=${lastTrain.y.toFixed(4)}` : "") +
+    (lastVal ? ` · val=${lastVal.y.toFixed(4)}` : "")
+  );
+}
+
+function buildLossDatasets() {
+  const logs = lossLogsForChart();
+  if (!logs.length) return null;
+  const datasets = [];
+
+  if (compareLossRuns && canCompareRuns()) {
+    for (const item of logs) {
+      const color = runColor(item.run_id);
+      const isCurrent = item.run_id === runId;
+      if (lossViewMode === "both" || lossViewMode === "train") {
+        datasets.push({
+          label: `${item.label} · train`,
+          data: filterLossPoints(item.log.train),
+          borderColor: color,
+          backgroundColor: `${color}22`,
+          borderWidth: isCurrent ? 2.5 : 1.75,
+          borderDash: [],
+          pointRadius: 0,
+          tension: 0.2,
+          fill: false,
+        });
+      }
+      if (lossViewMode === "both" || lossViewMode === "val") {
+        datasets.push({
+          label: `${item.label} · val`,
+          data: filterLossPoints(item.log.val),
+          borderColor: color,
+          backgroundColor: `${color}22`,
+          borderWidth: isCurrent ? 2.5 : 1.75,
+          borderDash: [6, 3],
+          pointRadius: 0,
+          tension: 0.2,
+          fill: false,
+        });
+      }
+    }
+    return datasets.length ? datasets : null;
+  }
+
+  const item = logs[0];
+  if (lossViewMode === "both" || lossViewMode === "train") {
+    datasets.push({
+      label: "Train loss",
+      data: filterLossPoints(item.log.train),
+      borderColor: "#2563eb",
+      backgroundColor: "rgba(37, 99, 235, 0.12)",
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.2,
+      fill: false,
+    });
+  }
+  if (lossViewMode === "both" || lossViewMode === "val") {
+    datasets.push({
+      label: "Val loss",
+      data: filterLossPoints(item.log.val),
+      borderColor: "#dc2626",
+      backgroundColor: "rgba(220, 38, 38, 0.12)",
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.2,
+      fill: false,
+    });
+  }
+  return datasets.length ? datasets : null;
+}
+
+function createLossChart(canvas) {
+  const datasets = buildLossDatasets();
+  if (!datasets) return null;
+  return new Chart(canvas, {
+    type: "line",
+    data: { datasets },
+    options: chartCommonOptions({ legend: true }),
+  });
+}
+
+function updateLossViewButtons() {
+  document.querySelectorAll(".loss-view-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.mode === lossViewMode);
+  });
+}
+
+function setLossOverlayChrome(show) {
+  const el = document.getElementById("lossViewToggleFull");
+  if (el) el.hidden = !show;
+  const range = document.getElementById("lossRangeFull");
+  if (range) range.hidden = !show;
+}
+
+function setLossViewMode(mode) {
+  if (!["both", "train", "val"].includes(mode)) return;
+  lossViewMode = mode;
+  updateLossViewButtons();
+  renderLossChart();
+  if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
+}
+
+function renderLossChart() {
+  const section = document.getElementById("lossSection");
+  const infoEl = document.getElementById("lossInfo");
+  const canvas = document.getElementById("lossChart");
+  if (!section || !infoEl || !canvas) return;
+
+  destroyLossChart();
+  updateLossViewButtons();
+  updateLossCompareToggle();
+
+  if (lossLog?.error) {
+    section.hidden = false;
+    infoEl.textContent = "未找到 eval_loss_log.csv";
+    return;
+  }
+
+  if (!lossLog) {
+    section.hidden = true;
+    return;
+  }
+
+  section.hidden = false;
+  infoEl.textContent = lossInfoText();
+  lossChart = createLossChart(canvas);
+  if (lossChart) canvas.ondblclick = () => lossChart?.resetZoom?.();
+}
 
 function renderFullLossChart() {
   const canvas = document.getElementById("curveChartFull");
@@ -824,7 +1339,12 @@ function renderFullLossChart() {
   titleEl.textContent = "Training Loss";
   infoEl.textContent = lossInfoText();
   fullChart = createLossChart(canvas);
-  if (fullChart) canvas.ondblclick = () => fullChart?.resetZoom?.();
+  if (fullChart) {
+    canvas.ondblclick = () => fullChart?.resetZoom?.();
+    if (typeof attachFullscreenNoteHandlers === "function") {
+      attachFullscreenNoteHandlers(fullChart);
+    }
+  }
 }
 
 function renderFullChart(spec) {
@@ -837,17 +1357,11 @@ function renderFullChart(spec) {
   }
   const lineData = buildLineDatasets(spec);
   titleEl.textContent = chartTitleFor(spec);
-  if (compareLayers && canCompareLayers(spec)) {
-    const labels = familyMembers(spec)
-      .filter((m) => selectedLayers.has(m.layer))
-      .sort((a, b) => a.layer - b.layer)
-      .map((m) => `L${m.layer}`).join(", ") || "未选层";
-    infoEl.textContent = `${spec.role} · ${labels} · every ${spec.every} steps`;
-  } else {
-    infoEl.textContent = `${spec.selector} · every ${spec.every} steps`;
-  }
+  infoEl.textContent = chartInfoFor(spec, lineData);
   if (!lineData || lineData.empty) {
-    infoEl.textContent = lineData?.empty ? "请在上方勾选要对比的层" : "No curve data yet.";
+    infoEl.textContent = lineData?.empty
+      ? (lineData.emptyMessage || "请在上方勾选要对比的层")
+      : "No curve data yet.";
     return;
   }
   fullChart = new Chart(canvas, {
@@ -856,6 +1370,9 @@ function renderFullChart(spec) {
     options: chartCommonOptions({ legend: lineData.legend }),
   });
   canvas.ondblclick = () => fullChart?.resetZoom?.();
+  if (typeof attachFullscreenNoteHandlers === "function") {
+    attachFullscreenNoteHandlers(fullChart);
+  }
 }
 
 function openLossFullscreen() {
@@ -868,10 +1385,11 @@ function openLossFullscreen() {
   overlay.classList.add("visible");
   overlay.setAttribute("aria-hidden", "false");
   renderFullLossChart();
+  if (typeof refreshNotes === "function") refreshNotes();
 }
 
 function openFullscreen() {
-  const spec = activeSpecId ? specById.get(activeSpecId) : null;
+  const spec = activeSpec();
   if (!spec) return;
   fullOverlayMode = "spec";
   fullOverlayOpen = true;
@@ -881,9 +1399,11 @@ function openFullscreen() {
   overlay.classList.add("visible");
   overlay.setAttribute("aria-hidden", "false");
   renderFullChart(spec);
+  if (typeof refreshNotes === "function") refreshNotes();
 }
 
 function closeFullscreen() {
+  if (typeof closeNoteModal === "function") closeNoteModal();
   fullOverlayOpen = false;
   fullOverlayMode = null;
   setLossOverlayChrome(false);
@@ -908,11 +1428,21 @@ function clearSelection() {
   activeModuleId = null;
   activeSpecId = null;
   compareLayers = false;
+  compareRuns = false;
   selectedLayers = new Set();
   const input = document.getElementById("compareLayers");
   if (input) input.checked = false;
-  document.getElementById("compareToggleWrap").hidden = true;
-  document.getElementById("layerPickWrap").hidden = true;
+  const runInput = document.getElementById("compareRuns");
+  if (runInput) runInput.checked = false;
+  const layerWrap = document.getElementById("compareToggleWrap");
+  if (layerWrap) layerWrap.hidden = true;
+  const runWrap = document.getElementById("compareRunsWrap");
+  if (runWrap) runWrap.hidden = true;
+  const layerPick = document.getElementById("layerPickWrap");
+  if (layerPick) layerPick.hidden = true;
+  const runPick = document.getElementById("runPickWrap");
+  if (runPick) runPick.hidden = true;
+  setRunPickStatus("");
   setChartChrome(false);
   closeFullscreen();
   document.getElementById("detailEmpty").style.display = "grid";

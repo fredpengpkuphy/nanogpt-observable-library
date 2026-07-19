@@ -3,10 +3,10 @@
 Build viewer data from training observables: manifest + tree-organized curves.
 
 Usage:
-    python3 viewer/scripts/build_viewer_data.py
-    python3 viewer/scripts/build_viewer_data.py --obs-dir out_baseline/observables
-    python3 viewer/scripts/build_viewer_data.py --run run_20260704_184808
-    python3 viewer/scripts/build_viewer_data.py --clean
+    python3 scripts/build_viewer_data.py
+    python3 scripts/build_viewer_data.py --obs-dir ../out_baseline/observables
+    python3 scripts/build_viewer_data.py --run run_20260709_031351
+    python3 scripts/build_viewer_data.py --clean
 """
 
 from __future__ import annotations
@@ -21,9 +21,16 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-VIEWER_DATA = ROOT / "viewer" / "data"
-DEFAULT_OBS = ROOT / "out_baseline" / "observables"
+# Repo root is this viewer package (scripts/..). Also works when nested as
+# <project>/viewer/scripts/... with observables under <project>/out_baseline.
+VIEWER_ROOT = Path(__file__).resolve().parents[1]
+VIEWER_DATA = VIEWER_ROOT / "data"
+_PARENT = VIEWER_ROOT.parent
+DEFAULT_OBS = (
+    (_PARENT / "out_baseline" / "observables")
+    if (_PARENT / "out_baseline" / "observables").is_dir()
+    else (VIEWER_ROOT / "out_baseline" / "observables")
+)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from curve_tree import organize_curves, selector_to_ui_module  # noqa: E402
@@ -170,11 +177,14 @@ def build_manifest(obs_dir: Path, run_id: str, curve_paths: dict[str, str]) -> d
             "n_layers": len(members),
         }
 
+    layer_idxs = [e["layer"] for e in spec_entries if e.get("layer") is not None]
+    n_layer = (max(layer_idxs) + 1) if layer_idxs else 12
+
     return {
         "run_id": run_id,
         "model": {
             "name": "nanoGPT GPT-2 124M",
-            "n_layer": 12,
+            "n_layer": n_layer,
             "n_head": 12,
             "n_embd": 768,
             "block_size": 1024,
@@ -200,21 +210,30 @@ def clean_viewer_data():
     VIEWER_DATA.mkdir(parents=True)
 
 
-def copy_loss_log(obs_dir: Path, run_id: str, dest: Path) -> bool:
+def copy_loss_log(
+    obs_dir: Path, run_id: str, dest: Path, *, allow_shared: bool = False
+) -> bool:
+    """Copy run-specific loss log into viewer data. Prefer per-run filenames."""
     candidates = [
-        obs_dir / "eval_loss_log.csv",
         obs_dir / f"{run_id}_eval_loss_log.csv",
-        obs_dir.parent / "eval_loss_log.csv",
-        dest / "eval_loss_log.csv",
+        obs_dir / run_id / "eval_loss_log.csv",
+        dest / "eval_loss_log.csv",  # already present (manual drop-in)
     ]
+    # Shared fallback only for single-run builds — otherwise every run
+    # could silently receive the same loss curve.
+    if allow_shared:
+        candidates.append(obs_dir / "eval_loss_log.csv")
     for src in candidates:
-        if src.is_file():
-            shutil.copy2(src, dest / "eval_loss_log.csv")
-            return True
+        if not src.is_file():
+            continue
+        target = dest / "eval_loss_log.csv"
+        if src.resolve() != target.resolve():
+            shutil.copy2(src, target)
+        return True
     return False
 
 
-def build_run(obs_dir: Path, run_id: str) -> dict:
+def build_run(obs_dir: Path, run_id: str, *, allow_shared_loss: bool = False) -> dict:
     specs_path = obs_dir / f"{run_id}_specs.json"
     if not specs_path.exists():
         raise SystemExit(f"Missing {specs_path}")
@@ -236,7 +255,7 @@ def build_run(obs_dir: Path, run_id: str) -> dict:
     with (dest / "manifest.json").open("w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
 
-    has_loss = copy_loss_log(obs_dir, run_id, dest)
+    has_loss = copy_loss_log(obs_dir, run_id, dest, allow_shared=allow_shared_loss)
 
     meta = meta_from_manifest(run_id, manifest)
     meta["n_curves"] = len(curve_paths)
@@ -262,12 +281,32 @@ def meta_from_manifest(run_id: str, manifest: dict) -> dict:
     }
 
 
+def load_existing_labels() -> dict[str, str]:
+    """Preserve custom display names from data/index.json across rebuilds."""
+    index_path = VIEWER_DATA / "index.json"
+    if not index_path.exists():
+        return {}
+    try:
+        with index_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    labels = {}
+    for run in data.get("runs") or []:
+        rid = run.get("run_id")
+        lab = run.get("label")
+        if rid and lab and lab != rid:
+            labels[rid] = lab
+    return labels
+
+
 def rebuild_index(built_metas: list[dict]) -> list[dict]:
     """Merge newly built runs with any existing run dirs under viewer/data."""
     by_id = {m["run_id"]: m for m in built_metas}
+    saved_labels = load_existing_labels()
     if VIEWER_DATA.exists():
-        for run_dir in sorted(VIEWER_DATA.glob("run_*")):
-            if not run_dir.is_dir():
+        for run_dir in sorted(VIEWER_DATA.iterdir()):
+            if not run_dir.is_dir() or run_dir.name.startswith("."):
                 continue
             run_id = run_dir.name
             if run_id in by_id:
@@ -280,6 +319,21 @@ def rebuild_index(built_metas: list[dict]) -> list[dict]:
             meta = meta_from_manifest(run_id, manifest)
             meta["has_loss"] = (run_dir / "eval_loss_log.csv").is_file()
             by_id[run_id] = meta
+    for run_id, meta in by_id.items():
+        if run_id in saved_labels:
+            meta["label"] = saved_labels[run_id]
+            continue
+        # Folder may have been renamed; recover label via embedded manifest run_id.
+        manifest_path = VIEWER_DATA / run_id / "manifest.json"
+        if not manifest_path.exists():
+            continue
+        try:
+            with manifest_path.open(encoding="utf-8") as f:
+                old_id = json.load(f).get("run_id")
+        except (OSError, json.JSONDecodeError):
+            continue
+        if old_id and old_id in saved_labels:
+            meta["label"] = saved_labels[old_id]
     return sorted(by_id.values(), key=lambda m: m["run_id"], reverse=True)
 
 
@@ -300,9 +354,10 @@ def main():
         VIEWER_DATA.mkdir(parents=True, exist_ok=True)
 
     run_ids = find_run_ids(obs_dir, args.run)
+    allow_shared_loss = len(run_ids) == 1
     metas = []
     for run_id in run_ids:
-        meta = build_run(obs_dir, run_id)
+        meta = build_run(obs_dir, run_id, allow_shared_loss=allow_shared_loss)
         metas.append(meta)
         print(
             f"Built {run_id}: specs={meta['n_specs']}, "
