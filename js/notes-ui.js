@@ -62,9 +62,7 @@ function collectChartSteps(chart) {
   const steps = new Set();
   for (const ds of chart.data?.datasets || []) {
     for (const p of ds.data || []) {
-      if (!p || !Number.isFinite(p.x)) continue;
-      // Loss log–log plots at step+1 and stores the true step in `_step`.
-      steps.add(p._step != null ? p._step : p.x);
+      if (p && Number.isFinite(p.x)) steps.add(p.x);
     }
   }
   return [...steps].sort((a, b) => a - b);
@@ -75,33 +73,18 @@ function nearestStep(chart, pixelX) {
   if (!xScale) return null;
   const xVal = xScale.getValueForPixel(pixelX);
   if (!Number.isFinite(xVal)) return null;
-  let best = null;
-  let bestDist = Infinity;
-  for (const ds of chart.data?.datasets || []) {
-    for (const p of ds.data || []) {
-      if (!p || !Number.isFinite(p.x)) continue;
-      const d = Math.abs(p.x - xVal);
-      if (d < bestDist) {
-        bestDist = d;
-        best = p._step != null ? p._step : p.x;
-      }
+  const steps = collectChartSteps(chart);
+  if (!steps.length) return Math.round(xVal);
+  let best = steps[0];
+  let bestDist = Math.abs(steps[0] - xVal);
+  for (const s of steps) {
+    const d = Math.abs(s - xVal);
+    if (d < bestDist) {
+      best = s;
+      bestDist = d;
     }
   }
-  if (best != null) return best;
-  return Math.round(xVal);
-}
-
-function plotXForNoteStep(step) {
-  // Loss log–log charts plot at step+1 (log axis cannot show 0).
-  if (
-    typeof fullOverlayMode !== "undefined" &&
-    fullOverlayMode === "loss" &&
-    typeof lossScaleMode !== "undefined" &&
-    lossScaleMode === "loglog"
-  ) {
-    return Number(step) + 1;
-  }
-  return step;
+  return best;
 }
 
 function noteAnnotationConfig(notes) {
@@ -113,11 +96,10 @@ function noteAnnotationConfig(notes) {
   const annotations = {};
   let i = 0;
   for (const [step, list] of byStep) {
-    const x = plotXForNoteStep(step);
     annotations[`note_${i++}`] = {
       type: "line",
-      xMin: x,
-      xMax: x,
+      xMin: step,
+      xMax: step,
       borderColor: "rgba(232, 200, 136, 0.9)",
       borderWidth: 1.5,
       borderDash: [4, 3],

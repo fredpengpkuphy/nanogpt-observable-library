@@ -1250,29 +1250,16 @@ function resetLossStepRange() {
   if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
 }
 
-/**
- * Prepare loss points for charting.
- * Log–log cannot plot x=0, so we plot at (step+1) and keep the true step in `_step`.
- */
 function filterLossPoints(points) {
-  const out = [];
-  for (const p of points) {
-    if (lossStepMin != null && p.x < lossStepMin) continue;
-    if (lossStepMax != null && p.x > lossStepMax) continue;
+  return points.filter((p) => {
+    if (lossStepMin != null && p.x < lossStepMin) return false;
+    if (lossStepMax != null && p.x > lossStepMax) return false;
     if (lossScaleMode === "loglog") {
-      if (!(p.y > 0) || !Number.isFinite(p.y)) continue;
-      if (!Number.isFinite(p.x) || p.x < 0) continue;
-      out.push({ x: p.x + 1, y: p.y, _step: p.x });
-    } else {
-      out.push(p);
+      // Log scales require strictly positive values (step 0 cannot be shown).
+      if (!(p.x > 0) || !(p.y > 0)) return false;
     }
-  }
-  return out;
-}
-
-function lossPointStep(p) {
-  if (!p) return null;
-  return p._step != null ? p._step : p.x;
+    return true;
+  });
 }
 
 function lossChartScaleOptions() {
@@ -1282,27 +1269,8 @@ function lossChartScaleOptions() {
   return {
     x: {
       type: log ? "logarithmic" : "linear",
-      title: {
-        display: true,
-        text: log ? "Step (log, plotted as step+1)" : "Step",
-        color: axis,
-      },
-      ticks: {
-        color: axis,
-        callback: log
-          ? (val) => {
-              const step = Number(val) - 1;
-              if (!Number.isFinite(step) || step < 0) return "";
-              // Prefer clean labels: 0, 1, 2, … and decade marks.
-              if (step === 0 || step === 1 || step === 2 || step === 5) return String(step);
-              const log10 = Math.log10(step);
-              if (Number.isFinite(log10) && Math.abs(log10 - Math.round(log10)) < 1e-9) {
-                return String(step);
-              }
-              return "";
-            }
-          : undefined,
-      },
+      title: { display: true, text: log ? "Step (log)" : "Step", color: axis },
+      ticks: { color: axis },
       grid: { color: grid },
     },
     y: {
@@ -1317,16 +1285,6 @@ function lossChartScaleOptions() {
 function lossChartOptions({ enablePan = true, onClick = null } = {}) {
   const opts = chartCommonOptions({ legend: true, enablePan, onClick });
   opts.scales = lossChartScaleOptions();
-  opts.plugins = opts.plugins || {};
-  opts.plugins.tooltip = {
-    callbacks: {
-      title: (items) => {
-        if (!items.length) return "";
-        const step = lossPointStep(items[0].raw);
-        return Number.isFinite(step) ? `step ${step}` : "";
-      },
-    },
-  };
   return opts;
 }
 
