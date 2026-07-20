@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=21">
+  <link rel="stylesheet" href="css/style.css?v=22">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 </head>
 <body class="ref-page">
@@ -45,7 +45,10 @@
           <span id="refCount" class="ref-count">—</span>
           <div class="ref-pager">
             <button type="button" class="chart-btn ref-page-btn" id="refPrevPage" title="Previous page" aria-label="Previous page">‹</button>
-            <span id="refPageLabel" class="ref-page-label">—</span>
+            <label class="ref-page-jump" title="Type a page number and press Enter">
+              <input type="number" id="refPageInput" class="ref-page-input" min="1" step="1" inputmode="numeric" aria-label="Page number" />
+              <span class="ref-page-total">/ <span id="refPageTotal">—</span></span>
+            </label>
             <button type="button" class="chart-btn ref-page-btn" id="refNextPage" title="Next page" aria-label="Next page">›</button>
           </div>
         </div>
@@ -59,6 +62,6 @@
 
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script defer src="js/observable_defs.js?v=5"></script>
-  <script defer src="js/reference.js?v=5"></script>
+  <script defer src="js/reference.js?v=6"></script>
 </body>
 </html>

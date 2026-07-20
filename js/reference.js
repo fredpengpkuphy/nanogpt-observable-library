@@ -81,6 +81,28 @@ function wireControls() {
       renderPage();
     }
   });
+  const pageInput = document.getElementById("refPageInput");
+  const jumpToTypedPage = () => {
+    const maxPage = Math.max(0, Math.ceil(filtered.length / PAGE_SIZE) - 1);
+    let n = Number(pageInput.value);
+    if (!Number.isFinite(n)) {
+      pageInput.value = String(page + 1);
+      return;
+    }
+    n = Math.round(n);
+    n = Math.min(Math.max(n, 1), maxPage + 1);
+    page = n - 1;
+    renderPage();
+  };
+  pageInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      jumpToTypedPage();
+      pageInput.blur();
+    }
+  });
+  pageInput.addEventListener("change", jumpToTypedPage);
+  pageInput.addEventListener("focus", () => pageInput.select());
 }
 
 function applyFilters() {
@@ -144,8 +166,14 @@ function renderPage() {
       : total === catalog.length
         ? `${shownStart}–${end} of ${total}`
         : `${shownStart}–${end} of ${total} · ${catalog.length} total`;
-  document.getElementById("refPageLabel").textContent =
-    total === 0 ? "—" : `${page + 1} / ${maxPage + 1}`;
+  const pageInput = document.getElementById("refPageInput");
+  const pageTotal = document.getElementById("refPageTotal");
+  if (pageInput && document.activeElement !== pageInput) {
+    pageInput.value = total === 0 ? "" : String(page + 1);
+    pageInput.max = String(maxPage + 1);
+    pageInput.disabled = total === 0;
+  }
+  if (pageTotal) pageTotal.textContent = total === 0 ? "—" : String(maxPage + 1);
   document.getElementById("refPrevPage").disabled = page <= 0;
   document.getElementById("refNextPage").disabled = page >= maxPage;
 
