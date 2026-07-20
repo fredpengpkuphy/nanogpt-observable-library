@@ -46,6 +46,16 @@ const NotesStore = (() => {
       }
       text = body.slice(m.index + m[0].length).trim();
     }
+    // Fallback: title like "[note] <runId> · step <n>" when meta fence is missing.
+    if (!Number.isFinite(Number(meta.step))) {
+      const tm = String(issue.title || "").match(
+        /^\[note\]\s*(.+?)\s*[·•]\s*step\s*(\d+)/i
+      );
+      if (tm) {
+        meta.runId = meta.runId || tm[1].trim();
+        meta.step = Number(tm[2]);
+      }
+    }
     return {
       id: String(issue.number),
       issueNumber: issue.number,
@@ -60,14 +70,25 @@ const NotesStore = (() => {
     };
   }
 
+  /** Accept labeled notes OR untitled-form notes missing the label. */
+  function isNoteIssue(issue) {
+    if (!issue || issue.pull_request) return false;
+    const want = gh().label || "chart-note";
+    const labels = (issue.labels || []).map((l) => (typeof l === "string" ? l : l.name));
+    if (labels.includes(want)) return true;
+    if (/^\[note\]/i.test(issue.title || "")) return true;
+    if (META_RE.test(issue.body || "")) return true;
+    return false;
+  }
+
   async function listNotes() {
     if (!cfg().enabled) return [];
-    const { label } = gh();
     const issues = [];
-    // GitHub caps per_page at 100; page through so older notes are not dropped.
+    // Do not require the chart-note label: the GitHub "new issue" form drops
+    // unknown labels, so notes would never appear if the label is missing.
     for (let page = 1; page <= 20; page += 1) {
       const url =
-        `${apiBase()}/issues?state=open&labels=${encodeURIComponent(label)}` +
+        `${apiBase()}/issues?state=open` +
         `&per_page=100&page=${page}&sort=created&direction=desc`;
       const res = await fetch(url, { headers: headers(false) });
       if (!res.ok) {
@@ -80,7 +101,7 @@ const NotesStore = (() => {
       if (batch.length < 100) break;
     }
     return issues
-      .filter((i) => !i.pull_request)
+      .filter(isNoteIssue)
       .map(parseIssue)
       .filter((n) => Number.isFinite(n.step));
   }
