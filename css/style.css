@@ -291,7 +291,9 @@ h1, h2, h3,
   background: var(--bg-card);
 }
 
-.loss-view-btn.active {
+.loss-view-btn.active,
+.loss-scale-btn.active,
+.curve-scale-btn.active {
   border-color: rgba(126, 184, 201, 0.45);
   background: rgba(126, 184, 201, 0.16);
   color: var(--text);

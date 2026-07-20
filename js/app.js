@@ -75,6 +75,8 @@ let lossLog = null;
 let lossViewMode = "both";
 /** @type {"linear" | "loglog"} */
 let lossScaleMode = "linear";
+/** @type {"linear" | "loglog"} */
+let curveScaleMode = "linear";
 let lossStepMin = null;
 let lossStepMax = null;
 let fullChart = null;
@@ -208,6 +210,9 @@ function wireEvents() {
   });
   document.querySelectorAll(".loss-scale-btn").forEach((btn) => {
     btn.addEventListener("click", () => setLossScaleMode(btn.dataset.scale));
+  });
+  document.querySelectorAll(".curve-scale-btn").forEach((btn) => {
+    btn.addEventListener("click", () => setCurveScaleMode(btn.dataset.scale));
   });
   document.getElementById("lossApplyRangeBtn")?.addEventListener("click", applyLossStepRange);
   document.getElementById("lossResetRangeBtn")?.addEventListener("click", resetLossStepRange);
@@ -764,18 +769,24 @@ function renderLayerPicker(spec) {
   }
 }
 
-function chartScaleOptions() {
+function chartScaleOptions({
+  scaleMode = "linear",
+  xTitle = "Step",
+  yTitle = "Value",
+} = {}) {
   const axis = "rgba(255, 255, 255, 0.78)";
   const grid = "rgba(255, 255, 255, 0.12)";
+  const log = scaleMode === "loglog";
   return {
     x: {
-      type: "linear",
-      title: { display: true, text: "Step", color: axis },
+      type: log ? "logarithmic" : "linear",
+      title: { display: true, text: log ? `${xTitle} (log)` : xTitle, color: axis },
       ticks: { color: axis },
       grid: { color: grid },
     },
     y: {
-      title: { display: true, text: "Value", color: axis },
+      type: log ? "logarithmic" : "linear",
+      title: { display: true, text: log ? `${yTitle} (log)` : yTitle, color: axis },
       ticks: { color: axis },
       grid: { color: grid },
     },
@@ -804,7 +815,13 @@ function zoomPluginOptions({ enablePan = true } = {}) {
   };
 }
 
-function chartCommonOptions({ legend = false, onClick = null, enablePan = true } = {}) {
+function chartCommonOptions({
+  legend = false,
+  onClick = null,
+  enablePan = true,
+  scaleMode = "linear",
+  yTitle = "Value",
+} = {}) {
   const opts = {
     responsive: true,
     maintainAspectRatio: false,
@@ -824,7 +841,7 @@ function chartCommonOptions({ legend = false, onClick = null, enablePan = true }
       },
       zoom: zoomPluginOptions({ enablePan }),
     },
-    scales: chartScaleOptions(),
+    scales: chartScaleOptions({ scaleMode, yTitle }),
   };
   if (typeof onClick === "function") opts.onClick = onClick;
   return opts;
@@ -928,10 +945,43 @@ function setChartChrome(hasSeriesChart) {
   document.getElementById("resetZoomBtn").hidden = !hasSeriesChart;
   document.getElementById("chartHint").hidden = !hasSeriesChart;
   document.getElementById("expandBtn").hidden = !hasSeriesChart;
+  const scale = document.getElementById("curveScaleToggle");
+  if (scale) scale.hidden = !hasSeriesChart;
+  updateCurveScaleButtons();
 }
 
 function pointsFromSeries(series) {
-  return series.steps.map((step, i) => ({ x: step, y: series.values[i] }));
+  const pts = series.steps.map((step, i) => ({ x: step, y: series.values[i] }));
+  if (curveScaleMode !== "loglog") return pts;
+  // Log scales require strictly positive values (step 0 / non-positive y omitted).
+  return pts.filter(
+    (p) => Number.isFinite(p.x) && Number.isFinite(p.y) && p.x > 0 && p.y > 0
+  );
+}
+
+function lineDataHasPoints(lineData) {
+  return !!(lineData?.datasets || []).some((d) => (d.data || []).length);
+}
+
+function updateCurveScaleButtons() {
+  document.querySelectorAll(".curve-scale-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.scale === curveScaleMode);
+  });
+}
+
+function setCurveScaleMode(mode) {
+  if (!["linear", "loglog"].includes(mode)) return;
+  curveScaleMode = mode;
+  updateCurveScaleButtons();
+  const spec = activeSpec();
+  if (spec) renderChart(spec);
+  if (fullOverlayOpen && fullOverlayMode === "spec" && spec) renderFullChart(spec);
+}
+
+function setCurveOverlayChrome(show) {
+  const el = document.getElementById("curveScaleToggleFull");
+  if (el) el.hidden = !show;
+  if (show) updateCurveScaleButtons();
 }
 
 function buildLineDatasets(spec) {
@@ -1024,21 +1074,24 @@ function chartTitleFor(spec) {
 }
 
 function chartInfoFor(spec, lineData = null) {
+  const scaleLabel = curveScaleMode === "loglog" ? "log–log" : "linear";
+  let base;
   if (compareRuns && canCompareRuns()) {
     const labels = availableRuns
       .filter((r) => selectedRuns.has(r.run_id))
       .map((r) => runLabel(r.run_id));
-    const base = `${spec.role} · ${labels.join(" vs ") || "no setup"} · every ${spec.every} steps`;
-    return lineData?.missingNote ? `${base} · ${lineData.missingNote}` : base;
-  }
-  if (compareLayers && canCompareLayers(spec)) {
+    base = `${spec.role} · ${labels.join(" vs ") || "no setup"} · every ${spec.every} steps`;
+    if (lineData?.missingNote) base = `${base} · ${lineData.missingNote}`;
+  } else if (compareLayers && canCompareLayers(spec)) {
     const labels = familyMembers(spec)
       .filter((m) => selectedLayers.has(m.layer))
       .sort((a, b) => a.layer - b.layer)
       .map((m) => `L${m.layer}`).join(", ") || "no layers selected";
-    return `${spec.role} · ${labels} · every ${spec.every} steps`;
+    base = `${spec.role} · ${labels} · every ${spec.every} steps`;
+  } else {
+    base = `${spec.selector} · every ${spec.every} steps`;
   }
-  return `${spec.selector} · every ${spec.every} steps`;
+  return `${base} · ${scaleLabel}`;
 }
 
 function renderSpecDefinition(spec) {
@@ -1123,10 +1176,22 @@ function renderChart(spec) {
   }
 
   if (lineData) {
+    if (!lineDataHasPoints(lineData)) {
+      setChartChrome(true);
+      infoEl.textContent =
+        curveScaleMode === "loglog"
+          ? "No positive step/value points for log–log view."
+          : "No curve data yet.";
+      if (fullOverlayOpen && fullOverlayMode === "spec") renderFullChart(spec);
+      return;
+    }
     chart = new Chart(canvas, {
       type: "line",
       data: { datasets: lineData.datasets },
-      options: chartCommonOptions({ legend: lineData.legend }),
+      options: chartCommonOptions({
+        legend: lineData.legend,
+        scaleMode: curveScaleMode,
+      }),
     });
     attachDoubleClickReset(canvas);
     setChartChrome(true);
@@ -1547,6 +1612,7 @@ function renderFullChart(spec) {
   const canvas = document.getElementById("curveChartFull");
   const titleEl = document.getElementById("fullChartTitle");
   const infoEl = document.getElementById("fullChartInfo");
+  updateCurveScaleButtons();
   const lineData = buildLineDatasets(spec);
   titleEl.textContent = chartTitleFor(spec);
   infoEl.textContent = chartInfoFor(spec, lineData);
@@ -1555,6 +1621,14 @@ function renderFullChart(spec) {
       ? (lineData.emptyMessage || "Select layers to compare above")
       : "No curve data yet.";
     // Do not destroy an existing healthy chart when a transient empty state appears.
+    return;
+  }
+  if (!lineDataHasPoints(lineData)) {
+    infoEl.textContent =
+      curveScaleMode === "loglog"
+        ? "No positive step/value points for log–log view."
+        : "No curve data yet.";
+    destroyFullChart();
     return;
   }
   destroyFullChart();
@@ -1570,6 +1644,7 @@ function renderFullChart(spec) {
       legend: lineData.legend,
       onClick: fullscreenNoteClickHandler,
       enablePan: false,
+      scaleMode: curveScaleMode,
     }),
   });
   bindFullscreenCanvasInteractions(canvas);
@@ -1579,6 +1654,7 @@ function openLossFullscreen() {
   if (!lossLog || lossLog.error || !buildLossDatasets()) return;
   fullOverlayMode = "loss";
   fullOverlayOpen = true;
+  setCurveOverlayChrome(false);
   setLossOverlayChrome(true);
   const overlay = document.getElementById("chartOverlay");
   overlay.hidden = false;
@@ -1594,6 +1670,7 @@ function openFullscreen() {
   fullOverlayMode = "spec";
   fullOverlayOpen = true;
   setLossOverlayChrome(false);
+  setCurveOverlayChrome(true);
   const overlay = document.getElementById("chartOverlay");
   overlay.hidden = false;
   overlay.classList.add("visible");
@@ -1608,6 +1685,7 @@ function closeFullscreen() {
   fullOverlayOpen = false;
   fullOverlayMode = null;
   setLossOverlayChrome(false);
+  setCurveOverlayChrome(false);
   const overlay = document.getElementById("chartOverlay");
   overlay.classList.remove("visible");
   overlay.setAttribute("aria-hidden", "true");
