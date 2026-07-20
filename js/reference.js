@@ -11,9 +11,9 @@ async function bootReference() {
     if (!res.ok) throw new Error(`reference_catalog.json (${res.status})`);
     const data = await res.json();
     catalog = data.observables || [];
-    document.getElementById("refSubtitle").textContent =
-      `${catalog.length} observables · one direct formula each` +
-      (data.run_id ? ` · from ${data.run_id}` : "");
+    document.getElementById("refSubtitle").textContent = data.run_id
+      ? `Direct formulas from ${data.run_id}`
+      : "Direct formula for each observable";
     fillFilters(catalog);
     wireControls();
     applyFilters();
@@ -136,12 +136,16 @@ function renderPage() {
   const start = page * PAGE_SIZE;
   const slice = filtered.slice(start, start + PAGE_SIZE);
 
+  const end = Math.min(start + PAGE_SIZE, total);
+  const shownStart = total === 0 ? 0 : start + 1;
   document.getElementById("refCount").textContent =
-    total === catalog.length
-      ? `${total} formulas`
-      : `${total} / ${catalog.length} formulas`;
+    total === 0
+      ? "No matches"
+      : total === catalog.length
+        ? `${shownStart}–${end} of ${total}`
+        : `${shownStart}–${end} of ${total} · ${catalog.length} total`;
   document.getElementById("refPageLabel").textContent =
-    total === 0 ? "0 / 0" : `${page + 1} / ${maxPage + 1}`;
+    total === 0 ? "—" : `${page + 1} / ${maxPage + 1}`;
   document.getElementById("refPrevPage").disabled = page <= 0;
   document.getElementById("refNextPage").disabled = page >= maxPage;
 

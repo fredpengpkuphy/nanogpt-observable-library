@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20">
+  <link rel="stylesheet" href="css/style.css?v=21">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 </head>
 <body class="ref-page">
@@ -23,31 +23,31 @@
   </header>
 
   <main class="ref-shell">
-    <section class="panel ref-toolbar">
-      <div class="ref-toolbar-row">
-        <label class="ref-search">
-          <span class="ref-search-label">Search</span>
-          <input type="search" id="refSearch" placeholder="selector / reduction / module / id…" autocomplete="off" />
-        </label>
-        <label class="ref-filter">
-          <span>Source</span>
-          <select id="refSourceFilter">
-            <option value="">All</option>
+    <section class="panel ref-toolbar" aria-label="Catalog filters">
+      <div class="ref-toolbar-inner">
+        <div class="ref-toolbar-controls">
+          <input
+            type="search"
+            id="refSearch"
+            class="ref-search-input"
+            placeholder="Search by selector, reduction, module…"
+            aria-label="Search formulas"
+            autocomplete="off"
+          />
+          <select id="refSourceFilter" class="ref-select" aria-label="Filter by source">
+            <option value="">All sources</option>
           </select>
-        </label>
-        <label class="ref-filter">
-          <span>Reduction</span>
-          <select id="refReductionFilter">
-            <option value="">All</option>
+          <select id="refReductionFilter" class="ref-select" aria-label="Filter by reduction">
+            <option value="">All reductions</option>
           </select>
-        </label>
-      </div>
-      <div class="ref-toolbar-meta">
-        <span id="refCount">—</span>
-        <div class="ref-pager">
-          <button type="button" class="chart-btn" id="refPrevPage">Previous</button>
-          <span id="refPageLabel">—</span>
-          <button type="button" class="chart-btn" id="refNextPage">Next</button>
+        </div>
+        <div class="ref-toolbar-aside">
+          <span id="refCount" class="ref-count">—</span>
+          <div class="ref-pager">
+            <button type="button" class="chart-btn ref-page-btn" id="refPrevPage" title="Previous page" aria-label="Previous page">‹</button>
+            <span id="refPageLabel" class="ref-page-label">—</span>
+            <button type="button" class="chart-btn ref-page-btn" id="refNextPage" title="Next page" aria-label="Next page">›</button>
+          </div>
         </div>
       </div>
     </section>
@@ -59,6 +59,6 @@
 
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script defer src="js/observable_defs.js?v=5"></script>
-  <script defer src="js/reference.js?v=4"></script>
+  <script defer src="js/reference.js?v=5"></script>
 </body>
 </html>
