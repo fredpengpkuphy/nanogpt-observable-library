@@ -73,6 +73,8 @@ let chart = null;
 let lossChart = null;
 let lossLog = null;
 let lossViewMode = "both";
+/** @type {"linear" | "loglog"} */
+let lossScaleMode = "linear";
 let lossStepMin = null;
 let lossStepMax = null;
 let fullChart = null;
@@ -203,6 +205,9 @@ function wireEvents() {
   });
   document.querySelectorAll(".loss-view-btn").forEach((btn) => {
     btn.addEventListener("click", () => setLossViewMode(btn.dataset.mode));
+  });
+  document.querySelectorAll(".loss-scale-btn").forEach((btn) => {
+    btn.addEventListener("click", () => setLossScaleMode(btn.dataset.scale));
   });
   document.getElementById("lossApplyRangeBtn")?.addEventListener("click", applyLossStepRange);
   document.getElementById("lossResetRangeBtn")?.addEventListener("click", resetLossStepRange);
@@ -841,12 +846,24 @@ function fitChartScalesToData(chart) {
   const xMax = Math.max(...xs);
   const yMin = Math.min(...ys);
   const yMax = Math.max(...ys);
-  const yPad = (yMax - yMin) * 0.06 || Math.max(Math.abs(yMax) * 0.05, 1e-6);
-  const xPad = (xMax - xMin) * 0.01 || 1;
-  chart.options.scales.x.min = xMin - xPad;
-  chart.options.scales.x.max = xMax + xPad;
-  chart.options.scales.y.min = yMin - yPad;
-  chart.options.scales.y.max = yMax + yPad;
+  const xLog = chart.options.scales?.x?.type === "logarithmic";
+  const yLog = chart.options.scales?.y?.type === "logarithmic";
+  if (xLog) {
+    chart.options.scales.x.min = Math.max(xMin / 1.05, Number.EPSILON);
+    chart.options.scales.x.max = xMax * 1.05;
+  } else {
+    const xPad = (xMax - xMin) * 0.01 || 1;
+    chart.options.scales.x.min = xMin - xPad;
+    chart.options.scales.x.max = xMax + xPad;
+  }
+  if (yLog) {
+    chart.options.scales.y.min = Math.max(yMin / 1.08, Number.EPSILON);
+    chart.options.scales.y.max = yMax * 1.08;
+  } else {
+    const yPad = (yMax - yMin) * 0.06 || Math.max(Math.abs(yMax) * 0.05, 1e-6);
+    chart.options.scales.y.min = yMin - yPad;
+    chart.options.scales.y.max = yMax + yPad;
+  }
   try {
     chart.update("none");
     return true;
@@ -963,7 +980,7 @@ function buildLineDatasets(spec) {
     const members = familyMembers(spec)
       .filter((m) => selectedLayers.has(m.layer))
       .sort((a, b) => a.layer - b.layer);
-    if (!members.length) return { empty: true, emptyMessage: "请在上方勾选要对比的层" };
+    if (!members.length) return { empty: true, emptyMessage: "Select layers to compare above" };
     return {
       legend: true,
       datasets: members.map((m) => {
@@ -1002,7 +1019,7 @@ function buildLineDatasets(spec) {
 
 function chartTitleFor(spec) {
   if (compareRuns && canCompareRuns()) return `${spec.label} · setup compare`;
-  if (compareLayers && canCompareLayers(spec)) return `${spec.label} · 层对比`;
+  if (compareLayers && canCompareLayers(spec)) return `${spec.label} · layer compare`;
   return spec.label;
 }
 
@@ -1018,7 +1035,7 @@ function chartInfoFor(spec, lineData = null) {
     const labels = familyMembers(spec)
       .filter((m) => selectedLayers.has(m.layer))
       .sort((a, b) => a.layer - b.layer)
-      .map((m) => `L${m.layer}`).join(", ") || "未选层";
+      .map((m) => `L${m.layer}`).join(", ") || "no layers selected";
     return `${spec.role} · ${labels} · every ${spec.every} steps`;
   }
   return `${spec.selector} · every ${spec.every} steps`;
@@ -1063,8 +1080,8 @@ function renderSpecDefinition(spec) {
     direct.description ||
     (typeof buildSpecPlainDescription === "function" ? buildSpecPlainDescription(spec) : "");
   el.innerHTML = [
-    `<div class="chart-def-row"><span class="chart-def-label">定义</span>` +
-      `<a class="chart-def-link" href="${href}" target="_blank" rel="noopener">全部公式</a></div>`,
+    `<div class="chart-def-row"><span class="chart-def-label">Definition</span>` +
+      `<a class="chart-def-link" href="${href}" target="_blank" rel="noopener">All formulas</a></div>`,
     desc ? `<p class="chart-def-desc">${escapeHtml(desc)}</p>` : "",
     `<div class="chart-def-eq" title="${escapeHtml(direct.title)}">${mathHtml}</div>`,
   ].filter(Boolean).join("");
@@ -1100,7 +1117,7 @@ function renderChart(spec) {
 
   if (lineData?.empty) {
     setChartChrome(false);
-    infoEl.textContent = lineData.emptyMessage || "请在上方勾选要对比的层";
+    infoEl.textContent = lineData.emptyMessage || "Select layers to compare above";
     if (fullOverlayOpen && fullOverlayMode === "spec") renderFullChart(spec);
     return;
   }
@@ -1237,8 +1254,38 @@ function filterLossPoints(points) {
   return points.filter((p) => {
     if (lossStepMin != null && p.x < lossStepMin) return false;
     if (lossStepMax != null && p.x > lossStepMax) return false;
+    if (lossScaleMode === "loglog") {
+      // Log scales require strictly positive values.
+      if (!(p.x > 0) || !(p.y > 0)) return false;
+    }
     return true;
   });
+}
+
+function lossChartScaleOptions() {
+  const axis = "rgba(255, 255, 255, 0.78)";
+  const grid = "rgba(255, 255, 255, 0.12)";
+  const log = lossScaleMode === "loglog";
+  return {
+    x: {
+      type: log ? "logarithmic" : "linear",
+      title: { display: true, text: log ? "Step (log)" : "Step", color: axis },
+      ticks: { color: axis },
+      grid: { color: grid },
+    },
+    y: {
+      type: log ? "logarithmic" : "linear",
+      title: { display: true, text: log ? "Loss (log)" : "Loss", color: axis },
+      ticks: { color: axis },
+      grid: { color: grid },
+    },
+  };
+}
+
+function lossChartOptions({ enablePan = true, onClick = null } = {}) {
+  const opts = chartCommonOptions({ legend: true, enablePan, onClick });
+  opts.scales = lossChartScaleOptions();
+  return opts;
 }
 
 function destroyLossChart() {
@@ -1254,6 +1301,7 @@ function lossInfoText() {
   const lo = lossStepMin ?? bounds.min;
   const hi = lossStepMax ?? bounds.max;
   const modeLabel = lossViewMode === "both" ? "train + val" : lossViewMode;
+  const scaleLabel = lossScaleMode === "loglog" ? "log–log" : "linear";
   if (compareLossRuns && canCompareRuns()) {
     const want = new Set(selectedRunIds());
     const missing = availableRuns
@@ -1270,7 +1318,7 @@ function lossInfoText() {
     }
     const names = logs.map((x) => x.label).join(" vs ");
     return (
-      `${modeLabel} · setup compare · ${names} · step ${lo}–${hi}` +
+      `${modeLabel} · ${scaleLabel} · setup compare · ${names} · step ${lo}–${hi}` +
       (missing.length ? ` · missing: ${missing.join(", ")}` : "")
     );
   }
@@ -1281,7 +1329,7 @@ function lossInfoText() {
   const lastTrain = train.at(-1);
   const lastVal = val.at(-1);
   return (
-    `${modeLabel} · step ${lo}–${hi} · ${train.length} train / ${val.length} val pts` +
+    `${modeLabel} · ${scaleLabel} · step ${lo}–${hi} · ${train.length} train / ${val.length} val pts` +
     (lastTrain ? ` · train=${lastTrain.y.toFixed(4)}` : "") +
     (lastVal ? ` · val=${lastVal.y.toFixed(4)}` : "")
   );
@@ -1323,7 +1371,9 @@ function buildLossDatasets() {
         });
       }
     }
-    return datasets.length ? datasets : null;
+    if (!datasets.length) return null;
+    if (!datasets.some((d) => (d.data || []).length)) return null;
+    return datasets;
   }
 
   const item = logs[0];
@@ -1351,16 +1401,18 @@ function buildLossDatasets() {
       fill: false,
     });
   }
-  return datasets.length ? datasets : null;
+  if (!datasets.length) return null;
+  if (!datasets.some((d) => (d.data || []).length)) return null;
+  return datasets;
 }
 
-function createLossChart(canvas) {
+function createLossChart(canvas, { enablePan = true, onClick = null } = {}) {
   const datasets = buildLossDatasets();
   if (!datasets) return null;
   return new Chart(canvas, {
     type: "line",
     data: { datasets },
-    options: chartCommonOptions({ legend: true }),
+    options: lossChartOptions({ enablePan, onClick }),
   });
 }
 
@@ -1368,11 +1420,16 @@ function updateLossViewButtons() {
   document.querySelectorAll(".loss-view-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.mode === lossViewMode);
   });
+  document.querySelectorAll(".loss-scale-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.scale === lossScaleMode);
+  });
 }
 
 function setLossOverlayChrome(show) {
   const el = document.getElementById("lossViewToggleFull");
   if (el) el.hidden = !show;
+  const scale = document.getElementById("lossScaleToggleFull");
+  if (scale) scale.hidden = !show;
   const range = document.getElementById("lossRangeFull");
   if (range) range.hidden = !show;
 }
@@ -1380,6 +1437,14 @@ function setLossOverlayChrome(show) {
 function setLossViewMode(mode) {
   if (!["both", "train", "val"].includes(mode)) return;
   lossViewMode = mode;
+  updateLossViewButtons();
+  renderLossChart();
+  if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
+}
+
+function setLossScaleMode(mode) {
+  if (!["linear", "loglog"].includes(mode)) return;
+  lossScaleMode = mode;
   updateLossViewButtons();
   renderLossChart();
   if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
@@ -1397,7 +1462,7 @@ function renderLossChart() {
 
   if (lossLog?.error) {
     section.hidden = false;
-    infoEl.textContent = "未找到 eval_loss_log.csv";
+    infoEl.textContent = "eval_loss_log.csv not found";
     return;
   }
 
@@ -1409,12 +1474,17 @@ function renderLossChart() {
   section.hidden = false;
   infoEl.textContent = lossInfoText();
   lossChart = createLossChart(canvas);
-  if (lossChart) {
-    canvas.ondblclick = (evt) => {
-      evt.preventDefault();
-      renderLossChart();
-    };
+  if (!lossChart) {
+    infoEl.textContent =
+      lossScaleMode === "loglog"
+        ? "No positive step/loss points for log–log view."
+        : lossInfoText() || "No loss data to display.";
+    return;
   }
+  canvas.ondblclick = (evt) => {
+    evt.preventDefault();
+    renderLossChart();
+  };
 }
 
 function destroyFullChart() {
@@ -1453,24 +1523,24 @@ function renderFullLossChart() {
   const canvas = document.getElementById("curveChartFull");
   const titleEl = document.getElementById("fullChartTitle");
   const infoEl = document.getElementById("fullChartInfo");
+  updateLossViewButtons();
   const datasets = buildLossDatasets();
   titleEl.textContent = "Training Loss";
   infoEl.textContent = lossInfoText();
   if (!datasets) {
-    infoEl.textContent = "No loss data to display.";
+    infoEl.textContent =
+      lossScaleMode === "loglog"
+        ? "No positive step/loss points for log–log view."
+        : "No loss data to display.";
+    destroyFullChart();
     return;
   }
   destroyFullChart();
-  fullChart = new Chart(canvas, {
-    type: "line",
-    data: { datasets },
-    options: chartCommonOptions({
-      legend: true,
-      onClick: fullscreenNoteClickHandler,
-      enablePan: false,
-    }),
+  fullChart = createLossChart(canvas, {
+    enablePan: false,
+    onClick: fullscreenNoteClickHandler,
   });
-  bindFullscreenCanvasInteractions(canvas);
+  if (fullChart) bindFullscreenCanvasInteractions(canvas);
 }
 
 function renderFullChart(spec) {
@@ -1482,7 +1552,7 @@ function renderFullChart(spec) {
   infoEl.textContent = chartInfoFor(spec, lineData);
   if (!lineData || lineData.empty) {
     infoEl.textContent = lineData?.empty
-      ? (lineData.emptyMessage || "请在上方勾选要对比的层")
+      ? (lineData.emptyMessage || "Select layers to compare above")
       : "No curve data yet.";
     // Do not destroy an existing healthy chart when a transient empty state appears.
     return;

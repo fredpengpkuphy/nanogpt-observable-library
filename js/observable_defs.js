@@ -187,183 +187,183 @@ function wrapTemporal(raw, scalarTex) {
 
 /* ---------- Plain-language “what this measures” (Chinese) ---------- */
 
-function modulePlaceZh(spec) {
+function modulePlaceEn(spec) {
   const role = spec.role || "";
   const sel = spec.selector || "";
   const layer = spec.layer;
   const L = layer === null || layer === undefined ? null : Number(layer);
 
-  const layerPrefix = L == null ? "" : `第 ${L} 层 `;
+  const layerPrefix = L == null ? "" : `layer ${L} `;
 
-  if (role === "wte" || sel.includes("wte")) return "Token Embedding（wte）";
-  if (role === "wpe" || sel.includes("wpe")) return "Position Embedding（wpe）";
-  if (role === "ln_f" || sel.includes("ln_f")) return "最终 LayerNorm（ln_f）";
-  if (role === "lm_head" || sel.includes("lm_head")) return "LM Head（词表 logits 投影）";
+  if (role === "wte" || sel.includes("wte")) return "token embedding (wte)";
+  if (role === "wpe" || sel.includes("wpe")) return "position embedding (wpe)";
+  if (role === "ln_f" || sel.includes("ln_f")) return "final LayerNorm (ln_f)";
+  if (role === "lm_head" || sel.includes("lm_head")) return "LM head (vocab logits projection)";
 
-  if (role === "ln_1" || /\.ln_1/.test(sel)) return `${layerPrefix}Pre-Attention LayerNorm（ln_1）`;
-  if (role === "ln_2" || /\.ln_2/.test(sel)) return `${layerPrefix}Pre-MLP LayerNorm（ln_2）`;
+  if (role === "ln_1" || /\.ln_1/.test(sel)) return `${layerPrefix}pre-attention LayerNorm (ln_1)`;
+  if (role === "ln_2" || /\.ln_2/.test(sel)) return `${layerPrefix}pre-MLP LayerNorm (ln_2)`;
   if (role === "attn.c_attn" || sel.includes("c_attn")) {
-    return `${layerPrefix}Attention QKV 投影（c_attn）`;
+    return `${layerPrefix}attention QKV projection (c_attn)`;
   }
   if (role === "attn.c_proj" || /attn\.c_proj/.test(sel)) {
-    return `${layerPrefix}Attention 输出投影（c_proj）`;
+    return `${layerPrefix}attention output projection (c_proj)`;
   }
   if (
     role === "attn" ||
     /^h\.\d+\.attn$/.test(spec.ui_module || "") ||
     (sourceLooksLikeAttentionWeights(spec) && !sel.includes("c_attn") && !sel.includes("c_proj"))
   ) {
-    return `${layerPrefix}因果 Self-Attention（softmax 注意力权重）`;
+    return `${layerPrefix}causal self-attention (softmax attention weights)`;
   }
   if (role === "mlp.c_fc" || sel.includes("c_fc")) {
-    return `${layerPrefix}MLP 上投影（c_fc）`;
+    return `${layerPrefix}MLP up-projection (c_fc)`;
   }
   if (role === "mlp.c_proj" || /mlp\.c_proj/.test(sel)) {
-    return `${layerPrefix}MLP 下投影（c_proj）`;
+    return `${layerPrefix}MLP down-projection (c_proj)`;
   }
   if (role === "mlp.gelu" || (spec.ui_module || "").includes("gelu") || spec.source_kind === "gelu_activation") {
-    return `${layerPrefix}MLP GELU 后隐层`;
+    return `${layerPrefix}MLP post-GELU hidden state`;
   }
 
   if (spec.ui_module) return `${layerPrefix}${spec.ui_module}`;
-  return sel || "该模块";
+  return sel || "this module";
 }
 
 function sourceLooksLikeAttentionWeights(spec) {
   return spec.source_kind === "attention" || String(spec.reduction || "").startsWith("attention_");
 }
 
-function sourceObjectZh(spec) {
+function sourceObjectEn(spec) {
   switch (spec.source_kind) {
     case "weight":
-      return "参数权重张量 θ";
+      return "parameter weight tensor θ";
     case "grad":
-      return "反向传播得到的梯度 g=∇_θℒ";
+      return "backpropagated gradient g=∇_θℒ";
     case "update":
-      return "相邻观测步之间的参数更新量 u=θ_t−θ_{t−1}";
+      return "parameter update between adjacent observation steps u=θ_t−θ_{t−1}";
     case "opt_m":
-      return "Adam 一阶矩估计 m̂（exp_avg）";
+      return "Adam first-moment estimate m̂ (exp_avg)";
     case "opt_v":
-      return "Adam 二阶矩估计 v̂（exp_avg_sq）";
+      return "Adam second-moment estimate v̂ (exp_avg_sq)";
     case "activation":
-      return "该 Linear 的前向输出激活 a";
+      return "forward activation a of this Linear";
     case "preactivation":
-      return "该 Linear 的输入（激活前）ã";
+      return "pre-activation input ã of this Linear";
     case "logits":
-      return "LM head 输出的 logits z（对词表维）";
+      return "LM-head logits z over the vocabulary";
     case "attention":
-      return "因果 softmax 注意力矩阵 A∈ℝ^{B×H×T×T}（query→key 概率）";
+      return "causal softmax attention matrix A∈ℝ^{B×H×T×T} (query→key probabilities)";
     case "gelu_activation":
-      return "MLP 中 GELU 之后的隐层激活";
+      return "post-GELU hidden activations in the MLP";
     default:
-      return spec.source_kind || "张量";
+      return spec.source_kind || "tensor";
   }
 }
 
-function transformClauseZh(tensorOps) {
+function transformClauseEn(tensorOps) {
   if (!tensorOps?.length) return "";
   const parts = [];
   for (const op of tensorOps) {
     const name = parseOpName(op);
     if (name === "center") {
-      parts.push("先沿 batch（sample）维减去均值；若无 batch 维则对全体元素去均值");
+      parts.push("first subtract the mean along the batch (sample) axis, or over all elements if there is no batch axis");
     } else if (name === "abs") {
-      parts.push("先取绝对值");
+      parts.push("first take absolute values");
     } else if (name === "normalize") {
-      parts.push("先沿 feature 维做 L2 归一化（无 feature 维则整体归一化）");
+      parts.push("first L2-normalize along the feature axis (or globally if there is no feature axis)");
     } else if (name === "square") {
-      parts.push("先对元素平方");
+      parts.push("first square the elements");
     } else {
-      parts.push(`先施加变换 ${name}`);
+      parts.push(`first apply transform ${name}`);
     }
   }
-  return parts.length ? parts.join("，") + "，然后" : "";
+  return parts.length ? parts.join("; ") + "; then " : "";
 }
 
-function reductionMeaningZh(reduction, sourceKind) {
+function reductionMeaningEn(reduction, sourceKind) {
   const isAttn = sourceKind === "attention" || String(reduction).startsWith("attention_");
   const isGelu = sourceKind === "gelu_activation" || String(reduction).startsWith("massive_") || reduction === "activation_rate";
 
   switch (reduction) {
     case "mean":
-      return "全体元素的均值，反映整体偏置/平均水平";
+      return "mean over all elements (overall bias / average level)";
     case "std":
-      return "全体元素的标准差，反映离散程度与尺度波动";
+      return "standard deviation over all elements (spread / scale fluctuation)";
     case "min":
-      return "全体元素的最小值";
+      return "minimum over all elements";
     case "max":
-      return "全体元素的最大值";
+      return "maximum over all elements";
     case "l1_norm":
-      return "L1 范数（元素绝对值之和），衡量总“质量”/稀疏相关的尺度";
+      return "L1 norm (sum of absolute values), a total-mass / sparsity-related scale";
     case "l2_norm":
-      return "L2 范数（欧氏长度），衡量该张量的总体能量/尺度";
+      return "L2 norm (Euclidean length), the overall energy / scale of the tensor";
     case "rms":
-      return "均方根 RMS=√E[x²]，衡量典型幅度（对符号不敏感）";
+      return "RMS = √E[x²], a typical magnitude (sign-insensitive)";
     case "max_abs":
-      return "最大绝对值，捕捉最极端的单个元素幅度";
+      return "maximum absolute value — the most extreme single-element magnitude";
     case "sparsity":
-      return "近似零元素比例（|x|<10⁻⁶），衡量有多少分量接近失活/为零";
+      return "fraction of near-zero elements (|x|<10⁻⁶)";
     case "positive_fraction":
-      return "正元素所占比例，反映符号偏置与“激活”占比（对权重/梯度/激活均适用）";
+      return "fraction of positive elements (sign bias / “active” share)";
     case "entropy":
-      return "把 |x| 归一化成概率质量后的 Shannon 熵：越高说明质量越分散，越低说明集中在少数分量上";
+      return "Shannon entropy after normalizing |x| into a probability mass: higher = more diffuse, lower = concentrated on few components";
     case "spectral_norm":
     case "top_singular_value":
-      return "权重矩阵的最大奇异值 σ_max，衡量该线性映射的最大增益（算子范数）";
+      return "largest singular value σ_max of the weight matrix (operator norm / max gain)";
     case "trace":
-      return "方阵的迹 tr(W)，即对角元之和（非方阵时无定义）";
+      return "trace tr(W) of a square matrix (sum of diagonal entries; undefined for non-square)";
     case "row_std_mean":
-      return "各输出行（out）标准差的均值，衡量行方向上的异质性";
+      return "mean of per-output-row standard deviations (row-wise heterogeneity)";
     case "col_std_mean":
-      return "各输入列（in）标准差的均值，衡量列方向上的异质性";
+      return "mean of per-input-column standard deviations (column-wise heterogeneity)";
     case "effective_rank":
-      return "基于去中心化后协方差特征值熵的有效秩：越大说明能量分布在更多方向上，越小说明低秩/坍缩";
+      return "effective rank from the entropy of centered covariance eigenvalues: higher = energy spread over more directions, lower = low-rank / collapse";
     case "attention_entropy_mean":
       return isAttn
-        ? "每个 (batch, head, query) 对 key 分布的 Shannon 熵再取平均：越高注意力越分散，越低越尖锐集中"
-        : "注意力熵的均值";
+        ? "mean Shannon entropy of each (batch, head, query) key distribution: higher = more diffuse attention, lower = sharper focus"
+        : "mean attention entropy";
     case "attention_entropy_min":
-      return "所有 (batch, head, query) 上注意力熵的最小值：越小说明存在极度 peaked 的注意力";
+      return "minimum attention entropy over all (batch, head, query): smaller = extremely peaked attention exists";
     case "attention_sink_first_token":
-      return "非首 token 的 query 分配给 key=0（序列首位置）的平均注意力质量，衡量 attention sink 强度";
+      return "mean attention mass that non-first-token queries assign to key=0 (sequence start) — attention-sink strength";
     case "attention_sink_domination":
-      return "各 key 位置收到的平均注意力质量的最大值：接近 1 表示几乎所有质量汇到单一 key（强 sink）";
+      return "max average attention mass received by any key position: near 1 means almost all mass sinks to one key";
     case "attention_sink_ratio":
-      return "首 token sink 质量相对均匀注意力 1/T 的倍数（= T·E[A_{q,0}]）：>1 表示首位置被过度关注";
+      return "first-token sink mass relative to uniform attention 1/T (= T·E[A_{q,0}]): >1 means the first position is over-attended";
     case "activation_rate":
       return isGelu
-        ? "GELU 后隐层中 x>0 的元素比例（firing rate），衡量有多少单元处于“激活”侧"
-        : "x>0 的元素比例（firing rate）";
+        ? "fraction of post-GELU hidden elements with x>0 (firing rate)"
+        : "fraction of elements with x>0 (firing rate)";
     case "massive_activation_peak_ratio":
-      return "max|x| / RMS(x)：越大说明存在相对背景被强烈放大的 massive activation 尖峰";
+      return "max|x| / RMS(x): larger means a strongly amplified massive-activation spike vs background";
     case "massive_activation_outlier_fraction":
-      return "|x|>3·RMS(x) 的元素占比，衡量逐元素 outlier / massive activation 的覆盖面";
+      return "fraction of elements with |x|>3·RMS(x) (elementwise outlier / massive-activation coverage)";
     case "massive_neuron_fraction":
-      return "在 hidden 维上，若某神经元在全部 batch×time 上的峰值 max|x| 超过 3·RMS(全局)，则计为 massive neuron；本指标是这类神经元占比";
+      return "fraction of hidden neurons whose peak |x| over all batch×time exceeds 3·RMS(global) — massive-neuron share";
     default:
-      return `标量汇总「${reduction}」`;
+      return `scalar summary “${reduction}”`;
   }
 }
 
-function temporalClauseZh(temporalOps) {
+function temporalClauseEn(temporalOps) {
   if (!temporalOps?.length) return "";
   const raw = temporalOps[0];
   const name = parseOpName(raw);
   const args = parseOpArgs(raw);
-  if (name === "delta") return "再对训练步序列做一阶差分（相对上一观测步的变化）。";
+  if (name === "delta") return " Then take a first difference along the training-step series (change vs the previous observation).";
   if (name === "ema") {
     const a = parseNamedArg(args, "alpha") || "0.9";
-    return `再对训练步序列做 EMA 平滑（α=${a}）。`;
+    return ` Then apply EMA smoothing along the training-step series (α=${a}).`;
   }
   if (name === "slope") {
     const w = parseNamedArg(args, "window") || parseNamedArg(args, "w") || "5";
-    return `再在最近 ${w} 个观测点上做 OLS 斜率，看短期趋势。`;
+    return ` Then fit an OLS slope over the last ${w} observations (short-term trend).`;
   }
   if (name === "rolling_std") {
     const w = parseNamedArg(args, "window") || parseNamedArg(args, "w") || "5";
-    return `再取最近 ${w} 个观测点的滚动标准差，看短期波动。`;
+    return ` Then take the rolling standard deviation over the last ${w} observations (short-term volatility).`;
   }
-  if (name === "curvature") return "再做三点二阶差分，看加速度/曲率。";
+  if (name === "curvature") return " Then take a three-point second difference (acceleration / curvature).";
   return "";
 }
 
@@ -372,16 +372,16 @@ function temporalClauseZh(temporalOps) {
  */
 function buildSpecPlainDescription(spec) {
   if (!spec) return "";
-  const place = modulePlaceZh(spec);
-  const obj = sourceObjectZh(spec);
+  const place = modulePlaceEn(spec);
+  const obj = sourceObjectEn(spec);
   const { tensorOps, temporalOps } = splitPipelineOps(spec.transforms || []);
-  const tClause = transformClauseZh(tensorOps);
-  const meaning = reductionMeaningZh(spec.reduction, spec.source_kind);
-  const temporal = temporalClauseZh(temporalOps);
+  const tClause = transformClauseEn(tensorOps);
+  const meaning = reductionMeaningEn(spec.reduction, spec.source_kind);
+  const temporal = temporalClauseEn(temporalOps);
 
-  const core = `测的是${place}的${obj}：${tClause}${meaning}`;
-  if (temporal) return `${core}。${temporal}`;
-  return `${core}。`;
+  const core = `Measures the ${obj} of ${place}: ${tClause}${meaning}`;
+  if (temporal) return `${core}.${temporal}`;
+  return `${core}.`;
 }
 
 /**

@@ -54,10 +54,8 @@ function updateNotesHint() {
   if (!fullOverlayOpen) return;
   const n = notesForCurrentChart().length;
   const base =
-    "单击曲线留言 · 或点「留言」· 滚轮缩放 · 双击重置 · Esc 关闭";
-  hint.textContent = n
-    ? `${base} · 本曲线 ${n} 条公开留言`
-    : base;
+    "Click the curve to leave a note · or use Note · scroll to zoom · double-click to reset · Esc to close";
+  hint.textContent = n ? `${base} · ${n} note${n === 1 ? "" : "s"} on this curve` : base;
 }
 
 function collectChartSteps(chart) {
@@ -141,7 +139,7 @@ function renderNotesRail(notes) {
   const rail = document.getElementById("notesRail");
   if (!rail) return;
   if (!notes.length) {
-    rail.innerHTML = `<p class="notes-rail-empty">No public notes on this curve yet. Click the chart to add one.</p>`;
+    rail.innerHTML = `<p class="notes-rail-empty">No notes yet. Click the chart to add one.</p>`;
     return;
   }
   const sorted = [...notes].sort((a, b) => a.step - b.step || a.createdAt.localeCompare(b.createdAt));
@@ -317,7 +315,7 @@ function openNoteModal(step, { viewOnly = false } = {}) {
     if (existing.length) {
       listEl.hidden = false;
       listEl.innerHTML =
-        `<h4>Public notes at this step</h4>` +
+        `<h4>Notes at this step</h4>` +
         existing
           .map(
             (n) => `
@@ -341,11 +339,6 @@ function openNoteModal(step, { viewOnly = false } = {}) {
   const textEl = document.getElementById("noteText");
   if (authorEl) authorEl.value = localStorage.getItem("noteAuthor") || "";
   if (textEl) textEl.value = "";
-
-  const tokenHint = document.getElementById("noteTokenHint");
-  if (tokenHint) {
-    tokenHint.hidden = NotesStore.hasWriteToken();
-  }
 
   modal.removeAttribute("hidden");
   modal.hidden = false;
@@ -384,9 +377,7 @@ async function submitNote(evt) {
   const key = noteContextKey();
   submitBtn.disabled = true;
   status.hidden = false;
-  status.textContent = NotesStore.hasWriteToken()
-    ? "Publishing note…"
-    : "Opening GitHub to publish your note…";
+  status.textContent = "Publishing…";
 
   try {
     const result = await NotesStore.createNote({
@@ -399,12 +390,11 @@ async function submitNote(evt) {
     });
     if (result.mode === "api") {
       allNotes.unshift(result.note);
-      status.textContent = "Note published.";
+      status.textContent = "Published.";
       if (chartIsAlive(fullChart)) applyNoteAnnotations(fullChart);
       setTimeout(closeNoteModal, 500);
     } else {
-      status.textContent =
-        "Finish creating the GitHub Issue, then refresh notes (or reopen fullscreen).";
+      status.textContent = "Continue in the new tab to publish, then refresh notes.";
     }
   } catch (err) {
     status.textContent = err.message || String(err);

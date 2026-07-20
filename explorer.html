@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=19">
+  <link rel="stylesheet" href="css/style.css?v=20">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
@@ -24,7 +24,7 @@
     <div class="header-actions">
       <a class="header-link" href="select.html">← Select run</a>
       <a class="header-link" href="index.html">Home</a>
-      <a class="header-link" href="reference.html">观测量定义</a>
+      <a class="header-link" href="reference.html">Formulas</a>
       <div class="badge" id="runBadge">—</div>
     </div>
   </header>
@@ -47,12 +47,16 @@
               <button type="button" class="chart-btn loss-view-btn" data-mode="train">Train</button>
               <button type="button" class="chart-btn loss-view-btn" data-mode="val">Val</button>
             </div>
+            <div class="loss-view-toggle" id="lossScaleToggle" title="Axis scale">
+              <button type="button" class="chart-btn loss-scale-btn active" data-scale="linear">Linear</button>
+              <button type="button" class="chart-btn loss-scale-btn" data-scale="loglog">Log–log</button>
+            </div>
             <label class="compare-toggle" id="compareLossRunsWrap" hidden>
               <input type="checkbox" id="compareLossRuns" />
               <span>Compare setups</span>
             </label>
-            <button type="button" class="chart-btn" id="lossResetZoomBtn" title="重置缩放">重置缩放</button>
-            <button type="button" class="chart-btn" id="lossExpandBtn" title="放大查看">⤢ 放大</button>
+            <button type="button" class="chart-btn" id="lossResetZoomBtn" title="Reset zoom">Reset</button>
+            <button type="button" class="chart-btn" id="lossExpandBtn" title="Expand">⤢ Expand</button>
           </div>
         </div>
         <div class="loss-range" id="lossRange">
@@ -63,13 +67,13 @@
           <label>
             <input type="number" id="lossStepMax" min="0" step="1" placeholder="max" />
           </label>
-          <button type="button" class="chart-btn" id="lossApplyRangeBtn">应用</button>
-          <button type="button" class="chart-btn" id="lossResetRangeBtn">全部</button>
+          <button type="button" class="chart-btn" id="lossApplyRangeBtn">Apply</button>
+          <button type="button" class="chart-btn" id="lossResetRangeBtn">All</button>
         </div>
         <div class="loss-chart-wrap">
           <canvas id="lossChart"></canvas>
         </div>
-        <p class="chart-hint">train / val · 指定 step 范围 · 滚轮缩放 · Alt+拖拽平移 · 双击重置</p>
+        <p class="chart-hint">Scroll to zoom · Alt+drag to pan · double-click to reset</p>
       </div>
       <div class="layer-tabs" id="layerTabs"></div>
       <div class="architecture" id="architecture"></div>
@@ -81,8 +85,7 @@
       </div>
       <div class="detail-empty" id="detailEmpty">
         <div>
-          <p>点击左侧模型模块查看观测量</p>
-          <p style="font-size:0.85rem;margin-top:0.5rem;">支持 weight / grad / update / activation / attention / massive / logits</p>
+          <p>Select a module on the left to inspect observables</p>
         </div>
       </div>
       <div class="detail-content" id="detailContent">
@@ -99,8 +102,8 @@
                 <span id="chartInfo"></span>
               </div>
               <div class="chart-actions">
-                <button type="button" class="chart-btn" id="resetZoomBtn" hidden title="重置缩放">重置缩放</button>
-                <button type="button" class="chart-btn" id="expandBtn" hidden title="放大查看">⤢ 放大</button>
+                <button type="button" class="chart-btn" id="resetZoomBtn" hidden title="Reset zoom">Reset</button>
+                <button type="button" class="chart-btn" id="expandBtn" hidden title="Expand">⤢ Expand</button>
                 <label class="compare-toggle" id="compareRunsWrap" hidden>
                   <input type="checkbox" id="compareRuns" />
                   <span>Compare setups</span>
@@ -126,11 +129,11 @@
           </div>
           <div class="layer-pick" id="layerPickWrap" hidden>
             <div class="layer-pick-head">
-              <span>选择对比层</span>
+              <span>Layers to compare</span>
               <div class="layer-pick-presets">
-                <button type="button" class="chart-btn" id="pickCurrentLayer">仅当前层</button>
-                <button type="button" class="chart-btn" id="pickAllLayers">全选</button>
-                <button type="button" class="chart-btn" id="pickClearLayers">清空</button>
+                <button type="button" class="chart-btn" id="pickCurrentLayer">Current only</button>
+                <button type="button" class="chart-btn" id="pickAllLayers">All</button>
+                <button type="button" class="chart-btn" id="pickClearLayers">Clear</button>
               </div>
             </div>
             <div class="layer-pick-list" id="layerPickList"></div>
@@ -139,7 +142,7 @@
             <canvas id="curveChart"></canvas>
             <img id="curveImage" alt="Observable curve" hidden>
           </div>
-          <p class="chart-hint" id="chartHint">滚轮缩放 · Alt+拖拽平移 · 双击重置</p>
+          <p class="chart-hint" id="chartHint">Scroll to zoom · Alt+drag to pan · double-click to reset</p>
         </div>
       </div>
     </section>
@@ -158,15 +161,19 @@
             <button type="button" class="chart-btn loss-view-btn" data-mode="train">Train</button>
             <button type="button" class="chart-btn loss-view-btn" data-mode="val">Val</button>
           </div>
+          <div class="loss-view-toggle" id="lossScaleToggleFull" hidden>
+            <button type="button" class="chart-btn loss-scale-btn" data-scale="linear">Linear</button>
+            <button type="button" class="chart-btn loss-scale-btn" data-scale="loglog">Log–log</button>
+          </div>
           <div class="loss-range loss-range-compact" id="lossRangeFull" hidden>
             <input type="number" id="lossStepMinFull" min="0" step="1" placeholder="min" />
             <span>–</span>
             <input type="number" id="lossStepMaxFull" min="0" step="1" placeholder="max" />
-            <button type="button" class="chart-btn" id="lossApplyRangeFullBtn">应用</button>
+            <button type="button" class="chart-btn" id="lossApplyRangeFullBtn">Apply</button>
           </div>
-          <button type="button" class="chart-btn" id="fullAddNoteBtn" title="在此曲线留言">留言</button>
-          <button type="button" class="chart-btn" id="fullResetZoomBtn" title="重置缩放">重置缩放</button>
-          <button type="button" class="chart-btn" id="fullCloseBtn" title="关闭">✕ 关闭</button>
+          <button type="button" class="chart-btn" id="fullAddNoteBtn" title="Leave a note">Note</button>
+          <button type="button" class="chart-btn" id="fullResetZoomBtn" title="Reset zoom">Reset</button>
+          <button type="button" class="chart-btn" id="fullCloseBtn" title="Close">✕ Close</button>
         </div>
       </div>
       <div class="chart-modal-body chart-modal-body-split">
@@ -175,40 +182,37 @@
         </div>
         <aside class="notes-rail" id="notesRail" aria-label="Public notes">
           <div class="notes-rail-head">
-            <span>Public notes</span>
-            <button type="button" class="chart-btn" id="notesRefreshBtn" title="Refresh notes">↻</button>
+            <span>Notes</span>
+            <button type="button" class="chart-btn" id="notesRefreshBtn" title="Refresh">↻</button>
           </div>
-          <p class="notes-rail-empty">Loading notes…</p>
+          <p class="notes-rail-empty">No notes yet. Click the chart to add one.</p>
         </aside>
       </div>
-      <p class="chart-hint" id="fullChartHint">单击曲线留言 · 或点「留言」· 滚轮缩放 · 双击重置 · Esc 关闭</p>
+      <p class="chart-hint" id="fullChartHint">Click the curve to leave a note · scroll to zoom · double-click to reset · Esc to close</p>
     </div>
   </div>
 
   <div class="note-modal" id="noteModal" aria-hidden="true" hidden>
     <div class="note-dialog" role="dialog" aria-modal="true" aria-labelledby="noteModalTitle">
       <div class="note-dialog-head">
-        <h3 id="noteModalTitle">Leave a public note</h3>
+        <h3 id="noteModalTitle">Leave a note</h3>
         <button type="button" class="chart-btn" id="noteModalClose" title="Close">✕</button>
       </div>
-      <p class="note-dialog-step">At <strong id="noteModalStep">step —</strong> · visible to everyone</p>
+      <p class="note-dialog-step">At <strong id="noteModalStep">step —</strong></p>
       <div id="noteModalExisting" class="note-modal-existing" hidden></div>
       <form id="noteModalForm" class="note-modal-form">
         <label>
-          Display name
+          Name
           <input type="text" id="noteAuthor" maxlength="64" placeholder="anonymous" autocomplete="nickname" />
         </label>
         <label>
           Note
           <textarea id="noteText" rows="4" maxlength="2000" required placeholder="What do you notice at this step?"></textarea>
         </label>
-        <p class="note-token-hint" id="noteTokenHint">
-          No API token configured — submitting will open a GitHub Issue form so the note can be published to this repository.
-        </p>
         <p class="note-modal-status" id="noteModalStatus" hidden></p>
         <div class="note-modal-actions">
           <button type="button" class="chart-btn" id="noteModalCancel">Cancel</button>
-          <button type="submit" class="chart-btn note-submit" id="noteSubmitBtn">Publish note</button>
+          <button type="submit" class="chart-btn note-submit" id="noteSubmitBtn">Publish</button>
         </div>
       </form>
     </div>
@@ -216,8 +220,8 @@
 
   <script src="js/notes-config.js?v=1"></script>
   <script src="js/notes-store.js?v=2"></script>
-  <script src="js/notes-ui.js?v=5"></script>
-  <script src="js/observable_defs.js?v=4"></script>
-  <script src="js/app.js?v=20"></script>
+  <script src="js/notes-ui.js?v=6"></script>
+  <script src="js/observable_defs.js?v=5"></script>
+  <script src="js/app.js?v=21"></script>
 </body>
 </html>

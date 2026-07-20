@@ -12,7 +12,7 @@ async function bootReference() {
     const data = await res.json();
     catalog = data.observables || [];
     document.getElementById("refSubtitle").textContent =
-      `${catalog.length} 条观测量 · 每条一个直接公式` +
+      `${catalog.length} observables · one direct formula each` +
       (data.run_id ? ` · from ${data.run_id}` : "");
     fillFilters(catalog);
     wireControls();

@@ -278,6 +278,10 @@ h1, h2, h3,
   font-size: 0.68rem;
 }
 
+.loss-view-toggle + .loss-view-toggle {
+  margin-left: 0.15rem;
+}
+
 .loss-view-toggle {
   display: inline-flex;
   gap: 0.2rem;
