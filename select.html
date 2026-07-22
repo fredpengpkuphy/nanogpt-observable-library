@@ -7,9 +7,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=25">
+  <link rel="stylesheet" href="css/style.css?v=27">
 </head>
 <body class="select-page">
+  <div class="curator-bar" id="curatorBar" hidden>
+    <div class="curator-bar-inner" id="curatorBarInner"></div>
+  </div>
   <main class="select-shell">
     <header class="select-header select-header-row">
       <div>
@@ -25,6 +28,12 @@
     <div id="selectError" class="select-error" hidden></div>
     <div id="runGrid" class="run-grid" hidden></div>
   </main>
-  <script src="js/select.js?v=7"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="js/notes-config.js?v=2"></script>
+  <script src="js/notes-store.js?v=5"></script>
+  <script src="js/curator-ui.js?v=1"></script>
+  <script src="js/select.js?v=8"></script>
 </body>
 </html>

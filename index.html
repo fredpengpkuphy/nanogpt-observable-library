@@ -40,8 +40,25 @@
       and instrumented the run with observables that may open the door to the science of AI.
     </p>
     <div class="landing-cta">
-      <a class="landing-btn" href="select.html">Start Exploration</a>
+      <a class="landing-btn" id="startExploration" href="select.html">Start Exploration</a>
     </div>
   </main>
+
+  <script>
+    (function () {
+      try {
+        const params = new URLSearchParams(location.search);
+        if (params.has("admin")) {
+          sessionStorage.setItem("notesAdminEntry", "1");
+          location.replace("select.html?admin=1");
+          return;
+        }
+        if (sessionStorage.getItem("notesAdminEntry") === "1") {
+          const a = document.getElementById("startExploration");
+          if (a) a.href = "select.html?admin=1";
+        }
+      } catch (_) {}
+    })();
+  </script>
 </body>
 </html>

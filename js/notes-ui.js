@@ -11,21 +11,13 @@ let noteIsAdmin = false;
 let noteMyHandle = null;
 
 function isNoteAdminEntry() {
-  try {
-    const params = new URLSearchParams(location.search);
-    if (params.has("admin")) {
-      sessionStorage.setItem("notesAdminEntry", "1");
-      return true;
-    }
-    if (sessionStorage.getItem("notesAdminEntry") === "1") return true;
-  } catch (_) {}
-  return false;
+  return typeof CuratorUI !== "undefined"
+    ? CuratorUI.isAdminEntry()
+    : new URLSearchParams(location.search).has("admin");
 }
 
 function clearNoteAdminEntry() {
-  try {
-    sessionStorage.removeItem("notesAdminEntry");
-  } catch (_) {}
+  if (typeof CuratorUI !== "undefined") CuratorUI.clearAdminEntry();
 }
 
 function showCuratorChrome() {
@@ -452,56 +444,9 @@ async function submitNote(evt) {
 }
 
 function renderAdminBar() {
-  const bar = document.getElementById("curatorBar");
-  const inner = document.getElementById("curatorBarInner");
-  if (!bar || !inner) return;
-
-  if (!showCuratorChrome()) {
-    bar.hidden = true;
-    inner.innerHTML = "";
-    document.body.classList.remove("curator-mode");
+  if (typeof CuratorUI !== "undefined") {
+    CuratorUI.render();
     return;
-  }
-
-  bar.hidden = false;
-  if (noteIsAdmin) {
-    document.body.classList.add("curator-mode");
-    inner.innerHTML = `
-      <div class="curator-bar-status">
-        <span class="curator-pill">Curator mode</span>
-        <span class="curator-hint">Signed in globally — open any curve to delete notes</span>
-      </div>
-      <button type="button" class="chart-btn" id="notesAdminSignOut">Sign out</button>`;
-    inner.querySelector("#notesAdminSignOut")?.addEventListener("click", async () => {
-      clearNoteAdminEntry();
-      await NotesStore.signOutAdmin();
-    });
-  } else {
-    document.body.classList.remove("curator-mode");
-    inner.innerHTML = `
-      <div class="curator-bar-status">
-        <span class="curator-pill curator-pill-muted">Curator sign-in</span>
-        <span class="curator-hint">Applies to every curve on this site</span>
-      </div>
-      <form class="notes-admin-form curator-form" id="notesAdminForm">
-        <input type="email" id="adminEmail" placeholder="email" autocomplete="username" required />
-        <input type="password" id="adminPass" placeholder="password" autocomplete="current-password" required />
-        <button type="submit" class="chart-btn">Sign in</button>
-        <span class="notes-admin-status" id="adminStatus"></span>
-      </form>`;
-    inner.querySelector("#notesAdminForm")?.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = inner.querySelector("#adminEmail").value.trim();
-      const pass = inner.querySelector("#adminPass").value;
-      const status = inner.querySelector("#adminStatus");
-      status.textContent = "Signing in…";
-      try {
-        await NotesStore.signInAdmin(email, pass);
-        status.textContent = "";
-      } catch (err) {
-        status.textContent = err.message || String(err);
-      }
-    });
   }
 }
 
@@ -509,11 +454,6 @@ function renderAdminBar() {
 function onNotesAuthChange(state) {
   noteIsAdmin = !!state.isAdmin;
   noteMyHandle = state.isAdmin ? null : state.handle;
-  if (noteIsAdmin) {
-    try {
-      sessionStorage.setItem("notesAdminEntry", "1");
-    } catch (_) {}
-  }
   renderAdminBar();
   const identityEl = document.getElementById("notesRailIdentity");
   if (identityEl) {
@@ -535,7 +475,15 @@ function onNotesAuthChange(state) {
 }
 
 function wireNotesUi() {
-  if (typeof NotesStore !== "undefined") {
+  if (typeof CuratorUI !== "undefined") {
+    document.addEventListener("curator-auth", (e) => {
+      onNotesAuthChange({
+        isAdmin: e.detail.isAdmin,
+        handle: e.detail.handle,
+      });
+    });
+    CuratorUI.wire();
+  } else if (typeof NotesStore !== "undefined") {
     NotesStore.onAuthChange(onNotesAuthChange);
     NotesStore.init();
   }

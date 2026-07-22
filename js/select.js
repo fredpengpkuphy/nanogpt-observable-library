@@ -29,7 +29,10 @@ async function bootSelect() {
 function createRunCard(run) {
   const btn = document.createElement("a");
   btn.className = "run-card";
-  btn.href = `explorer.html?run=${encodeURIComponent(run.run_id)}`;
+  btn.href =
+    typeof CuratorUI !== "undefined"
+      ? CuratorUI.withAdminParam(`explorer.html?run=${encodeURIComponent(run.run_id)}`)
+      : `explorer.html?run=${encodeURIComponent(run.run_id)}`;
 
   const title = document.createElement("div");
   title.className = "run-card-title";
@@ -63,3 +66,4 @@ function escapeHtml(text) {
 }
 
 bootSelect();
+if (typeof CuratorUI !== "undefined") CuratorUI.wire();
