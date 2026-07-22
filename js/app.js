@@ -771,6 +771,43 @@ function renderLayerPicker(spec) {
   }
 }
 
+/** Collect unique plot-x values from chart datasets (log-x tick positions). */
+function collectPlotXsFromChart(chart) {
+  const xs = new Set();
+  for (const ds of chart?.data?.datasets || []) {
+    for (const p of ds.data || []) {
+      if (p && Number.isFinite(p.x) && p.x > 0) xs.add(p.x);
+    }
+  }
+  return [...xs].sort((a, b) => a - b);
+}
+
+/**
+ * Log-x ticks: only mark steps present in the curve.
+ * Plot x=1 stands for true step 0, so label it "0".
+ */
+function logXAxisTickConfig(axisColor) {
+  return {
+    color: axisColor,
+    autoSkip: false,
+    maxRotation: 45,
+    minRotation: 0,
+    callback(value) {
+      const v = Number(value);
+      if (!Number.isFinite(v)) return "";
+      // step 0 is plotted at x=1 → show "0" on the axis
+      if (Math.abs(v - 1) < 1e-12) return "0";
+      if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
+      return String(v);
+    },
+  };
+}
+
+function afterBuildLogXTicks(axis) {
+  const values = collectPlotXsFromChart(axis.chart);
+  axis.ticks = values.map((value) => ({ value }));
+}
+
 function chartScaleOptions({
   scaleMode = "linear",
   xTitle = "Step",
@@ -783,7 +820,8 @@ function chartScaleOptions({
     x: {
       type: log ? "logarithmic" : "linear",
       title: { display: true, text: log ? `${xTitle} (log)` : xTitle, color: axis },
-      ticks: { color: axis },
+      ticks: log ? logXAxisTickConfig(axis) : { color: axis },
+      ...(log ? { afterBuildTicks: afterBuildLogXTicks } : {}),
       grid: { color: grid },
     },
     y: {
@@ -1356,7 +1394,8 @@ function lossChartScaleOptions() {
     x: {
       type: log ? "logarithmic" : "linear",
       title: { display: true, text: log ? "Step (log)" : "Step", color: axis },
-      ticks: { color: axis },
+      ticks: log ? logXAxisTickConfig(axis) : { color: axis },
+      ...(log ? { afterBuildTicks: afterBuildLogXTicks } : {}),
       grid: { color: grid },
     },
     y: {
