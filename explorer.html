@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=30">
+  <link rel="stylesheet" href="css/style.css?v=31">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
@@ -183,10 +183,32 @@
             <input type="number" id="lossStepMaxFull" min="0" step="1" placeholder="max" />
             <button type="button" class="chart-btn" id="lossApplyRangeFullBtn">Apply</button>
           </div>
+          <label class="compare-toggle" id="compareLossRunsFullWrap" hidden>
+            <input type="checkbox" id="compareLossRunsFull" />
+            <span>Compare setups</span>
+          </label>
+          <label class="compare-toggle" id="compareRunsFullWrap" hidden>
+            <input type="checkbox" id="compareRunsFull" />
+            <span>Compare setups</span>
+          </label>
+          <label class="compare-toggle" id="fullResidualWrap" hidden>
+            <input type="checkbox" id="fullResidual" />
+            <span>Residuals vs baseline</span>
+          </label>
           <button type="button" class="chart-btn" id="fullAddNoteBtn" title="Leave a note">Note</button>
           <button type="button" class="chart-btn" id="fullResetZoomBtn" title="Reset zoom">Reset</button>
           <button type="button" class="chart-btn" id="fullCloseBtn" title="Close">✕ Close</button>
         </div>
+      </div>
+      <div class="full-run-pick" id="fullRunPick" hidden>
+        <div class="full-run-pick-head">
+          <span>Setups</span>
+          <div class="layer-pick-presets">
+            <button type="button" class="chart-btn" id="fullPickAllRuns">All</button>
+            <button type="button" class="chart-btn" id="fullPickCurrentRun">Current only</button>
+          </div>
+        </div>
+        <div class="layer-pick-list" id="fullRunPickList"></div>
       </div>
       <div class="chart-modal-body chart-modal-body-split">
         <div class="chart-modal-canvas-wrap">
@@ -243,6 +265,6 @@
   <script src="js/curator-ui.js?v=3"></script>
   <script src="js/notes-ui.js?v=14"></script>
   <script src="js/observable_defs.js?v=5"></script>
-  <script src="js/app.js?v=33"></script>
+  <script src="js/app.js?v=34"></script>
 </body>
 </html>

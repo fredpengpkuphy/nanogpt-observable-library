@@ -1044,6 +1044,36 @@ body.curator-mode .app-header {
   color: var(--text);
 }
 
+.full-run-pick {
+  margin: 0.35rem 0 0.15rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+.full-run-pick[hidden] {
+  display: none !important;
+}
+
+.full-run-pick-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.full-run-pick .layer-pick-list {
+  max-height: 4.5rem;
+  overflow: auto;
+}
+
 .chart-modal-body {
   flex: 1;
   min-height: 0;

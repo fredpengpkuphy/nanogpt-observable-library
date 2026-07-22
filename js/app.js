@@ -148,24 +148,50 @@ function wireEvents() {
   document.getElementById("compareRuns")?.addEventListener("change", async (e) => {
     await setCompareRuns(e.target.checked);
   });
+  document.getElementById("compareRunsFull")?.addEventListener("change", async (e) => {
+    await setCompareRuns(e.target.checked);
+  });
+  document.getElementById("compareLossRunsFull")?.addEventListener("change", async (e) => {
+    await setCompareLossRuns(e.target.checked);
+  });
   document.getElementById("curveResidual")?.addEventListener("change", (e) => {
     setSetupResidualMode(e.target.checked);
   });
   document.getElementById("lossResidual")?.addEventListener("change", (e) => {
     setSetupResidualMode(e.target.checked);
   });
+  document.getElementById("fullResidual")?.addEventListener("change", (e) => {
+    setSetupResidualMode(e.target.checked);
+  });
+  document.getElementById("fullPickAllRuns")?.addEventListener("click", async () => {
+    selectedRuns = new Set(availableRuns.map((r) => r.run_id));
+    renderRunPicker();
+    renderFullRunPicker();
+    await ensureSelectedRunManifests();
+    refreshCompareViews();
+  });
+  document.getElementById("fullPickCurrentRun")?.addEventListener("click", async () => {
+    selectedRuns = new Set([runId]);
+    renderRunPicker();
+    renderFullRunPicker();
+    refreshCompareViews();
+  });
   document.getElementById("pickAllRuns")?.addEventListener("click", async () => {
     selectedRuns = new Set(availableRuns.map((r) => r.run_id));
     renderRunPicker();
+    renderFullRunPicker();
     await ensureSelectedRunManifests();
     const spec = activeSpec();
     if (spec) renderChart(spec);
+    refreshCompareViews();
   });
   document.getElementById("pickCurrentRun")?.addEventListener("click", () => {
     selectedRuns = new Set([runId]);
     renderRunPicker();
+    renderFullRunPicker();
     const spec = activeSpec();
     if (spec) renderChart(spec);
+    refreshCompareViews();
   });
   document.getElementById("resetZoomBtn").addEventListener("click", resetChartZoom);
   document.getElementById("expandBtn").addEventListener("click", openFullscreen);
@@ -340,7 +366,9 @@ async function setCompareRuns(on) {
   const spec = activeSpec();
   updateCompareToggle(spec);
   updateResidualToggles();
+  updateFullscreenCompareChrome();
   if (spec) renderChart(spec);
+  if (fullOverlayOpen && fullOverlayMode === "spec" && spec) renderFullChart(spec);
 }
 
 async function ensureLossLogForRun(rid) {
@@ -467,6 +495,7 @@ function updateResidualToggles() {
     }
   }
   if (!compareRuns && !compareLossRuns) setupResidualMode = false;
+  updateFullscreenCompareChrome();
 }
 
 async function setCompareLossRuns(on) {
@@ -479,6 +508,7 @@ async function setCompareLossRuns(on) {
   }
   updateLossCompareToggle();
   updateResidualToggles();
+  updateFullscreenCompareChrome();
   syncLossRangeInputs();
   renderLossChart();
   if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
@@ -838,6 +868,15 @@ function updateCompareToggle(spec) {
   updateResidualToggles();
 }
 
+function refreshCompareViews() {
+  const spec = activeSpec();
+  if (spec && compareRuns) renderChart(spec);
+  if (compareLossRuns) renderLossChart();
+  if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
+  if (fullOverlayOpen && fullOverlayMode === "spec" && spec) renderFullChart(spec);
+  updateFullscreenCompareChrome();
+}
+
 function renderRunPicker() {
   const list = document.getElementById("runPickList");
   if (!list) return;
@@ -859,14 +898,78 @@ function renderRunPicker() {
       if (e.target.checked) selectedRuns.add(run.run_id);
       else selectedRuns.delete(run.run_id);
       renderRunPicker();
+      renderFullRunPicker();
       await ensureSelectedRunManifests();
       const spec = activeSpec();
       if (spec) renderChart(spec);
       if (compareLossRuns) {
         await setCompareLossRuns(true);
       }
+      updateFullscreenCompareChrome();
     });
     list.appendChild(label);
+  }
+}
+
+function renderFullRunPicker() {
+  const list = document.getElementById("fullRunPickList");
+  if (!list) return;
+  list.innerHTML = "";
+  for (const run of availableRuns) {
+    const color = runColor(run.run_id);
+    const checked = selectedRuns.has(run.run_id);
+    const label = document.createElement("label");
+    label.className = `layer-pick-chip${checked ? " active" : ""}`;
+    label.style.setProperty("--chip-color", color);
+    const name = run.label || run.run_id;
+    const currentMark = run.run_id === runId ? " · current" : "";
+    label.innerHTML = `
+      <input type="checkbox" ${checked ? "checked" : ""} />
+      <span class="layer-pick-dot"></span>
+      <span>${escapeHtml(name)}${currentMark}</span>
+    `;
+    label.querySelector("input").addEventListener("change", async (e) => {
+      if (e.target.checked) selectedRuns.add(run.run_id);
+      else selectedRuns.delete(run.run_id);
+      renderRunPicker();
+      renderFullRunPicker();
+      await ensureSelectedRunManifests();
+      if (compareLossRuns) await Promise.all(selectedRunIds().map((rid) => ensureLossLogForRun(rid)));
+      refreshCompareViews();
+    });
+    list.appendChild(label);
+  }
+}
+
+function updateFullscreenCompareChrome() {
+  const lossWrap = document.getElementById("compareLossRunsFullWrap");
+  const lossInput = document.getElementById("compareLossRunsFull");
+  const curveWrap = document.getElementById("compareRunsFullWrap");
+  const curveInput = document.getElementById("compareRunsFull");
+  const residualWrap = document.getElementById("fullResidualWrap");
+  const residualInput = document.getElementById("fullResidual");
+  const pick = document.getElementById("fullRunPick");
+
+  const inLoss = fullOverlayOpen && fullOverlayMode === "loss";
+  const inSpec = fullOverlayOpen && fullOverlayMode === "spec";
+  const can = canCompareRuns();
+
+  if (lossWrap) lossWrap.hidden = !(inLoss && can && lossLog && !lossLog.error);
+  if (lossInput) lossInput.checked = !!(inLoss && compareLossRuns);
+
+  if (curveWrap) curveWrap.hidden = !(inSpec && can);
+  if (curveInput) curveInput.checked = !!(inSpec && compareRuns);
+
+  const residualActive =
+    (inLoss && compareLossRuns && can) || (inSpec && compareRuns && can);
+  if (residualWrap) residualWrap.hidden = !residualActive;
+  if (residualInput) residualInput.checked = residualActive && setupResidualMode;
+
+  const showPick =
+    (inLoss && compareLossRuns && can) || (inSpec && compareRuns && can);
+  if (pick) {
+    pick.hidden = !showPick;
+    if (showPick) renderFullRunPicker();
   }
 }
 
@@ -1256,6 +1359,7 @@ function setCurveOverlayChrome(show) {
   const el = document.getElementById("curveScaleToggleFull");
   if (el) el.hidden = !show || !CURVE_LOGLOG_ENABLED;
   if (show && CURVE_LOGLOG_ENABLED) updateCurveScaleButtons();
+  updateFullscreenCompareChrome();
 }
 
 function buildLineDatasets(spec) {
@@ -1899,6 +2003,7 @@ function setLossOverlayChrome(show) {
   if (scale) scale.hidden = !show;
   const range = document.getElementById("lossRangeFull");
   if (range) range.hidden = !show;
+  updateFullscreenCompareChrome();
 }
 
 function setLossViewMode(mode) {
@@ -2090,6 +2195,7 @@ function closeFullscreen() {
   fullOverlayMode = null;
   setLossOverlayChrome(false);
   setCurveOverlayChrome(false);
+  updateFullscreenCompareChrome();
   const overlay = document.getElementById("chartOverlay");
   overlay.classList.remove("visible");
   overlay.setAttribute("aria-hidden", "true");
