@@ -783,7 +783,38 @@ function collectPlotXsFromChart(chart) {
 }
 
 /**
- * Log-x ticks: only mark steps present in the curve.
+ * Keep first/last and a few more spaced in log space so late steps do not pile up.
+ */
+function thinLogAxisTicks(values, maxTicks = 8) {
+  if (values.length <= maxTicks) return values;
+  const first = values[0];
+  const last = values[values.length - 1];
+  if (!(first > 0) || !(last > 0) || first === last) return [first, last].filter((v, i, a) => a.indexOf(v) === i);
+
+  const picked = [first];
+  const logMin = Math.log(first);
+  const logMax = Math.log(last);
+  for (let i = 1; i < maxTicks - 1; i += 1) {
+    const target = logMin + ((logMax - logMin) * i) / (maxTicks - 1);
+    let best = null;
+    let bestDist = Infinity;
+    for (const v of values) {
+      if (v <= picked[picked.length - 1]) continue;
+      if (v >= last) continue;
+      const d = Math.abs(Math.log(v) - target);
+      if (d < bestDist) {
+        best = v;
+        bestDist = d;
+      }
+    }
+    if (best != null) picked.push(best);
+  }
+  if (picked[picked.length - 1] !== last) picked.push(last);
+  return picked;
+}
+
+/**
+ * Log-x ticks: only mark a sparse subset of steps present in the curve.
  * Plot x=1 stands for true step 0, so label it "0".
  */
 function logXAxisTickConfig(axisColor) {
@@ -804,7 +835,7 @@ function logXAxisTickConfig(axisColor) {
 }
 
 function afterBuildLogXTicks(axis) {
-  const values = collectPlotXsFromChart(axis.chart);
+  const values = thinLogAxisTicks(collectPlotXsFromChart(axis.chart), 8);
   axis.ticks = values.map((value) => ({ value }));
 }
 
@@ -1327,6 +1358,27 @@ function lossDataBounds() {
   return { min: Math.min(...xs), max: Math.max(...xs) };
 }
 
+/** Sorted unique true steps available in the current loss data. */
+function lossAvailableSteps() {
+  const logs = lossLogsForChart();
+  const xs = new Set();
+  for (const item of logs) {
+    for (const p of [...item.log.train, ...item.log.val]) {
+      if (Number.isFinite(p.x)) xs.add(p.x);
+    }
+  }
+  return [...xs].sort((a, b) => a - b);
+}
+
+/** Smallest data step ≥ value (clamp to last step if past the end). */
+function ceilToAvailableStep(value, steps) {
+  if (!Number.isFinite(value) || !steps.length) return null;
+  for (const s of steps) {
+    if (s >= value) return s;
+  }
+  return steps[steps.length - 1];
+}
+
 function syncLossRangeInputs() {
   const bounds = lossDataBounds();
   if (lossLog?.error) return;
@@ -1347,14 +1399,15 @@ function syncLossRangeInputs() {
 function applyLossStepRange() {
   const minEl = document.getElementById("lossStepMin");
   const maxEl = document.getElementById("lossStepMax");
-  const bounds = lossDataBounds();
+  const steps = lossAvailableSteps();
   let min = minEl.value === "" ? null : Number(minEl.value);
   let max = maxEl.value === "" ? null : Number(maxEl.value);
   if (min != null && !Number.isFinite(min)) min = null;
   if (max != null && !Number.isFinite(max)) max = null;
+  // Snap typed values up to the next step that actually has data.
+  if (min != null) min = ceilToAvailableStep(min, steps);
+  if (max != null) max = ceilToAvailableStep(max, steps);
   if (min != null && max != null && min > max) [min, max] = [max, min];
-  if (min != null && min < bounds.min) min = bounds.min;
-  if (max != null && max > bounds.max) max = bounds.max;
   lossStepMin = min;
   lossStepMax = max;
   syncLossRangeInputs();
