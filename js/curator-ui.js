@@ -1,11 +1,10 @@
 /**
  * Site-wide curator (admin) chrome — works on any page with #curatorBar.
  * Enter via ?admin=1 on the homepage, select page, or explorer.
- * Curators can also publish a site-wide announcement broadcast.
+ * Announcements are managed on announcements.html.
  */
 const CuratorUI = (() => {
   let noteIsAdmin = false;
-  let cachedAnnouncement = "";
 
   function isAdminEntry() {
     try {
@@ -53,45 +52,6 @@ const CuratorUI = (() => {
     return bar;
   }
 
-  async function refreshAnnouncementCache() {
-    if (typeof NotesStore === "undefined") return;
-    try {
-      cachedAnnouncement = await NotesStore.getAnnouncement();
-    } catch (_) {
-      cachedAnnouncement = "";
-    }
-  }
-
-  function wireAnnounceForm(inner) {
-    const ta = inner.querySelector("#announceText");
-    const status = inner.querySelector("#announceStatus");
-    inner.querySelector("#announcePublish")?.addEventListener("click", async () => {
-      status.textContent = "Publishing…";
-      try {
-        cachedAnnouncement = await NotesStore.setAnnouncement(ta.value);
-        status.textContent = cachedAnnouncement ? "Published." : "Cleared.";
-        if (typeof AnnouncementBanner !== "undefined") {
-          AnnouncementBanner.render(cachedAnnouncement);
-        }
-      } catch (err) {
-        status.textContent = err.message || String(err);
-      }
-    });
-    inner.querySelector("#announceClear")?.addEventListener("click", async () => {
-      status.textContent = "Clearing…";
-      try {
-        cachedAnnouncement = await NotesStore.setAnnouncement("");
-        if (ta) ta.value = "";
-        status.textContent = "Cleared.";
-        if (typeof AnnouncementBanner !== "undefined") {
-          AnnouncementBanner.render("");
-        }
-      } catch (err) {
-        status.textContent = err.message || String(err);
-      }
-    });
-  }
-
   function render() {
     ensureBar();
     const bar = document.getElementById("curatorBar");
@@ -108,30 +68,20 @@ const CuratorUI = (() => {
     bar.hidden = false;
     if (noteIsAdmin) {
       document.body.classList.add("curator-mode");
+      const announceHref = withAdminParam("announcements.html");
       inner.innerHTML = `
         <div class="curator-bar-main">
           <div class="curator-bar-status">
             <span class="curator-pill">Curator mode</span>
-            <span class="curator-hint">Delete notes · broadcast announcements</span>
+            <span class="curator-hint">Delete notes · manage announcements</span>
+            <a class="curator-link" href="${announceHref}">Announcements →</a>
           </div>
           <button type="button" class="chart-btn" id="notesAdminSignOut">Sign out</button>
-        </div>
-        <div class="curator-announce">
-          <label for="announceText">Site announcement</label>
-          <textarea id="announceText" rows="2" maxlength="1000" placeholder="Visible on every page…">${escapeHtml(
-            cachedAnnouncement
-          )}</textarea>
-          <div class="curator-announce-actions">
-            <button type="button" class="chart-btn note-submit" id="announcePublish">Publish</button>
-            <button type="button" class="chart-btn" id="announceClear">Clear</button>
-            <span class="notes-admin-status" id="announceStatus"></span>
-          </div>
         </div>`;
       inner.querySelector("#notesAdminSignOut")?.addEventListener("click", async () => {
         clearAdminEntry();
         await NotesStore.signOutAdmin();
       });
-      wireAnnounceForm(inner);
     } else {
       document.body.classList.remove("curator-mode");
       inner.innerHTML = `
@@ -161,24 +111,14 @@ const CuratorUI = (() => {
     }
   }
 
-  function escapeHtml(text) {
-    return String(text)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  }
-
   function onAuthChange(state) {
     noteIsAdmin = !!state.isAdmin;
     if (noteIsAdmin) {
       try {
         sessionStorage.setItem("notesAdminEntry", "1");
       } catch (_) {}
-      refreshAnnouncementCache().then(() => render());
-    } else {
-      render();
     }
+    render();
     document.dispatchEvent(
       new CustomEvent("curator-auth", { detail: { isAdmin: noteIsAdmin, handle: state.handle } })
     );
@@ -188,7 +128,7 @@ const CuratorUI = (() => {
     if (typeof NotesStore === "undefined") return;
     NotesStore.onAuthChange(onAuthChange);
     NotesStore.init();
-    refreshAnnouncementCache().then(() => render());
+    render();
     if (typeof AnnouncementBanner !== "undefined") AnnouncementBanner.wire();
   }
 

@@ -61,16 +61,20 @@ Pages domain (e.g. `yourname.github.io`) and `localhost` are listed.
 ## Using it
 
 - **Visitors**: open a chart fullscreen, click the curve at a step, write a note.
-  They are auto-assigned `explorer_00N` on first post and keep it forever
-  (unless they wipe browser storage).
-- **You (curator)**: open the explorer with `?admin=1` in the URL, e.g.
-  `explorer.html?run=…&admin=1`. A sign-in box appears in the Notes panel;
-  sign in with your email/password. You'll then see a ✕ delete button on every
-  note. Click **Sign out** to return to normal browsing.
+- **You (curator)**: open any page with `?admin=1`, sign in with email/password.
+  You'll see delete controls on notes. Click **Sign out** to leave curator mode.
+
+## Using announcements
+
+- Public list: `announcements.html` (also linked from Select / Formulas / Explorer).
+- Banner on every page shows the newest 3; **All →** opens the full list.
+- Curator: open **Announcements →** from the curator bar, then Publish / Edit / Delete.
+- After updating `firestore.rules`, **Publish** the rules in the Firebase console
+  (needed for the new `announcements` collection).
+- If you still have the old single `meta/siteAnnouncement`, it appears as
+  **legacy** on the announcements page — click **Move into list** once.
 
 ## Notes on the design
-- Handles are assigned by a Firestore transaction on `meta/counter`, so numbers
-  are sequential and unique.
-- A handle is tied to the browser's anonymous Firebase identity, which persists
-  automatically. Clearing site data / using another browser yields a new number
-  — unavoidable without forcing people to log in.
+- Notes are anonymous (no public usernames).
+- A visitor's Firebase anonymous identity persists in the browser; clearing site
+  data yields a new identity — unavoidable without forcing people to log in.

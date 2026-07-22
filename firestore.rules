@@ -53,7 +53,22 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Public site-wide broadcast — anyone can read; only curator can write.
+    // Multi announcements — anyone can read; only curator can write.
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow create: if isAdmin()
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 1000
+        && request.resource.data.uid == request.auth.uid;
+      allow update: if isAdmin()
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 1000;
+      allow delete: if isAdmin();
+    }
+
+    // Legacy single announcement doc (kept for migration).
     match /meta/siteAnnouncement {
       allow read: if true;
       allow create, update: if isAdmin()

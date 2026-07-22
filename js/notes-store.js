@@ -6,9 +6,11 @@
  *     { runId, specId, context, step|null, uid, text, createdAt }
  *   notes/{id}/comments/{id}
  *     { uid, text, parentId|null, createdAt }
+ *   announcements/{id}
+ *     { text, uid, createdAt, updatedAt }
  *
  * Visitors sign in anonymously under the hood (no public username).
- * Only the curator (email/password) may delete notes or comments.
+ * Only the curator (email/password) may delete notes/comments or manage announcements.
  */
 const NotesStore = (() => {
   let app = null;
@@ -361,52 +363,164 @@ const NotesStore = (() => {
     await auth.signOut();
   }
 
-  async function getAnnouncement() {
-    await init();
-    if (!backendReady) return "";
-    const snap = await db.collection("meta").doc("siteAnnouncement").get();
-    if (!snap.exists) return "";
-    return String(snap.data().text || "").trim();
+  function mapAnnouncementDoc(doc) {
+    const d = doc.data() || {};
+    return {
+      id: doc.id,
+      text: String(d.text || "").trim(),
+      createdAt: d.createdAt || null,
+      updatedAt: d.updatedAt || null,
+      legacy: false,
+    };
   }
 
-  /** Live updates for the public banner. Returns an unsubscribe fn (or null). */
-  function watchAnnouncement(cb) {
+  async function readLegacyAnnouncement() {
+    const snap = await db.collection("meta").doc("siteAnnouncement").get();
+    if (!snap.exists) return null;
+    const text = String(snap.data().text || "").trim();
+    if (!text) return null;
+    return {
+      id: "_legacy",
+      text,
+      createdAt: snap.data().updatedAt || null,
+      updatedAt: snap.data().updatedAt || null,
+      legacy: true,
+    };
+  }
+
+  async function listAnnouncements() {
+    await init();
+    if (!backendReady) return [];
+    const snap = await db
+      .collection("announcements")
+      .orderBy("createdAt", "desc")
+      .get();
+    const items = snap.docs.map(mapAnnouncementDoc).filter((a) => a.text);
+    if (items.length) return items;
+    const legacy = await readLegacyAnnouncement();
+    return legacy ? [legacy] : [];
+  }
+
+  /** Live list for banner + announcements page. Callback receives an array. */
+  function watchAnnouncements(cb) {
     let unsub = null;
-    init().then(() => {
+    let cancelled = false;
+    init().then(async () => {
+      if (cancelled) return;
       if (!backendReady) {
-        cb("");
+        cb([]);
         return;
       }
-      unsub = db.collection("meta").doc("siteAnnouncement").onSnapshot(
-        (snap) => {
-          cb(snap.exists ? String(snap.data().text || "").trim() : "");
-        },
-        (err) => {
-          console.warn("watchAnnouncement", err);
-          cb("");
-        }
-      );
+      unsub = db
+        .collection("announcements")
+        .orderBy("createdAt", "desc")
+        .onSnapshot(
+          async (snap) => {
+            const items = snap.docs.map(mapAnnouncementDoc).filter((a) => a.text);
+            if (items.length) {
+              cb(items);
+              return;
+            }
+            try {
+              const legacy = await readLegacyAnnouncement();
+              cb(legacy ? [legacy] : []);
+            } catch (_) {
+              cb([]);
+            }
+          },
+          (err) => {
+            console.warn("watchAnnouncements", err);
+            cb([]);
+          }
+        );
     });
     return () => {
+      cancelled = true;
       if (unsub) unsub();
     };
   }
 
-  async function setAnnouncement(text) {
+  async function createAnnouncement(text) {
     await init();
     if (!backendReady) throw new Error("Notes backend is not configured yet.");
-    if (!adminMode) throw new Error("Only the curator can edit the announcement.");
+    if (!adminMode) throw new Error("Only the curator can publish announcements.");
     const clean = String(text || "").trim().slice(0, 1000);
-    const ref = db.collection("meta").doc("siteAnnouncement");
-    if (!clean) {
-      await ref.delete();
-      return "";
-    }
-    await ref.set({
+    if (!clean) throw new Error("Announcement text is empty.");
+    const ref = await db.collection("announcements").add({
       text: clean,
       uid: myUid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
+    return { id: ref.id, text: clean, legacy: false };
+  }
+
+  async function updateAnnouncement(id, text) {
+    await init();
+    if (!backendReady) throw new Error("Notes backend is not configured yet.");
+    if (!adminMode) throw new Error("Only the curator can edit announcements.");
+    const clean = String(text || "").trim().slice(0, 1000);
+    if (!clean) throw new Error("Announcement text is empty.");
+    if (id === "_legacy") {
+      await db.collection("meta").doc("siteAnnouncement").set({
+        text: clean,
+        uid: myUid,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      return { id: "_legacy", text: clean, legacy: true };
+    }
+    await db.collection("announcements").doc(id).update({
+      text: clean,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    return { id, text: clean, legacy: false };
+  }
+
+  async function deleteAnnouncement(id) {
+    await init();
+    if (!backendReady) throw new Error("Notes backend is not configured yet.");
+    if (!adminMode) throw new Error("Only the curator can delete announcements.");
+    if (id === "_legacy") {
+      await db.collection("meta").doc("siteAnnouncement").delete();
+      return;
+    }
+    await db.collection("announcements").doc(id).delete();
+  }
+
+  /** Migrate the old single meta/siteAnnouncement into the collection. */
+  async function migrateLegacyAnnouncement() {
+    await init();
+    if (!backendReady) throw new Error("Notes backend is not configured yet.");
+    if (!adminMode) throw new Error("Only the curator can migrate announcements.");
+    const legacy = await readLegacyAnnouncement();
+    if (!legacy) return null;
+    const created = await createAnnouncement(legacy.text);
+    await db.collection("meta").doc("siteAnnouncement").delete();
+    return created;
+  }
+
+  /** @deprecated Prefer listAnnouncements / createAnnouncement. */
+  async function getAnnouncement() {
+    const items = await listAnnouncements();
+    return items[0] ? items[0].text : "";
+  }
+
+  /** @deprecated Prefer watchAnnouncements. */
+  function watchAnnouncement(cb) {
+    return watchAnnouncements((items) => {
+      cb(items[0] ? items[0].text : "");
+    });
+  }
+
+  /** @deprecated Prefer createAnnouncement / deleteAnnouncement. */
+  async function setAnnouncement(text) {
+    const clean = String(text || "").trim();
+    if (!clean) {
+      const items = await listAnnouncements();
+      for (const item of items) await deleteAnnouncement(item.id);
+      return "";
+    }
+    await createAnnouncement(clean);
     return clean;
   }
 
@@ -426,6 +540,12 @@ const NotesStore = (() => {
     createComment,
     deleteNote,
     deleteComment,
+    listAnnouncements,
+    watchAnnouncements,
+    createAnnouncement,
+    updateAnnouncement,
+    deleteAnnouncement,
+    migrateLegacyAnnouncement,
     getAnnouncement,
     watchAnnouncement,
     setAnnouncement,

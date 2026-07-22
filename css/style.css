@@ -133,50 +133,24 @@ h1, h2, h3,
   width: 100%;
 }
 
-.curator-announce {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  width: 100%;
-  margin-top: 0.15rem;
-  padding-top: 0.55rem;
-  border-top: 1px solid rgba(232, 200, 136, 0.22);
-}
-
-.curator-announce label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(232, 200, 136, 0.9);
-}
-
-.curator-announce textarea {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.4rem 0.5rem;
-  font: inherit;
+.curator-link {
+  color: #ffe6b8;
   font-size: 0.82rem;
-  color: var(--text);
-  background: var(--bg-card);
-  resize: vertical;
-  min-height: 3.2rem;
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(232, 200, 136, 0.45);
 }
 
-.curator-announce-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
+.curator-link:hover {
+  color: #fff6e0;
+  border-bottom-color: rgba(255, 246, 224, 0.7);
 }
 
 .site-announcement {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.45rem 0.85rem;
-  padding: 0.65rem 1.75rem;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.65rem 1.75rem 0.75rem;
   border-bottom: 1px solid rgba(232, 200, 136, 0.4);
   background: rgba(40, 28, 10, 0.95);
   color: #ffe6b8;
@@ -188,6 +162,14 @@ h1, h2, h3,
   display: none !important;
 }
 
+.site-announcement-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
+}
+
 .site-announcement-label {
   flex: 0 0 auto;
   font-size: 0.68rem;
@@ -197,12 +179,153 @@ h1, h2, h3,
   color: #e8c888;
 }
 
+.site-announcement-all,
+.site-announcement-more a {
+  color: #ffe6b8;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(232, 200, 136, 0.4);
+}
+
+.site-announcement-all:hover,
+.site-announcement-more a:hover {
+  color: #fff6e0;
+}
+
+.site-announcement-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.site-announcement-list li {
+  margin: 0;
+  padding: 0;
+}
+
+.site-announcement-list p,
 .site-announcement p {
   margin: 0;
-  flex: 1 1 12rem;
   color: #fff6e0;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.site-announcement-more {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.announce-shell {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+
+.announce-composer {
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.1rem;
+}
+
+.announce-composer h2 {
+  margin: 0 0 0.55rem;
+  font-size: 1rem;
+  font-family: var(--font-ui);
+}
+
+.announce-composer textarea,
+.announce-edit-ta {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--bg-card);
+  resize: vertical;
+  min-height: 4rem;
+  box-sizing: border-box;
+}
+
+.announce-composer-actions,
+.announce-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
+.announce-migrate {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.announce-migrate p {
+  margin: 0 0 0.45rem;
+}
+
+.announce-empty {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.announce-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.announce-item {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+.announce-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.announce-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8a6a2a;
+  background: rgba(232, 200, 136, 0.25);
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+}
+
+.announce-item-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.announce-delete {
+  color: #b54a3a;
+}
+
+.announce-page .site-announcement {
+  display: none !important;
 }
 
 .curator-bar-status {
