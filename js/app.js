@@ -1516,11 +1516,6 @@ function destroyLossChart() {
 
 function lossInfoText() {
   const logs = lossLogsForChart();
-  const bounds = lossDataBounds();
-  const lo = lossStepMin ?? bounds.min;
-  const hi = lossStepMax ?? bounds.max;
-  const modeLabel = lossViewMode === "both" ? "train + val" : lossViewMode;
-  const scaleLabel = lossScaleMode === "loglog" ? "log–log" : "linear";
   if (compareLossRuns && canCompareRuns()) {
     const want = new Set(selectedRunIds());
     const missing = availableRuns
@@ -1532,26 +1527,13 @@ function lossInfoText() {
       .map((r) => runLabel(r.run_id));
     if (!logs.length) {
       return missing.length
-        ? `setup compare · no loss data (${missing.join(", ")})`
-        : "setup compare · no loss data";
+        ? `No loss data (${missing.join(", ")})`
+        : "No loss data";
     }
-    const names = logs.map((x) => x.label).join(" vs ");
-    return (
-      `${modeLabel} · ${scaleLabel} · setup compare · ${names} · step ${lo}–${hi}` +
-      (missing.length ? ` · missing: ${missing.join(", ")}` : "")
-    );
+    if (missing.length) return `Missing: ${missing.join(", ")}`;
+    return logs.map((x) => x.label).join(" vs ");
   }
-  if (!logs.length) return "";
-  const item = logs[0];
-  const train = filterLossPoints(item.log.train);
-  const val = filterLossPoints(item.log.val);
-  const lastTrain = train.at(-1);
-  const lastVal = val.at(-1);
-  return (
-    `${modeLabel} · ${scaleLabel} · step ${lo}–${hi} · ${train.length} train / ${val.length} val pts` +
-    (lastTrain ? ` · train=${lastTrain.y.toFixed(4)}` : "") +
-    (lastVal ? ` · val=${lastVal.y.toFixed(4)}` : "")
-  );
+  return "";
 }
 
 function buildLossDatasets() {
