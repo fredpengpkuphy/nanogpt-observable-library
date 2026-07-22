@@ -36,8 +36,7 @@
     <p class="landing-brand">nanoGPT Observable Library</p>
     <h1 class="landing-headline">Measure training.<br>Unlock the science.</h1>
     <p class="landing-lead">
-      We trained nanoGPT on OpenWebText under Karpathy’s exact setup—
-      and instrumented the run with observables that may open the door to the science of AI.
+      We trained nanoGPT on OpenWebText under Karpathy’s exact setup�?      and instrumented the run with observables that may open the door to the science of AI.
     </p>
     <div class="landing-cta">
       <a class="landing-btn" id="startExploration" href="select.html">Start Exploration</a>
@@ -48,9 +47,9 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
   <script src="js/notes-config.js?v=3"></script>
-  <script src="js/notes-store.js?v=11"></script>
+  <script src="js/notes-store.js?v=12"></script>
   <script src="js/announcement-banner.js?v=2"></script>
-  <script src="js/curator-ui.js?v=6"></script>
+  <script src="js/curator-ui.js?v=7"></script>
   <script>
     (function () {
       try {
@@ -76,13 +75,24 @@
         e.preventDefault();
         const fallback = btn.getAttribute("href") || "select.html";
         try {
-          await NotesStore.init();
+          if (typeof NotesStore.whenAuthReady === "function") {
+            await NotesStore.whenAuthReady();
+          } else {
+            await NotesStore.init();
+          }
           const mode = await NotesStore.getMaintenanceMode();
-          if (mode.enabled && !NotesStore.isAdmin()) {
+          const isAdmin = NotesStore.isAdmin();
+          if (
+            !isAdmin &&
+            (mode.enabled || (mode.available === false && NotesStore.isReady()))
+          ) {
             location.href = "maintenance.html";
             return;
           }
-        } catch (_) {}
+        } catch (_) {
+          location.href = "maintenance.html";
+          return;
+        }
         location.href = fallback;
       });
     })();

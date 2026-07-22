@@ -1,6 +1,6 @@
 /**
  * Redirect non-curators away from gated pages when maintenance mode is on.
- * Include on select / explorer / reference (after NotesStore + CuratorUI).
+ * Fail closed: if the flag cannot be read, public users are blocked.
  */
 const MaintenanceGate = (() => {
   let decided = false;
@@ -27,32 +27,24 @@ const MaintenanceGate = (() => {
     location.replace(maintenanceHref());
   }
 
+  function shouldBlock(mode) {
+    if (typeof NotesStore !== "undefined" && NotesStore.isAdmin()) return false;
+    if (!mode) {
+      return typeof NotesStore !== "undefined" && NotesStore.isReady();
+    }
+    if (mode.enabled) return true;
+    // Backend is up but flag is unreadable (rules not published) → lock public out.
+    if (mode.available === false && typeof NotesStore !== "undefined" && NotesStore.isReady()) {
+      return true;
+    }
+    return false;
+  }
+
   function startWatch() {
     if (watching || typeof NotesStore === "undefined") return;
     watching = true;
     NotesStore.watchMaintenanceMode((mode) => {
-      if (mode.enabled && !NotesStore.isAdmin()) block();
-    });
-  }
-
-  async function waitForAuth(timeoutMs = 2500) {
-    if (typeof NotesStore === "undefined") return;
-    await NotesStore.init();
-    if (NotesStore.isAdmin()) return;
-    await new Promise((resolve) => {
-      let done = false;
-      const finish = () => {
-        if (done) return;
-        done = true;
-        resolve();
-      };
-      const t = setTimeout(finish, timeoutMs);
-      NotesStore.onAuthChange((state) => {
-        if (state.ready || NotesStore.isReady() || state.isAdmin) {
-          clearTimeout(t);
-          finish();
-        }
-      });
+      if (shouldBlock(mode)) block();
     });
   }
 
@@ -63,16 +55,26 @@ const MaintenanceGate = (() => {
       reveal();
       return true;
     }
+
     try {
-      await waitForAuth();
+      if (typeof NotesStore.whenAuthReady === "function") {
+        await NotesStore.whenAuthReady();
+      } else {
+        await NotesStore.init();
+      }
       const mode = await NotesStore.getMaintenanceMode();
-      if (mode.enabled && !NotesStore.isAdmin()) {
+      if (shouldBlock(mode)) {
         block();
         return false;
       }
-    } catch (_) {
-      /* fail open if backend unreachable */
+    } catch (err) {
+      console.warn("MaintenanceGate", err);
+      if (typeof NotesStore === "undefined" || !NotesStore.isAdmin()) {
+        block();
+        return false;
+      }
     }
+
     decided = true;
     reveal();
     startWatch();

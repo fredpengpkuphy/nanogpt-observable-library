@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=33">
+  <link rel="stylesheet" href="css/style.css?v=34">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
@@ -19,15 +19,15 @@
   <header class="app-header">
     <div>
       <h1>nanoGPT Observable Explorer</h1>
-      <p id="runSubtitle">Loading run metadata‚Ä¶</p>
+      <p id="runSubtitle">Loading run metadata‚Ä?/p>
     </div>
     <div class="header-actions">
-      <a class="header-link" href="select.html">‚Üê Select run</a>
+      <a class="header-link" href="select.html">‚Ü?Select run</a>
       <a class="header-link" href="index.html">Home</a>
       <a class="header-link" href="announcements.html">Announcements</a>
       <a class="header-link" href="suggestions.html">Suggestions</a>
       <a class="header-link" href="reference.html">Formulas</a>
-      <div class="badge" id="runBadge">‚Äî</div>
+      <div class="badge" id="runBadge">‚Ä?/div>
     </div>
   </header>
 
@@ -66,14 +66,14 @@
               <span>Residuals vs baseline</span>
             </label>
             <button type="button" class="chart-btn" id="lossResetZoomBtn" title="Reset zoom">Reset</button>
-            <button type="button" class="chart-btn" id="lossExpandBtn" title="Expand">‚§¢ Expand</button>
+            <button type="button" class="chart-btn" id="lossExpandBtn" title="Expand">‚§?Expand</button>
           </div>
         </div>
         <div class="loss-range" id="lossRange">
           <label>Step
             <input type="number" id="lossStepMin" min="0" step="1" placeholder="min" />
           </label>
-          <span class="loss-range-sep">‚Äì</span>
+          <span class="loss-range-sep">‚Ä?/span>
           <label>
             <input type="number" id="lossStepMax" min="0" step="1" placeholder="max" />
           </label>
@@ -100,8 +100,8 @@
       </div>
       <div class="detail-content" id="detailContent">
         <div class="detail-header">
-          <h3 id="moduleTitle">‚Äî</h3>
-          <p id="modulePath">‚Äî</p>
+          <h3 id="moduleTitle">‚Ä?/h3>
+          <p id="modulePath">‚Ä?/p>
         </div>
         <div class="spec-groups" id="specGroups"></div>
         <div class="chart-wrap">
@@ -113,7 +113,7 @@
               </div>
               <div class="chart-actions">
                 <button type="button" class="chart-btn" id="resetZoomBtn" hidden title="Reset zoom">Reset</button>
-                <button type="button" class="chart-btn" id="expandBtn" hidden title="Expand">‚§¢ Expand</button>
+                <button type="button" class="chart-btn" id="expandBtn" hidden title="Expand">‚§?Expand</button>
                 <label class="compare-toggle" id="compareRunsWrap" hidden>
                   <input type="checkbox" id="compareRuns" />
                   <span>Compare setups</span>
@@ -166,7 +166,7 @@
     <div class="chart-modal" role="dialog" aria-modal="true">
       <div class="chart-modal-head">
         <div class="chart-meta-text">
-          <span id="fullChartTitle">‚Äî</span>
+          <span id="fullChartTitle">‚Ä?/span>
           <span id="fullChartInfo"></span>
         </div>
         <div class="chart-actions">
@@ -181,7 +181,7 @@
           </div>
           <div class="loss-range loss-range-compact" id="lossRangeFull" hidden>
             <input type="number" id="lossStepMinFull" min="0" step="1" placeholder="min" />
-            <span>‚Äì</span>
+            <span>‚Ä?/span>
             <input type="number" id="lossStepMaxFull" min="0" step="1" placeholder="max" />
             <button type="button" class="chart-btn" id="lossApplyRangeFullBtn">Apply</button>
           </div>
@@ -199,7 +199,7 @@
           </label>
           <button type="button" class="chart-btn" id="fullAddNoteBtn" title="Leave a note">Note</button>
           <button type="button" class="chart-btn" id="fullResetZoomBtn" title="Reset zoom">Reset</button>
-          <button type="button" class="chart-btn" id="fullCloseBtn" title="Close">‚úï Close</button>
+          <button type="button" class="chart-btn" id="fullCloseBtn" title="Close">‚ú?Close</button>
         </div>
       </div>
       <div class="full-run-pick" id="fullRunPick" hidden>
@@ -221,12 +221,12 @@
             <span>Notes</span>
             <div class="notes-rail-head-actions">
               <span class="notes-identity" id="notesRailIdentity"></span>
-              <button type="button" class="chart-btn" id="notesExpandBtn" title="Expand notes">‚§¢</button>
-              <button type="button" class="chart-btn" id="notesRefreshBtn" title="Refresh">‚Üª</button>
+              <button type="button" class="chart-btn" id="notesExpandBtn" title="Expand notes">‚§?/button>
+              <button type="button" class="chart-btn" id="notesRefreshBtn" title="Refresh">‚Ü?/button>
             </div>
           </div>
           <form id="railNoteForm" class="rail-note-form">
-            <textarea id="railNoteText" rows="3" maxlength="2000" required placeholder="Leave a note on this curve‚Ä¶"></textarea>
+            <textarea id="railNoteText" rows="3" maxlength="2000" required placeholder="Leave a note on this curve‚Ä?></textarea>
             <div class="rail-note-form-row">
               <label class="rail-note-step-label">
                 Step
@@ -249,7 +249,7 @@
     <div class="note-dialog" role="dialog" aria-modal="true" aria-labelledby="noteModalTitle">
       <div class="note-dialog-head">
         <h3 id="noteModalTitle">Leave a note</h3>
-        <button type="button" class="chart-btn" id="noteModalClose" title="Close">‚úï</button>
+        <button type="button" class="chart-btn" id="noteModalClose" title="Close">‚ú?/button>
       </div>
       <p class="note-dialog-step">Use the Notes panel on the right to post.</p>
       <div class="note-modal-actions">
@@ -262,10 +262,10 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
   <script src="js/notes-config.js?v=3"></script>
-  <script src="js/notes-store.js?v=11"></script>
+  <script src="js/notes-store.js?v=12"></script>
   <script src="js/announcement-banner.js?v=2"></script>
-  <script src="js/curator-ui.js?v=6"></script>
-  <script src="js/maintenance-gate.js?v=1"></script>
+  <script src="js/curator-ui.js?v=7"></script>
+  <script src="js/maintenance-gate.js?v=2"></script>
   <script src="js/notes-ui.js?v=14"></script>
   <script src="js/observable_defs.js?v=5"></script>
   <script src="js/app.js?v=36"></script>

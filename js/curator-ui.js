@@ -86,7 +86,11 @@ const CuratorUI = (() => {
       const maintClass = maintenanceOn
         ? "chart-btn curator-bar-btn curator-maint-on"
         : "chart-btn curator-bar-btn";
+      const maintBanner = maintenanceOn
+        ? `<div class="curator-maint-banner">Maintenance is ON — public visitors are blocked from Select / Explorer / Formulas. Sign out to preview.</div>`
+        : "";
       inner.innerHTML = `
+        ${maintBanner}
         <div class="curator-bar-main">
           <div class="curator-bar-status">
             <span class="curator-pill">Curator</span>
@@ -103,15 +107,23 @@ const CuratorUI = (() => {
       });
       inner.querySelector("#maintToggle")?.addEventListener("click", async () => {
         if (maintBusy) return;
+        const turningOn = !maintenanceOn;
+        if (turningOn) {
+          const ok = confirm(
+            "Turn on maintenance mode?\n\nPublic visitors will see the maintenance page instead of the explorer.\nYou can still browse while signed in as curator."
+          );
+          if (!ok) return;
+        }
         maintBusy = true;
         const btn = inner.querySelector("#maintToggle");
         if (btn) btn.disabled = true;
         try {
-          maintenanceOn = await NotesStore.setMaintenanceMode(!maintenanceOn);
+          maintenanceOn = await NotesStore.setMaintenanceMode(turningOn);
           render();
         } catch (err) {
           alert(err.message || "Could not update maintenance mode.");
-          if (btn) btn.disabled = false;
+          await refreshMaintenance();
+          render();
         } finally {
           maintBusy = false;
         }
