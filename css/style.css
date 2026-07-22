@@ -107,6 +107,66 @@ h1, h2, h3,
   line-height: 1.45;
 }
 
+.curator-bar {
+  z-index: 9;
+  border-bottom: 1px solid rgba(232, 200, 136, 0.35);
+  background: rgba(28, 22, 12, 0.94);
+}
+
+.curator-bar[hidden] {
+  display: none !important;
+}
+
+.curator-bar-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+  padding: 0.55rem 1.75rem;
+}
+
+.curator-bar-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.75rem;
+}
+
+.curator-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 200, 136, 0.55);
+  background: rgba(232, 200, 136, 0.16);
+  color: #e8c888;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.curator-pill-muted {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.curator-hint {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.curator-form {
+  flex: 1 1 16rem;
+  justify-content: flex-end;
+}
+
+body.curator-mode .app-header {
+  border-bottom-color: rgba(232, 200, 136, 0.28);
+}
+
 .badge {
   display: inline-flex;
   align-items: center;

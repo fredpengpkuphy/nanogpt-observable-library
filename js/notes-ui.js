@@ -12,10 +12,24 @@ let noteMyHandle = null;
 
 function isNoteAdminEntry() {
   try {
-    return new URLSearchParams(location.search).has("admin");
-  } catch (_) {
-    return false;
-  }
+    const params = new URLSearchParams(location.search);
+    if (params.has("admin")) {
+      sessionStorage.setItem("notesAdminEntry", "1");
+      return true;
+    }
+    if (sessionStorage.getItem("notesAdminEntry") === "1") return true;
+  } catch (_) {}
+  return false;
+}
+
+function clearNoteAdminEntry() {
+  try {
+    sessionStorage.removeItem("notesAdminEntry");
+  } catch (_) {}
+}
+
+function showCuratorChrome() {
+  return isNoteAdminEntry() || noteIsAdmin;
 }
 
 function noteContextKey() {
@@ -438,34 +452,48 @@ async function submitNote(evt) {
 }
 
 function renderAdminBar() {
-  const bar = document.getElementById("notesAdmin");
-  if (!bar) return;
-  if (!isNoteAdminEntry()) {
+  const bar = document.getElementById("curatorBar");
+  const inner = document.getElementById("curatorBarInner");
+  if (!bar || !inner) return;
+
+  if (!showCuratorChrome()) {
     bar.hidden = true;
-    bar.innerHTML = "";
+    inner.innerHTML = "";
+    document.body.classList.remove("curator-mode");
     return;
   }
+
   bar.hidden = false;
   if (noteIsAdmin) {
-    bar.innerHTML = `
-      <span class="notes-admin-tag">Curator mode</span>
+    document.body.classList.add("curator-mode");
+    inner.innerHTML = `
+      <div class="curator-bar-status">
+        <span class="curator-pill">Curator mode</span>
+        <span class="curator-hint">Signed in globally — open any curve to delete notes</span>
+      </div>
       <button type="button" class="chart-btn" id="notesAdminSignOut">Sign out</button>`;
-    bar.querySelector("#notesAdminSignOut")?.addEventListener("click", async () => {
+    inner.querySelector("#notesAdminSignOut")?.addEventListener("click", async () => {
+      clearNoteAdminEntry();
       await NotesStore.signOutAdmin();
     });
   } else {
-    bar.innerHTML = `
-      <form class="notes-admin-form" id="notesAdminForm">
-        <input type="email" id="adminEmail" placeholder="curator email" autocomplete="username" required />
+    document.body.classList.remove("curator-mode");
+    inner.innerHTML = `
+      <div class="curator-bar-status">
+        <span class="curator-pill curator-pill-muted">Curator sign-in</span>
+        <span class="curator-hint">Applies to every curve on this site</span>
+      </div>
+      <form class="notes-admin-form curator-form" id="notesAdminForm">
+        <input type="email" id="adminEmail" placeholder="email" autocomplete="username" required />
         <input type="password" id="adminPass" placeholder="password" autocomplete="current-password" required />
         <button type="submit" class="chart-btn">Sign in</button>
         <span class="notes-admin-status" id="adminStatus"></span>
       </form>`;
-    bar.querySelector("#notesAdminForm")?.addEventListener("submit", async (e) => {
+    inner.querySelector("#notesAdminForm")?.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const email = bar.querySelector("#adminEmail").value.trim();
-      const pass = bar.querySelector("#adminPass").value;
-      const status = bar.querySelector("#adminStatus");
+      const email = inner.querySelector("#adminEmail").value.trim();
+      const pass = inner.querySelector("#adminPass").value;
+      const status = inner.querySelector("#adminStatus");
       status.textContent = "Signing in…";
       try {
         await NotesStore.signInAdmin(email, pass);
@@ -481,11 +509,16 @@ function renderAdminBar() {
 function onNotesAuthChange(state) {
   noteIsAdmin = !!state.isAdmin;
   noteMyHandle = state.isAdmin ? null : state.handle;
+  if (noteIsAdmin) {
+    try {
+      sessionStorage.setItem("notesAdminEntry", "1");
+    } catch (_) {}
+  }
   renderAdminBar();
   const identityEl = document.getElementById("notesRailIdentity");
   if (identityEl) {
     identityEl.textContent = state.isAdmin
-      ? "curator"
+      ? "curator · can delete"
       : state.handle
       ? `you: ${state.handle}`
       : "";
@@ -493,6 +526,11 @@ function onNotesAuthChange(state) {
   // Re-render notes so delete buttons appear/disappear with admin state.
   if (fullOverlayOpen && chartIsAlive(fullChart)) {
     renderNotesRail(notesForCurrentChart());
+  }
+  // Refresh delete buttons in an open note modal too.
+  const modal = document.getElementById("noteModal");
+  if (modal && !modal.hidden && pendingNoteStep != null) {
+    openNoteModal(pendingNoteStep);
   }
 }
 
