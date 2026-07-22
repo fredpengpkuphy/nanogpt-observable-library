@@ -781,7 +781,21 @@ function chartScaleOptions({
     x: {
       type: log ? "logarithmic" : "linear",
       title: { display: true, text: log ? `${xTitle} (log)` : xTitle, color: axis },
-      ticks: { color: axis },
+      ticks: {
+        color: axis,
+        // Points are stored at step+1 so step 0 is plottable; labels show the true step.
+        ...(log
+          ? {
+              callback(value) {
+                const step = Number(value) - 1;
+                if (!Number.isFinite(step)) return "";
+                return Math.abs(step - Math.round(step)) < 1e-9
+                  ? String(Math.round(step))
+                  : String(step);
+              },
+            }
+          : {}),
+      },
       grid: { color: grid },
     },
     y: {
@@ -836,7 +850,16 @@ function chartCommonOptions({
         : { display: false },
       tooltip: {
         callbacks: {
-          title: (items) => (items.length ? `step ${items[0].parsed.x}` : ""),
+          title: (items) => {
+            if (!items.length) return "";
+            const raw = items[0].raw;
+            if (raw && Number.isFinite(raw._step)) return `step ${raw._step}`;
+            const x = items[0].parsed.x;
+            if (scaleMode === "loglog" && Number.isFinite(x)) {
+              return `step ${Math.round(x - 1)}`;
+            }
+            return `step ${x}`;
+          },
         },
       },
       zoom: zoomPluginOptions({ enablePan }),
@@ -951,12 +974,21 @@ function setChartChrome(hasSeriesChart) {
 }
 
 function pointsFromSeries(series) {
-  const pts = series.steps.map((step, i) => ({ x: step, y: series.values[i] }));
-  if (curveScaleMode !== "loglog") return pts;
-  // Log scales require strictly positive values (step 0 / non-positive y omitted).
-  return pts.filter(
-    (p) => Number.isFinite(p.x) && Number.isFinite(p.y) && p.x > 0 && p.y > 0
-  );
+  const log = curveScaleMode === "loglog";
+  const pts = [];
+  for (let i = 0; i < series.steps.length; i += 1) {
+    const step = series.steps[i];
+    const y = series.values[i];
+    if (!Number.isFinite(step) || !Number.isFinite(y)) continue;
+    // Log-y still needs y > 0; x uses step+1 so step 0 appears as label "0".
+    if (log && !(y > 0)) continue;
+    pts.push({
+      x: log ? step + 1 : step,
+      y,
+      _step: step,
+    });
+  }
+  return pts;
 }
 
 function lineDataHasPoints(lineData) {
@@ -1316,15 +1348,19 @@ function resetLossStepRange() {
 }
 
 function filterLossPoints(points) {
-  return points.filter((p) => {
-    if (lossStepMin != null && p.x < lossStepMin) return false;
-    if (lossStepMax != null && p.x > lossStepMax) return false;
-    if (lossScaleMode === "loglog") {
-      // Log scales require strictly positive values (step 0 cannot be shown).
-      if (!(p.x > 0) || !(p.y > 0)) return false;
-    }
-    return true;
-  });
+  const log = lossScaleMode === "loglog";
+  return points
+    .filter((p) => {
+      if (lossStepMin != null && p.x < lossStepMin) return false;
+      if (lossStepMax != null && p.x > lossStepMax) return false;
+      if (log && !(p.y > 0)) return false;
+      return Number.isFinite(p.x) && Number.isFinite(p.y);
+    })
+    .map((p) =>
+      log
+        ? { x: p.x + 1, y: p.y, _step: p.x }
+        : { x: p.x, y: p.y, _step: p.x }
+    );
 }
 
 function lossChartScaleOptions() {
@@ -1335,7 +1371,20 @@ function lossChartScaleOptions() {
     x: {
       type: log ? "logarithmic" : "linear",
       title: { display: true, text: log ? "Step (log)" : "Step", color: axis },
-      ticks: { color: axis },
+      ticks: {
+        color: axis,
+        ...(log
+          ? {
+              callback(value) {
+                const step = Number(value) - 1;
+                if (!Number.isFinite(step)) return "";
+                return Math.abs(step - Math.round(step)) < 1e-9
+                  ? String(Math.round(step))
+                  : String(step);
+              },
+            }
+          : {}),
+      },
       grid: { color: grid },
     },
     y: {
@@ -1348,7 +1397,13 @@ function lossChartScaleOptions() {
 }
 
 function lossChartOptions({ enablePan = true, onClick = null } = {}) {
-  const opts = chartCommonOptions({ legend: true, enablePan, onClick });
+  const opts = chartCommonOptions({
+    legend: true,
+    enablePan,
+    onClick,
+    scaleMode: lossScaleMode,
+    yTitle: "Loss",
+  });
   opts.scales = lossChartScaleOptions();
   return opts;
 }

@@ -118,9 +118,15 @@ function updateNotesHint() {
 
 function collectChartSteps(chart) {
   const steps = new Set();
+  const logX = chart?.scales?.x?.type === "logarithmic";
   for (const ds of chart.data?.datasets || []) {
     for (const p of ds.data || []) {
-      if (p && Number.isFinite(p.x)) steps.add(p.x);
+      if (!p) continue;
+      if (Number.isFinite(p._step)) {
+        steps.add(p._step);
+      } else if (Number.isFinite(p.x)) {
+        steps.add(logX ? p.x - 1 : p.x);
+      }
     }
   }
   return [...steps].sort((a, b) => a - b);
@@ -131,12 +137,14 @@ function nearestStep(chart, pixelX) {
   if (!xScale) return null;
   const xVal = xScale.getValueForPixel(pixelX);
   if (!Number.isFinite(xVal)) return null;
+  const logX = xScale.type === "logarithmic";
+  const trueX = logX ? xVal - 1 : xVal;
   const steps = collectChartSteps(chart);
-  if (!steps.length) return Math.round(xVal);
+  if (!steps.length) return Math.round(trueX);
   let best = steps[0];
-  let bestDist = Math.abs(steps[0] - xVal);
+  let bestDist = Math.abs(steps[0] - trueX);
   for (const s of steps) {
-    const d = Math.abs(s - xVal);
+    const d = Math.abs(s - trueX);
     if (d < bestDist) {
       best = s;
       bestDist = d;
@@ -145,7 +153,13 @@ function nearestStep(chart, pixelX) {
   return best;
 }
 
-function noteAnnotationConfig(notes) {
+function plotXForNoteStep(chart, step) {
+  if (!Number.isFinite(step)) return step;
+  if (chart?.scales?.x?.type === "logarithmic") return step + 1;
+  return step;
+}
+
+function noteAnnotationConfig(notes, chart) {
   const byStep = new Map();
   for (const n of notes) {
     if (!Number.isFinite(n.step)) continue;
@@ -155,10 +169,11 @@ function noteAnnotationConfig(notes) {
   const annotations = {};
   let i = 0;
   for (const [step, list] of byStep) {
+    const x = plotXForNoteStep(chart, step);
     annotations[`note_${i++}`] = {
       type: "line",
-      xMin: step,
-      xMax: step,
+      xMin: x,
+      xMax: x,
       borderColor: "rgba(232, 200, 136, 0.9)",
       borderWidth: 1.5,
       borderDash: [4, 3],
@@ -182,7 +197,7 @@ function applyNoteAnnotations(chart) {
   try {
     if (!chart.options.plugins) chart.options.plugins = {};
     chart.options.plugins.annotation = {
-      annotations: noteAnnotationConfig(notes),
+      annotations: noteAnnotationConfig(notes, chart),
     };
     chart.update("none");
   } catch (err) {
