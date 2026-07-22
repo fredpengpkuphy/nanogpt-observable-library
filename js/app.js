@@ -782,21 +782,7 @@ function chartScaleOptions({
     x: {
       type: log ? "logarithmic" : "linear",
       title: { display: true, text: log ? `${xTitle} (log)` : xTitle, color: axis },
-      ticks: {
-        color: axis,
-        // Points are stored at step+1 so step 0 is plottable; labels show the true step.
-        ...(log
-          ? {
-              callback(value) {
-                const step = Number(value) - 1;
-                if (!Number.isFinite(step)) return "";
-                return Math.abs(step - Math.round(step)) < 1e-9
-                  ? String(Math.round(step))
-                  : String(step);
-              },
-            }
-          : {}),
-      },
+      ticks: { color: axis },
       grid: { color: grid },
     },
     y: {
@@ -855,11 +841,7 @@ function chartCommonOptions({
             if (!items.length) return "";
             const raw = items[0].raw;
             if (raw && Number.isFinite(raw._step)) return `step ${raw._step}`;
-            const x = items[0].parsed.x;
-            if (scaleMode === "loglog" && Number.isFinite(x)) {
-              return `step ${Math.round(x - 1)}`;
-            }
-            return `step ${x}`;
+            return `step ${items[0].parsed.x}`;
           },
         },
       },
@@ -981,13 +963,10 @@ function pointsFromSeries(series) {
     const step = series.steps[i];
     const y = series.values[i];
     if (!Number.isFinite(step) || !Number.isFinite(y)) continue;
-    // Log-y still needs y > 0; x uses step+1 so step 0 appears as label "0".
     if (log && !(y > 0)) continue;
-    pts.push({
-      x: log ? step + 1 : step,
-      y,
-      _step: step,
-    });
+    // Log-x cannot use 0: only step 0 is plotted as 1; all other steps stay unchanged.
+    const plotX = log && step === 0 ? 1 : step;
+    pts.push({ x: plotX, y, _step: step });
   }
   return pts;
 }
@@ -1361,11 +1340,11 @@ function filterLossPoints(points) {
       if (log && !(p.y > 0)) return false;
       return Number.isFinite(p.x) && Number.isFinite(p.y);
     })
-    .map((p) =>
-      log
-        ? { x: p.x + 1, y: p.y, _step: p.x }
-        : { x: p.x, y: p.y, _step: p.x }
-    );
+    .map((p) => {
+      // Log-x cannot use 0: only step 0 is plotted as 1; other steps unchanged.
+      const plotX = log && p.x === 0 ? 1 : p.x;
+      return { x: plotX, y: p.y, _step: p.x };
+    });
 }
 
 function lossChartScaleOptions() {
@@ -1376,20 +1355,7 @@ function lossChartScaleOptions() {
     x: {
       type: log ? "logarithmic" : "linear",
       title: { display: true, text: log ? "Step (log)" : "Step", color: axis },
-      ticks: {
-        color: axis,
-        ...(log
-          ? {
-              callback(value) {
-                const step = Number(value) - 1;
-                if (!Number.isFinite(step)) return "";
-                return Math.abs(step - Math.round(step)) < 1e-9
-                  ? String(Math.round(step))
-                  : String(step);
-              },
-            }
-          : {}),
-      },
+      ticks: { color: axis },
       grid: { color: grid },
     },
     y: {

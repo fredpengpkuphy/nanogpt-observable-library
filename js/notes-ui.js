@@ -118,15 +118,11 @@ function updateNotesHint() {
 
 function collectChartSteps(chart) {
   const steps = new Set();
-  const logX = chart?.scales?.x?.type === "logarithmic";
   for (const ds of chart.data?.datasets || []) {
     for (const p of ds.data || []) {
       if (!p) continue;
-      if (Number.isFinite(p._step)) {
-        steps.add(p._step);
-      } else if (Number.isFinite(p.x)) {
-        steps.add(logX ? p.x - 1 : p.x);
-      }
+      if (Number.isFinite(p._step)) steps.add(p._step);
+      else if (Number.isFinite(p.x)) steps.add(p.x);
     }
   }
   return [...steps].sort((a, b) => a - b);
@@ -137,14 +133,15 @@ function nearestStep(chart, pixelX) {
   if (!xScale) return null;
   const xVal = xScale.getValueForPixel(pixelX);
   if (!Number.isFinite(xVal)) return null;
-  const logX = xScale.type === "logarithmic";
-  const trueX = logX ? xVal - 1 : xVal;
   const steps = collectChartSteps(chart);
-  if (!steps.length) return Math.round(trueX);
+  // Prefer matching against true steps (_step); plot may put step 0 at x=1 on log.
+  if (!steps.length) return Math.round(xVal);
   let best = steps[0];
-  let bestDist = Math.abs(steps[0] - trueX);
+  let bestDist = Infinity;
   for (const s of steps) {
-    const d = Math.abs(s - trueX);
+    const plotX =
+      xScale.type === "logarithmic" && s === 0 ? 1 : s;
+    const d = Math.abs(plotX - xVal);
     if (d < bestDist) {
       best = s;
       bestDist = d;
@@ -155,7 +152,8 @@ function nearestStep(chart, pixelX) {
 
 function plotXForNoteStep(chart, step) {
   if (!Number.isFinite(step)) return step;
-  if (chart?.scales?.x?.type === "logarithmic") return step + 1;
+  // Only step 0 is remapped for log-x; everything else stays as-is.
+  if (chart?.scales?.x?.type === "logarithmic" && step === 0) return 1;
   return step;
 }
 
