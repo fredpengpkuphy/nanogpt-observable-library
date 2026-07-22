@@ -84,6 +84,40 @@ let lossStepMax = null;
 let fullChart = null;
 let fullOverlayOpen = false;
 let fullOverlayMode = null;
+/** Snapshot of main-page compare state while fullscreen is open. */
+let fullscreenCompareSnapshot = null;
+
+function snapshotCompareState() {
+  return {
+    compareRuns,
+    compareLossRuns,
+    setupResidualMode,
+    selectedRuns: new Set(selectedRuns),
+  };
+}
+
+function restoreCompareState(snap) {
+  if (!snap) return;
+  compareRuns = !!snap.compareRuns;
+  compareLossRuns = !!snap.compareLossRuns;
+  setupResidualMode = !!snap.setupResidualMode;
+  selectedRuns = new Set(snap.selectedRuns || []);
+  const runInput = document.getElementById("compareRuns");
+  if (runInput) runInput.checked = compareRuns;
+  const lossInput = document.getElementById("compareLossRuns");
+  if (lossInput) lossInput.checked = compareLossRuns;
+  const curveRes = document.getElementById("curveResidual");
+  if (curveRes) curveRes.checked = setupResidualMode && compareRuns;
+  const lossRes = document.getElementById("lossResidual");
+  if (lossRes) lossRes.checked = setupResidualMode && compareLossRuns;
+  const spec = activeSpec();
+  updateCompareToggle(spec);
+  updateLossCompareToggle();
+  updateResidualToggles();
+  renderRunPicker();
+  if (spec) renderChart(spec);
+  renderLossChart();
+}
 
 async function boot() {
   runId = new URLSearchParams(location.search).get("run");
@@ -2160,6 +2194,7 @@ function renderFullChart(spec) {
 
 function openLossFullscreen() {
   if (!lossLog || lossLog.error || !buildLossDatasets()) return;
+  fullscreenCompareSnapshot = snapshotCompareState();
   fullOverlayMode = "loss";
   fullOverlayOpen = true;
   setCurveOverlayChrome(false);
@@ -2175,6 +2210,7 @@ function openLossFullscreen() {
 function openFullscreen() {
   const spec = activeSpec();
   if (!spec) return;
+  fullscreenCompareSnapshot = snapshotCompareState();
   fullOverlayMode = "spec";
   fullOverlayOpen = true;
   setLossOverlayChrome(false);
@@ -2195,6 +2231,10 @@ function closeFullscreen() {
   fullOverlayMode = null;
   setLossOverlayChrome(false);
   setCurveOverlayChrome(false);
+  // Fullscreen compare edits must not leak back to the main page.
+  const snap = fullscreenCompareSnapshot;
+  fullscreenCompareSnapshot = null;
+  restoreCompareState(snap);
   updateFullscreenCompareChrome();
   const overlay = document.getElementById("chartOverlay");
   overlay.classList.remove("visible");
