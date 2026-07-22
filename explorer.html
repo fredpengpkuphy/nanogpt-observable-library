@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=27">
+  <link rel="stylesheet" href="css/style.css?v=28">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
@@ -200,12 +200,23 @@
               <button type="button" class="chart-btn" id="notesRefreshBtn" title="Refresh">↻</button>
             </div>
           </div>
+          <form id="railNoteForm" class="rail-note-form">
+            <textarea id="railNoteText" rows="3" maxlength="2000" required placeholder="Leave a note on this curve…"></textarea>
+            <div class="rail-note-form-row">
+              <label class="rail-note-step-label">
+                Step
+                <input type="number" id="railNoteStep" min="0" step="1" placeholder="optional" />
+              </label>
+              <button type="submit" class="chart-btn note-submit" id="railNoteSubmit">Post</button>
+            </div>
+            <p class="note-modal-status" id="railNoteStatus" hidden></p>
+          </form>
           <div class="notes-list" id="notesList">
-            <p class="notes-rail-empty">No notes yet. Click the chart to add one.</p>
+            <p class="notes-rail-empty">No notes yet. Write one above, or click the chart to tag a step.</p>
           </div>
         </aside>
       </div>
-      <p class="chart-hint" id="fullChartHint">Click the curve to leave a note · scroll to zoom · double-click to reset · Esc to close</p>
+      <p class="chart-hint" id="fullChartHint">Write in the Notes panel · click the curve to tag a step · scroll to zoom · double-click to reset · Esc to close</p>
     </div>
   </div>
 
@@ -215,30 +226,20 @@
         <h3 id="noteModalTitle">Leave a note</h3>
         <button type="button" class="chart-btn" id="noteModalClose" title="Close">✕</button>
       </div>
-      <p class="note-dialog-step">At <strong id="noteModalStep">step —</strong></p>
-      <div id="noteModalExisting" class="note-modal-existing" hidden></div>
-      <form id="noteModalForm" class="note-modal-form">
-        <p class="note-identity" id="noteIdentity">Assigning your handle…</p>
-        <label>
-          Note
-          <textarea id="noteText" rows="4" maxlength="2000" required placeholder="What do you notice at this step?"></textarea>
-        </label>
-        <p class="note-modal-status" id="noteModalStatus" hidden></p>
-        <div class="note-modal-actions">
-          <button type="button" class="chart-btn" id="noteModalCancel">Cancel</button>
-          <button type="submit" class="chart-btn note-submit" id="noteSubmitBtn">Publish</button>
-        </div>
-      </form>
+      <p class="note-dialog-step">Use the Notes panel on the right to post.</p>
+      <div class="note-modal-actions">
+        <button type="button" class="chart-btn" id="noteModalCancel">Close</button>
+      </div>
     </div>
   </div>
 
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
-  <script src="js/notes-config.js?v=2"></script>
-  <script src="js/notes-store.js?v=5"></script>
-  <script src="js/curator-ui.js?v=1"></script>
-  <script src="js/notes-ui.js?v=9"></script>
+  <script src="js/notes-config.js?v=3"></script>
+  <script src="js/notes-store.js?v=6"></script>
+  <script src="js/curator-ui.js?v=2"></script>
+  <script src="js/notes-ui.js?v=10"></script>
   <script src="js/observable_defs.js?v=5"></script>
   <script src="js/app.js?v=23"></script>
 </body>

@@ -52,7 +52,7 @@ const CuratorUI = (() => {
       inner.innerHTML = `
         <div class="curator-bar-status">
           <span class="curator-pill">Curator mode</span>
-          <span class="curator-hint">Signed in site-wide — open any run / curve to delete notes</span>
+          <span class="curator-hint">Signed in site-wide — open any run / curve to delete notes & comments</span>
         </div>
         <button type="button" class="chart-btn" id="notesAdminSignOut">Sign out</button>`;
       inner.querySelector("#notesAdminSignOut")?.addEventListener("click", async () => {

@@ -1,5 +1,6 @@
 /**
- * Fullscreen chart annotations: click a step → leave a public note.
+ * Fullscreen chart notes: panel compose, optional step tags, comments/replies.
+ * Anonymous posts (no public usernames). Curator can delete anything.
  */
 
 let allNotes = [];
@@ -8,7 +9,9 @@ let pendingNoteStep = null;
 let noteClickTimer = null;
 let noteClickBoundCanvas = null;
 let noteIsAdmin = false;
-let noteMyHandle = null;
+let notePointerDown = null;
+let noteCanvasClickBound = null;
+let replyTarget = null; // { noteId, parentId }
 
 function isNoteAdminEntry() {
   return typeof CuratorUI !== "undefined"
@@ -18,10 +21,6 @@ function isNoteAdminEntry() {
 
 function clearNoteAdminEntry() {
   if (typeof CuratorUI !== "undefined") CuratorUI.clearAdminEntry();
-}
-
-function showCuratorChrome() {
-  return isNoteAdminEntry() || noteIsAdmin;
 }
 
 function noteContextKey() {
@@ -49,6 +48,11 @@ function chartIsAlive(chart) {
   }
 }
 
+function isNoteModalOpen() {
+  const modal = document.getElementById("noteModal");
+  return !!(modal && !modal.hidden && modal.classList.contains("visible"));
+}
+
 async function refreshNotes() {
   try {
     allNotes = await NotesStore.listNotes();
@@ -61,16 +65,43 @@ async function refreshNotes() {
   updateNotesHint();
   if (fullOverlayOpen && chartIsAlive(fullChart)) {
     applyNoteAnnotations(fullChart);
+  } else if (fullOverlayOpen) {
+    renderNotesRail(notesForCurrentChart());
   }
 }
 
-/** Delete a note (admin only), then refresh the visible list. */
 async function deleteNoteById(id) {
   if (!id) return;
   try {
     await NotesStore.deleteNote(id);
     allNotes = allNotes.filter((n) => n.id !== id);
     if (chartIsAlive(fullChart)) applyNoteAnnotations(fullChart);
+    else renderNotesRail(notesForCurrentChart());
+  } catch (err) {
+    alert(err.message || String(err));
+  }
+}
+
+async function deleteCommentById(noteId, commentId) {
+  if (!noteId || !commentId) return;
+  try {
+    await NotesStore.deleteComment(noteId, commentId);
+    const note = allNotes.find((n) => n.id === noteId);
+    if (note) {
+      const drop = new Set([commentId]);
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const c of note.comments || []) {
+          if (c.parentId && drop.has(c.parentId) && !drop.has(c.id)) {
+            drop.add(c.id);
+            grew = true;
+          }
+        }
+      }
+      note.comments = (note.comments || []).filter((c) => !drop.has(c.id));
+    }
+    renderNotesRail(notesForCurrentChart());
   } catch (err) {
     alert(err.message || String(err));
   }
@@ -78,12 +109,11 @@ async function deleteNoteById(id) {
 
 function updateNotesHint() {
   const hint = document.getElementById("fullChartHint");
-  if (!hint) return;
-  if (!fullOverlayOpen) return;
+  if (!hint || !fullOverlayOpen) return;
   const n = notesForCurrentChart().length;
   const base =
-    "Click the curve to leave a note · or use Note · scroll to zoom · double-click to reset · Esc to close";
-  hint.textContent = n ? `${base} · ${n} note${n === 1 ? "" : "s"} on this curve` : base;
+    "Write in the Notes panel · click the curve to tag a step · scroll to zoom · double-click to reset · Esc to close";
+  hint.textContent = n ? `${base} · ${n} note${n === 1 ? "" : "s"}` : base;
 }
 
 function collectChartSteps(chart) {
@@ -118,6 +148,7 @@ function nearestStep(chart, pixelX) {
 function noteAnnotationConfig(notes) {
   const byStep = new Map();
   for (const n of notes) {
+    if (!Number.isFinite(n.step)) continue;
     if (!byStep.has(n.step)) byStep.set(n.step, []);
     byStep.get(n.step).push(n);
   }
@@ -150,8 +181,6 @@ function applyNoteAnnotations(chart) {
   const notes = notesForCurrentChart();
   try {
     if (!chart.options.plugins) chart.options.plugins = {};
-    // Only touch annotation config — never replace the whole plugins object
-    // (that would drop zoom/legend and can blank the chart after update).
     chart.options.plugins.annotation = {
       annotations: noteAnnotationConfig(notes),
     };
@@ -163,39 +192,220 @@ function applyNoteAnnotations(chart) {
   renderNotesRail(notes);
 }
 
+function formatNoteTime(iso) {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch (_) {
+    return "";
+  }
+}
+
+function stepLabel(step) {
+  return Number.isFinite(step) ? `step ${step}` : "General";
+}
+
+function buildCommentTree(comments) {
+  const list = comments || [];
+  const byParent = new Map();
+  for (const c of list) {
+    const key = c.parentId || "";
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key).push(c);
+  }
+  function renderLevel(parentId, depth) {
+    const kids = byParent.get(parentId || "") || [];
+    return kids
+      .map((c) => {
+        const nested = renderLevel(c.id, depth + 1);
+        return `
+        <div class="note-comment ${depth ? "note-comment-reply" : ""}" data-comment-id="${escapeHtml(c.id)}">
+          <div class="note-comment-head">
+            <time>${escapeHtml(formatNoteTime(c.createdAt))}</time>
+            <div class="note-comment-actions">
+              <button type="button" class="note-reply-btn" data-note-id="${escapeHtml(c.noteId || "")}" data-parent-id="${escapeHtml(c.id)}">Reply</button>
+              ${
+                noteIsAdmin
+                  ? `<button type="button" class="note-delete" data-note-id="${escapeHtml(c.noteId || "")}" data-comment-id="${escapeHtml(c.id)}" title="Delete comment">✕</button>`
+                  : ""
+              }
+            </div>
+          </div>
+          <p>${escapeHtml(c.text)}</p>
+          ${nested}
+        </div>`;
+      })
+      .join("");
+  }
+  return renderLevel(null, 0);
+}
+
 function renderNotesRail(notes) {
-  const rail = document.getElementById("notesList") || document.getElementById("notesRail");
+  const rail = document.getElementById("notesList");
   if (!rail) return;
   if (!notes.length) {
-    rail.innerHTML = `<p class="notes-rail-empty">No notes yet. Click the chart to add one.</p>`;
+    rail.innerHTML = `<p class="notes-rail-empty">No notes yet. Write one above, or click the chart to tag a step.</p>`;
     return;
   }
-  const sorted = [...notes].sort((a, b) => a.step - b.step || a.createdAt.localeCompare(b.createdAt));
+  const sorted = [...notes].sort((a, b) => {
+    const as = Number.isFinite(a.step) ? a.step : Number.POSITIVE_INFINITY;
+    const bs = Number.isFinite(b.step) ? b.step : Number.POSITIVE_INFINITY;
+    if (as !== bs) return as - bs;
+    return String(a.createdAt).localeCompare(String(b.createdAt));
+  });
   rail.innerHTML = sorted
-    .map(
-      (n) => `
-    <article class="note-card" data-step="${n.step}" data-id="${escapeHtml(n.id)}">
+    .map((n) => {
+      const commentsHtml = buildCommentTree(
+        (n.comments || []).map((c) => ({ ...c, noteId: n.id }))
+      );
+      return `
+    <article class="note-card" data-id="${escapeHtml(n.id)}" data-step="${Number.isFinite(n.step) ? n.step : ""}">
       <header>
-        <span class="note-step">step ${n.step}</span>
-        <span class="note-author">${escapeHtml(n.author)}</span>
-        ${noteIsAdmin ? `<button type="button" class="note-delete" data-id="${escapeHtml(n.id)}" title="Delete note">✕</button>` : ""}
+        <span class="note-step">${escapeHtml(stepLabel(n.step))}</span>
+        <time class="note-time">${escapeHtml(formatNoteTime(n.createdAt))}</time>
+        ${
+          noteIsAdmin
+            ? `<button type="button" class="note-delete" data-id="${escapeHtml(n.id)}" title="Delete note">✕</button>`
+            : ""
+        }
       </header>
       <p>${escapeHtml(n.text)}</p>
-    </article>`
-    )
+      <div class="note-comments">${commentsHtml || ""}</div>
+      <button type="button" class="note-reply-btn note-reply-root" data-note-id="${escapeHtml(n.id)}" data-parent-id="">Comment</button>
+    </article>`;
+    })
     .join("");
-  rail.querySelectorAll(".note-delete").forEach((btn) => {
+
+  rail.querySelectorAll(".note-delete[data-id]").forEach((btn) => {
+    if (btn.dataset.commentId) return;
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (confirm("Delete this note?")) deleteNoteById(btn.dataset.id);
+      if (confirm("Delete this note and its comments?")) deleteNoteById(btn.dataset.id);
     });
   });
-  rail.querySelectorAll(".note-card").forEach((card) => {
-    card.addEventListener("click", () => {
-      const step = Number(card.dataset.step);
-      openNoteModal(step, { viewOnly: false });
+  rail.querySelectorAll(".note-delete[data-comment-id]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (confirm("Delete this comment?")) {
+        deleteCommentById(btn.dataset.noteId, btn.dataset.commentId);
+      }
     });
   });
+  rail.querySelectorAll(".note-reply-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openReplyBox(btn.dataset.noteId, btn.dataset.parentId || null, btn);
+    });
+  });
+}
+
+function openReplyBox(noteId, parentId, anchorBtn) {
+  document.querySelectorAll(".note-reply-box").forEach((el) => el.remove());
+  replyTarget = { noteId, parentId: parentId || null };
+  const box = document.createElement("form");
+  box.className = "note-reply-box";
+  box.innerHTML = `
+    <textarea rows="2" maxlength="2000" placeholder="Write a reply…" required></textarea>
+    <div class="note-reply-box-actions">
+      <button type="button" class="chart-btn note-reply-cancel">Cancel</button>
+      <button type="submit" class="chart-btn note-submit">Post</button>
+    </div>
+    <p class="note-reply-status" hidden></p>`;
+  const host =
+    anchorBtn.closest(".note-comment") || anchorBtn.closest(".note-card");
+  if (host) host.appendChild(box);
+  const ta = box.querySelector("textarea");
+  ta?.focus();
+  box.querySelector(".note-reply-cancel")?.addEventListener("click", () => {
+    box.remove();
+    replyTarget = null;
+  });
+  box.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = ta.value.trim();
+    const status = box.querySelector(".note-reply-status");
+    const submitBtn = box.querySelector("[type=submit]");
+    if (!text) return;
+    submitBtn.disabled = true;
+    status.hidden = false;
+    status.textContent = "Posting…";
+    try {
+      const comment = await NotesStore.createComment({
+        noteId,
+        text,
+        parentId: parentId || null,
+      });
+      const note = allNotes.find((n) => n.id === noteId);
+      if (note) {
+        note.comments = note.comments || [];
+        note.comments.push(comment);
+      }
+      replyTarget = null;
+      renderNotesRail(notesForCurrentChart());
+    } catch (err) {
+      status.textContent = err.message || String(err);
+      submitBtn.disabled = false;
+    }
+  });
+}
+
+async function submitRailNote(evt) {
+  evt.preventDefault();
+  const textEl = document.getElementById("railNoteText");
+  const stepEl = document.getElementById("railNoteStep");
+  const status = document.getElementById("railNoteStatus");
+  const submitBtn = document.getElementById("railNoteSubmit");
+  const text = textEl?.value.trim() || "";
+  if (!text) {
+    if (status) {
+      status.hidden = false;
+      status.textContent = "Please write a note.";
+    }
+    return;
+  }
+  const key = noteContextKey();
+  if (!key.runId) {
+    if (status) {
+      status.hidden = false;
+      status.textContent = "No run selected.";
+    }
+    return;
+  }
+  let step = null;
+  if (stepEl && stepEl.value.trim() !== "") {
+    const n = Number(stepEl.value);
+    if (!Number.isFinite(n)) {
+      status.hidden = false;
+      status.textContent = "Step must be a number (or leave blank).";
+      return;
+    }
+    step = n;
+  }
+  submitBtn.disabled = true;
+  status.hidden = false;
+  status.textContent = "Publishing…";
+  try {
+    const result = await NotesStore.createNote({
+      runId: key.runId,
+      specId: key.specId,
+      context: key.context,
+      step,
+      text,
+    });
+    allNotes.unshift(result.note);
+    textEl.value = "";
+    if (stepEl) stepEl.value = "";
+    status.textContent = "Published.";
+    if (chartIsAlive(fullChart)) applyNoteAnnotations(fullChart);
+    else renderNotesRail(notesForCurrentChart());
+    setTimeout(() => {
+      status.hidden = true;
+      status.textContent = "";
+    }, 800);
+  } catch (err) {
+    status.textContent = err.message || String(err);
+  } finally {
+    submitBtn.disabled = false;
+  }
 }
 
 function cancelPendingNoteClick() {
@@ -205,15 +415,11 @@ function cancelPendingNoteClick() {
   }
 }
 
-let notePointerDown = null;
-let noteCanvasClickBound = null;
-
 function canvasCssPixelX(chart, clientX) {
   const canvas = chart?.canvas;
   if (!canvas) return null;
   const rect = canvas.getBoundingClientRect();
   if (!rect.width) return null;
-  // Match Chart.js getRelativePosition: CSS pixels in chart coordinate space.
   return ((clientX - rect.left) / rect.width) * chart.width;
 }
 
@@ -223,8 +429,12 @@ function scheduleOpenNoteAtStep(step) {
   noteClickTimer = setTimeout(() => {
     noteClickTimer = null;
     if (!fullOverlayOpen || !chartIsAlive(fullChart)) return;
-    if (typeof isNoteModalOpen === "function" && isNoteModalOpen()) return;
-    openNoteModal(step);
+    if (isNoteModalOpen()) return;
+    // Prefer filling the rail form with this step.
+    const stepEl = document.getElementById("railNoteStep");
+    const textEl = document.getElementById("railNoteText");
+    if (stepEl) stepEl.value = String(Math.round(step));
+    textEl?.focus();
   }, 280);
 }
 
@@ -233,14 +443,9 @@ function onFullscreenCanvasPointerDown(evt) {
   notePointerDown = { x: evt.clientX, y: evt.clientY, t: Date.now() };
 }
 
-/**
- * Native canvas click — does NOT use Chart.js onClick.
- * Chart.js only invokes onClick when the pointer is inside chartArea, and
- * zoom/Hammer can swallow clicks; both made the note modal appear "broken".
- */
 function onFullscreenCanvasClick(evt) {
   if (!fullOverlayOpen || !chartIsAlive(fullChart)) return;
-  if (typeof isNoteModalOpen === "function" && isNoteModalOpen()) return;
+  if (isNoteModalOpen()) return;
   if (evt.detail > 1) {
     cancelPendingNoteClick();
     return;
@@ -261,18 +466,9 @@ function onFullscreenCanvasClick(evt) {
   scheduleOpenNoteAtStep(step);
 }
 
-/** Open note at midpoint step (toolbar fallback when click path fails). */
 function openNoteModalAtChartCenter() {
-  if (!chartIsAlive(fullChart)) return;
-  const steps = collectChartSteps(fullChart);
-  let step;
-  if (steps.length) {
-    step = steps[Math.floor(steps.length / 2)];
-  } else {
-    const xScale = fullChart.scales?.x;
-    step = xScale ? Math.round((xScale.min + xScale.max) / 2) : 0;
-  }
-  openNoteModal(step);
+  const textEl = document.getElementById("railNoteText");
+  textEl?.focus();
 }
 
 function detachFullscreenNoteHandlers(chart) {
@@ -288,10 +484,9 @@ function detachFullscreenNoteHandlers(chart) {
   noteClickBoundCanvas = null;
 }
 
-/** Kept for app.js Chart onClick wiring (secondary path). */
 function handleFullscreenChartClick(evt, chart) {
   if (!fullOverlayOpen || !chartIsAlive(chart)) return;
-  if (typeof isNoteModalOpen === "function" && isNoteModalOpen()) return;
+  if (isNoteModalOpen()) return;
   const native = evt?.native || evt;
   if (native?.detail > 1) {
     cancelPendingNoteClick();
@@ -312,7 +507,6 @@ function attachFullscreenNoteHandlers(chart) {
   if (!chartIsAlive(chart)) return;
   applyNoteAnnotations(chart);
   const canvas = chart.canvas;
-  // Re-bind cleanly across re-renders.
   if (noteCanvasClickBound && noteCanvasClickBound !== canvas) {
     noteCanvasClickBound.removeEventListener("pointerdown", onFullscreenCanvasPointerDown);
     noteCanvasClickBound.removeEventListener("click", onFullscreenCanvasClick);
@@ -326,74 +520,13 @@ function attachFullscreenNoteHandlers(chart) {
   canvas.style.cursor = "crosshair";
 }
 
-function openNoteModal(step, { viewOnly = false } = {}) {
+function openNoteModal(step) {
+  // Legacy path: route into the rail composer.
   pendingNoteStep = step;
-  const modal = document.getElementById("noteModal");
-  if (!modal) {
-    console.error("noteModal element missing");
-    return;
-  }
-  const stepEl = document.getElementById("noteModalStep");
-  const listEl = document.getElementById("noteModalExisting");
-  const form = document.getElementById("noteModalForm");
-  const status = document.getElementById("noteModalStatus");
-
-  if (stepEl) stepEl.textContent = `step ${step}`;
-  if (status) {
-    status.textContent = "";
-    status.hidden = true;
-  }
-
-  const existing = notesForCurrentChart().filter((n) => n.step === step);
-  if (listEl) {
-    if (existing.length) {
-      listEl.hidden = false;
-      listEl.innerHTML =
-        `<h4>Notes at this step</h4>` +
-        existing
-          .map(
-            (n) => `
-        <article class="note-card" data-id="${escapeHtml(n.id)}">
-          <header>
-            <span class="note-author">${escapeHtml(n.author)}</span>
-            <time>${new Date(n.createdAt).toLocaleString()}</time>
-            ${noteIsAdmin ? `<button type="button" class="note-delete" data-id="${escapeHtml(n.id)}" title="Delete note">✕</button>` : ""}
-          </header>
-          <p>${escapeHtml(n.text)}</p>
-        </article>`
-          )
-          .join("");
-      listEl.querySelectorAll(".note-delete").forEach((btn) => {
-        btn.addEventListener("click", async (e) => {
-          e.stopPropagation();
-          if (confirm("Delete this note?")) {
-            await deleteNoteById(btn.dataset.id);
-            openNoteModal(step, { viewOnly });
-          }
-        });
-      });
-    } else {
-      listEl.hidden = true;
-      listEl.innerHTML = "";
-    }
-  }
-
-  if (form) form.hidden = viewOnly;
-  const identityEl = document.getElementById("noteIdentity");
-  if (identityEl) {
-    const h = noteMyHandle || (NotesStore.currentHandle && NotesStore.currentHandle());
-    identityEl.textContent = h ? `Posting anonymously as ${h}` : "Assigning your handle…";
-  }
-  const textEl = document.getElementById("noteText");
-  if (textEl) textEl.value = "";
-
-  modal.removeAttribute("hidden");
-  modal.hidden = false;
-  modal.classList.add("visible");
-  modal.setAttribute("aria-hidden", "false");
-  modal.style.display = "grid";
-  modal.style.zIndex = "9999";
-  if (!viewOnly) textEl?.focus();
+  const stepEl = document.getElementById("railNoteStep");
+  const textEl = document.getElementById("railNoteText");
+  if (stepEl && Number.isFinite(step)) stepEl.value = String(Math.round(step));
+  textEl?.focus();
 }
 
 function closeNoteModal() {
@@ -407,70 +540,19 @@ function closeNoteModal() {
   pendingNoteStep = null;
 }
 
-async function submitNote(evt) {
-  evt.preventDefault();
-  const text = document.getElementById("noteText").value.trim();
-  const status = document.getElementById("noteModalStatus");
-  const submitBtn = document.getElementById("noteSubmitBtn");
-  if (!text) {
-    status.hidden = false;
-    status.textContent = "Please write a note before submitting.";
-    return;
-  }
-  if (pendingNoteStep == null) return;
-
-  const key = noteContextKey();
-  submitBtn.disabled = true;
-  status.hidden = false;
-  status.textContent = "Publishing…";
-
-  try {
-    const result = await NotesStore.createNote({
-      runId: key.runId,
-      specId: key.specId,
-      context: key.context,
-      step: pendingNoteStep,
-      text,
-    });
-    allNotes.unshift(result.note);
-    status.textContent = "Published.";
-    if (chartIsAlive(fullChart)) applyNoteAnnotations(fullChart);
-    setTimeout(closeNoteModal, 500);
-  } catch (err) {
-    status.textContent = err.message || String(err);
-  } finally {
-    submitBtn.disabled = false;
-  }
-}
-
 function renderAdminBar() {
-  if (typeof CuratorUI !== "undefined") {
-    CuratorUI.render();
-    return;
-  }
+  if (typeof CuratorUI !== "undefined") CuratorUI.render();
 }
 
-/** Reflect the current identity / admin state across the notes UI. */
 function onNotesAuthChange(state) {
   noteIsAdmin = !!state.isAdmin;
-  noteMyHandle = state.isAdmin ? null : state.handle;
   renderAdminBar();
   const identityEl = document.getElementById("notesRailIdentity");
   if (identityEl) {
-    identityEl.textContent = state.isAdmin
-      ? "curator · can delete"
-      : state.handle
-      ? `you: ${state.handle}`
-      : "";
+    identityEl.textContent = state.isAdmin ? "curator · can delete" : "";
   }
-  // Re-render notes so delete buttons appear/disappear with admin state.
-  if (fullOverlayOpen && chartIsAlive(fullChart)) {
+  if (fullOverlayOpen) {
     renderNotesRail(notesForCurrentChart());
-  }
-  // Refresh delete buttons in an open note modal too.
-  const modal = document.getElementById("noteModal");
-  if (modal && !modal.hidden && pendingNoteStep != null) {
-    openNoteModal(pendingNoteStep);
   }
 }
 
@@ -488,12 +570,12 @@ function wireNotesUi() {
     NotesStore.init();
   }
   renderAdminBar();
+  document.getElementById("railNoteForm")?.addEventListener("submit", submitRailNote);
   document.getElementById("noteModalClose")?.addEventListener("click", closeNoteModal);
   document.getElementById("noteModalCancel")?.addEventListener("click", closeNoteModal);
   document.getElementById("noteModal")?.addEventListener("click", (e) => {
     if (e.target.id === "noteModal") closeNoteModal();
   });
-  document.getElementById("noteModalForm")?.addEventListener("submit", submitNote);
   document.getElementById("notesRefreshBtn")?.addEventListener("click", () => {
     refreshNotes();
   });

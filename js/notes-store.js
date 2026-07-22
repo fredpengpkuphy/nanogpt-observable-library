@@ -2,14 +2,13 @@
  * Chart notes backed by Firebase (Firestore + Auth).
  *
  * Collections
- *   notes/{id}       { runId, specId, context, step, uid, handle, text, createdAt }
- *   handles/{uid}    { number, handle, createdAt }   – locks a handle to a browser
- *   meta/counter     { next }                        – allocates the next number
+ *   notes/{id}
+ *     { runId, specId, context, step|null, uid, text, createdAt }
+ *   notes/{id}/comments/{id}
+ *     { uid, text, parentId|null, createdAt }
  *
- * Identity
- *   Every visitor is signed in with Firebase Anonymous Auth. Firebase keeps the
- *   same uid in this browser across sessions, so their handle (explorer_001) is
- *   stable and reused on every curve. The admin signs in with email/password.
+ * Visitors sign in anonymously under the hood (no public username).
+ * Only the curator (email/password) may delete notes or comments.
  */
 const NotesStore = (() => {
   let app = null;
@@ -23,7 +22,6 @@ const NotesStore = (() => {
   let lastAuthError = null;
 
   let myUid = null;
-  let myHandle = null;
   let adminMode = false;
 
   const authListeners = new Set();
@@ -79,17 +77,10 @@ const NotesStore = (() => {
     );
   }
 
-  function padHandle(n) {
-    const prefix = cfg().handlePrefix || "explorer_";
-    const pad = Number(cfg().handlePad) || 3;
-    return prefix + String(n).padStart(pad, "0");
-  }
-
   function emitAuth() {
     const state = {
       ready: backendReady,
       uid: myUid,
-      handle: adminMode ? "admin" : myHandle,
       isAdmin: adminMode,
     };
     authListeners.forEach((fn) => {
@@ -101,51 +92,14 @@ const NotesStore = (() => {
 
   function onAuthChange(fn) {
     authListeners.add(fn);
-    // Fire immediately with current state.
-    fn({ ready: backendReady, uid: myUid, handle: adminMode ? "admin" : myHandle, isAdmin: adminMode });
+    fn({ ready: backendReady, uid: myUid, isAdmin: adminMode });
     return () => authListeners.delete(fn);
-  }
-
-  /** Allocate (or reuse) this browser's stable handle via a counter transaction. */
-  async function ensureHandle(uid) {
-    const handleRef = db.collection("handles").doc(uid);
-    const existing = await handleRef.get();
-    if (existing.exists && existing.data().handle) {
-      return existing.data().handle;
-    }
-    const counterRef = db.collection("meta").doc("counter");
-    return db.runTransaction(async (tx) => {
-      // Re-check inside the transaction to avoid double allocation.
-      const hSnap = await tx.get(handleRef);
-      if (hSnap.exists && hSnap.data().handle) return hSnap.data().handle;
-      const cSnap = await tx.get(counterRef);
-      const next = (cSnap.exists ? Number(cSnap.data().next) : 1) || 1;
-      const handle = padHandle(next);
-      tx.set(counterRef, { next: next + 1 }, { merge: true });
-      tx.set(handleRef, {
-        number: next,
-        handle,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      });
-      return handle;
-    });
   }
 
   async function handleAuthedUser(user) {
     myUid = user.uid;
     lastAuthError = null;
-    if (user.uid === adminUid() && !user.isAnonymous) {
-      adminMode = true;
-      myHandle = "admin";
-    } else {
-      adminMode = false;
-      try {
-        myHandle = await ensureHandle(user.uid);
-      } catch (err) {
-        console.warn("Handle allocation failed", err);
-        myHandle = null;
-      }
-    }
+    adminMode = user.uid === adminUid() && !user.isAnonymous;
     emitAuth();
     markAuthReady();
   }
@@ -170,13 +124,11 @@ const NotesStore = (() => {
 
       backendReady = true;
 
-      // React to every auth change (initial load, admin sign-in/out).
       auth.onAuthStateChanged(async (user) => {
         if (user) {
           await handleAuthedUser(user);
         } else {
           myUid = null;
-          myHandle = null;
           adminMode = false;
           emitAuth();
           try {
@@ -189,7 +141,6 @@ const NotesStore = (() => {
         }
       });
 
-      // Kick off anonymous sign-in if nobody is signed in yet.
       if (!auth.currentUser) {
         try {
           await auth.signInAnonymously();
@@ -205,26 +156,54 @@ const NotesStore = (() => {
     return readyPromise;
   }
 
-  function parseDoc(doc) {
-    const d = doc.data() || {};
-    let created;
-    if (d.createdAt && typeof d.createdAt.toDate === "function") {
-      created = d.createdAt.toDate().toISOString();
-    } else {
-      created = new Date().toISOString();
+  function tsToIso(value) {
+    if (value && typeof value.toDate === "function") {
+      return value.toDate().toISOString();
     }
+    return new Date().toISOString();
+  }
+
+  function parseNote(doc) {
+    const d = doc.data() || {};
+    const stepRaw = d.step;
+    const step =
+      stepRaw === null || stepRaw === undefined || stepRaw === ""
+        ? null
+        : Number(stepRaw);
     return {
       id: doc.id,
       runId: d.runId || "",
       specId: d.specId || "",
       context: d.context || "spec",
-      step: Number(d.step),
+      step: Number.isFinite(step) ? step : null,
       uid: d.uid || "",
-      handle: d.handle || "explorer_000",
-      author: d.handle || "explorer_000",
       text: d.text || "",
-      createdAt: created,
+      createdAt: tsToIso(d.createdAt),
+      comments: [],
     };
+  }
+
+  function parseComment(doc) {
+    const d = doc.data() || {};
+    return {
+      id: doc.id,
+      noteId: d.noteId || "",
+      uid: d.uid || "",
+      text: d.text || "",
+      parentId: d.parentId || null,
+      createdAt: tsToIso(d.createdAt),
+    };
+  }
+
+  async function listComments(noteId) {
+    const snap = await db
+      .collection("notes")
+      .doc(noteId)
+      .collection("comments")
+      .orderBy("createdAt", "asc")
+      .limit(200)
+      .get();
+    return snap.docs.map(parseComment);
   }
 
   async function listNotes() {
@@ -233,9 +212,20 @@ const NotesStore = (() => {
     const snap = await db
       .collection("notes")
       .orderBy("createdAt", "desc")
-      .limit(1000)
+      .limit(500)
       .get();
-    return snap.docs.map(parseDoc).filter((n) => Number.isFinite(n.step));
+    const notes = snap.docs.map(parseNote);
+    await Promise.all(
+      notes.map(async (n) => {
+        try {
+          n.comments = await listComments(n.id);
+        } catch (err) {
+          console.warn("listComments failed", n.id, err);
+          n.comments = [];
+        }
+      })
+    );
+    return notes;
   }
 
   function filterNotes(notes, { runId, specId, context }) {
@@ -247,35 +237,26 @@ const NotesStore = (() => {
     );
   }
 
-  async function createNote({ runId, specId, context, step, text }) {
+  function normalizeStep(step) {
+    if (step === null || step === undefined || step === "") return null;
+    const n = Number(step);
+    return Number.isFinite(n) ? Math.round(n) : null;
+  }
+
+  async function createNote({ runId, specId, context, step = null, text }) {
     await init();
     if (!backendReady) throw new Error("Notes backend is not configured yet.");
     await waitForUid();
     if (!myUid) throw new Error("Not signed in.");
     const clean = String(text || "").trim().slice(0, 2000);
     if (!clean) throw new Error("Note is empty.");
-    let handle = adminMode ? "curator" : myHandle;
-    if (!handle && !adminMode) {
-      try {
-        handle = await ensureHandle(myUid);
-        myHandle = handle;
-        emitAuth();
-      } catch (err) {
-        throw new Error(
-          "Could not assign handle. Check Firestore rules were published. (" +
-            (err.code || err.message || String(err)) +
-            ")"
-        );
-      }
-    }
-    if (!handle) throw new Error("No handle assigned yet — try again in a moment.");
+    const stepVal = normalizeStep(step);
     const payload = {
       runId,
       specId,
       context: context || "spec",
-      step: Math.round(step),
+      step: stepVal,
       uid: myUid,
-      handle,
       text: clean,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     };
@@ -287,13 +268,42 @@ const NotesStore = (() => {
         runId,
         specId,
         context: context || "spec",
-        step: Math.round(step),
+        step: stepVal,
         uid: myUid,
-        handle,
-        author: handle,
         text: clean,
         createdAt: new Date().toISOString(),
+        comments: [],
       },
+    };
+  }
+
+  async function createComment({ noteId, text, parentId = null }) {
+    await init();
+    if (!backendReady) throw new Error("Notes backend is not configured yet.");
+    await waitForUid();
+    if (!myUid) throw new Error("Not signed in.");
+    const clean = String(text || "").trim().slice(0, 2000);
+    if (!clean) throw new Error("Comment is empty.");
+    if (!noteId) throw new Error("Missing note id.");
+    const payload = {
+      noteId,
+      uid: myUid,
+      text: clean,
+      parentId: parentId || null,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+    const ref = await db
+      .collection("notes")
+      .doc(noteId)
+      .collection("comments")
+      .add(payload);
+    return {
+      id: ref.id,
+      noteId,
+      uid: myUid,
+      text: clean,
+      parentId: parentId || null,
+      createdAt: new Date().toISOString(),
     };
   }
 
@@ -301,7 +311,37 @@ const NotesStore = (() => {
     await init();
     if (!backendReady) throw new Error("Notes backend is not configured yet.");
     if (!adminMode) throw new Error("Only the curator can delete notes.");
-    await db.collection("notes").doc(id).delete();
+    const noteRef = db.collection("notes").doc(id);
+    const comments = await noteRef.collection("comments").limit(400).get();
+    const batch = db.batch();
+    comments.docs.forEach((d) => batch.delete(d.ref));
+    batch.delete(noteRef);
+    await batch.commit();
+  }
+
+  async function deleteComment(noteId, commentId) {
+    await init();
+    if (!backendReady) throw new Error("Notes backend is not configured yet.");
+    if (!adminMode) throw new Error("Only the curator can delete comments.");
+    const col = db.collection("notes").doc(noteId).collection("comments");
+    const snap = await col.limit(400).get();
+    const all = snap.docs.map((d) => ({ id: d.id, ...d.data(), ref: d.ref }));
+    const toDelete = new Set([commentId]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const c of all) {
+        if (c.parentId && toDelete.has(c.parentId) && !toDelete.has(c.id)) {
+          toDelete.add(c.id);
+          grew = true;
+        }
+      }
+    }
+    const batch = db.batch();
+    for (const c of all) {
+      if (toDelete.has(c.id)) batch.delete(c.ref);
+    }
+    await batch.commit();
   }
 
   async function signInAdmin(email, password) {
@@ -318,14 +358,11 @@ const NotesStore = (() => {
   async function signOutAdmin() {
     await init();
     if (!backendReady) return;
-    await auth.signOut(); // onAuthStateChanged re-signs in anonymously
+    await auth.signOut();
   }
 
   function isAdmin() {
     return adminMode;
-  }
-  function currentHandle() {
-    return adminMode ? "curator" : myHandle;
   }
   function isReady() {
     return backendReady;
@@ -337,11 +374,12 @@ const NotesStore = (() => {
     listNotes,
     filterNotes,
     createNote,
+    createComment,
     deleteNote,
+    deleteComment,
     signInAdmin,
     signOutAdmin,
     isAdmin,
-    currentHandle,
     isReady,
     cfg,
   };
