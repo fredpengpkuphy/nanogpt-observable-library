@@ -553,6 +553,33 @@ function closeNoteModal() {
   pendingNoteStep = null;
 }
 
+let notesRailExpanded = false;
+
+function isNotesRailExpanded() {
+  return notesRailExpanded;
+}
+
+function setNotesRailExpanded(expanded) {
+  notesRailExpanded = !!expanded;
+  const modal = document.querySelector("#chartOverlay .chart-modal");
+  const btn = document.getElementById("notesExpandBtn");
+  if (modal) modal.classList.toggle("notes-expanded", notesRailExpanded);
+  if (btn) {
+    btn.textContent = notesRailExpanded ? "↘" : "⤢";
+    btn.title = notesRailExpanded ? "Exit notes fullscreen" : "Expand notes";
+  }
+  // Chart was hidden; resize when returning so it doesn't stay blank.
+  if (!notesRailExpanded && chartIsAlive(fullChart)) {
+    try {
+      fullChart.resize();
+    } catch (_) {}
+  }
+}
+
+function toggleNotesRailExpanded() {
+  setNotesRailExpanded(!notesRailExpanded);
+}
+
 function renderAdminBar() {
   if (typeof CuratorUI !== "undefined") CuratorUI.render();
 }
@@ -592,6 +619,11 @@ function wireNotesUi() {
   document.getElementById("notesRefreshBtn")?.addEventListener("click", () => {
     refreshNotes();
   });
+  document.getElementById("notesExpandBtn")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleNotesRailExpanded();
+  });
   document.getElementById("fullAddNoteBtn")?.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -604,6 +636,11 @@ function wireNotesUi() {
       if (modal && !modal.hidden) {
         e.stopImmediatePropagation();
         closeNoteModal();
+        return;
+      }
+      if (notesRailExpanded) {
+        e.stopImmediatePropagation();
+        setNotesRailExpanded(false);
       }
     }
   });

@@ -1460,6 +1460,41 @@ body.curator-mode .app-header {
   background: var(--bg-card);
 }
 
+.chart-modal.notes-expanded .chart-modal-canvas-wrap {
+  display: none;
+}
+
+.chart-modal.notes-expanded .chart-modal-body-split {
+  grid-template-columns: 1fr;
+}
+
+.chart-modal.notes-expanded .notes-rail {
+  max-height: none;
+  height: 100%;
+  min-height: min(70vh, 720px);
+  overflow: auto;
+}
+
+.chart-modal.notes-expanded .rail-note-form textarea {
+  min-height: 6rem;
+  font-size: 0.9rem;
+}
+
+.chart-modal.notes-expanded .notes-list {
+  flex: 1;
+}
+
+.chart-modal.notes-expanded .note-card p,
+.chart-modal.notes-expanded .note-comment p {
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.chart-modal.notes-expanded #notesExpandBtn {
+  border-color: rgba(232, 200, 136, 0.45);
+  background: rgba(232, 200, 136, 0.14);
+}
+
 .notes-rail-head {
   display: flex;
   align-items: center;

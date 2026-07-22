@@ -173,6 +173,7 @@ function wireEvents() {
     if (e.key !== "Escape" || !fullOverlayOpen) return;
     const noteModal = document.getElementById("noteModal");
     if (noteModal && !noteModal.hidden) return;
+    if (typeof isNotesRailExpanded === "function" && isNotesRailExpanded()) return;
     closeFullscreen();
   });
   document.getElementById("pickCurrentLayer").addEventListener("click", () => {
@@ -1708,6 +1709,7 @@ function openFullscreen() {
 function closeFullscreen() {
   if (typeof cancelPendingNoteClick === "function") cancelPendingNoteClick();
   if (typeof closeNoteModal === "function") closeNoteModal();
+  if (typeof setNotesRailExpanded === "function") setNotesRailExpanded(false);
   fullOverlayOpen = false;
   fullOverlayMode = null;
   setLossOverlayChrome(false);
