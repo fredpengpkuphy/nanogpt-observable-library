@@ -361,6 +361,55 @@ const NotesStore = (() => {
     await auth.signOut();
   }
 
+  async function getAnnouncement() {
+    await init();
+    if (!backendReady) return "";
+    const snap = await db.collection("meta").doc("siteAnnouncement").get();
+    if (!snap.exists) return "";
+    return String(snap.data().text || "").trim();
+  }
+
+  /** Live updates for the public banner. Returns an unsubscribe fn (or null). */
+  function watchAnnouncement(cb) {
+    let unsub = null;
+    init().then(() => {
+      if (!backendReady) {
+        cb("");
+        return;
+      }
+      unsub = db.collection("meta").doc("siteAnnouncement").onSnapshot(
+        (snap) => {
+          cb(snap.exists ? String(snap.data().text || "").trim() : "");
+        },
+        (err) => {
+          console.warn("watchAnnouncement", err);
+          cb("");
+        }
+      );
+    });
+    return () => {
+      if (unsub) unsub();
+    };
+  }
+
+  async function setAnnouncement(text) {
+    await init();
+    if (!backendReady) throw new Error("Notes backend is not configured yet.");
+    if (!adminMode) throw new Error("Only the curator can edit the announcement.");
+    const clean = String(text || "").trim().slice(0, 1000);
+    const ref = db.collection("meta").doc("siteAnnouncement");
+    if (!clean) {
+      await ref.delete();
+      return "";
+    }
+    await ref.set({
+      text: clean,
+      uid: myUid,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    return clean;
+  }
+
   function isAdmin() {
     return adminMode;
   }
@@ -377,6 +426,9 @@ const NotesStore = (() => {
     createComment,
     deleteNote,
     deleteComment,
+    getAnnouncement,
+    watchAnnouncement,
+    setAnnouncement,
     signInAdmin,
     signOutAdmin,
     isAdmin,

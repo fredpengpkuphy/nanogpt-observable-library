@@ -119,11 +119,90 @@ h1, h2, h3,
 
 .curator-bar-inner {
   display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.55rem 1.75rem;
+}
+
+.curator-bar-main {
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.65rem 1rem;
-  padding: 0.55rem 1.75rem;
+  width: 100%;
+}
+
+.curator-announce {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+  margin-top: 0.15rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(232, 200, 136, 0.22);
+}
+
+.curator-announce label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(232, 200, 136, 0.9);
+}
+
+.curator-announce textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: var(--bg-card);
+  resize: vertical;
+  min-height: 3.2rem;
+}
+
+.curator-announce-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.site-announcement {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem 0.85rem;
+  padding: 0.65rem 1.75rem;
+  border-bottom: 1px solid rgba(232, 200, 136, 0.4);
+  background: rgba(40, 28, 10, 0.95);
+  color: #ffe6b8;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.site-announcement[hidden] {
+  display: none !important;
+}
+
+.site-announcement-label {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #e8c888;
+}
+
+.site-announcement p {
+  margin: 0;
+  flex: 1 1 12rem;
+  color: #fff6e0;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .curator-bar-status {

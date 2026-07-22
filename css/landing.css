@@ -189,3 +189,40 @@ body.landing {
     stroke-dashoffset: 0;
   }
 }
+
+.site-announcement {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem 0.85rem;
+  padding: 0.65rem 1.5rem;
+  border-bottom: 1px solid rgba(232, 200, 136, 0.4);
+  background: rgba(40, 28, 10, 0.92);
+  color: #ffe6b8;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.site-announcement[hidden] {
+  display: none !important;
+}
+
+.site-announcement-label {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #e8c888;
+}
+
+.site-announcement p {
+  margin: 0;
+  flex: 1 1 12rem;
+  color: #fff6e0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
