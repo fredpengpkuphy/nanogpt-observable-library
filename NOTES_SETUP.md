@@ -64,6 +64,12 @@ Pages domain (e.g. `yourname.github.io`) and `localhost` are listed.
 - **You (curator)**: open any page with `?admin=1`, sign in with email/password.
   You'll see delete controls on notes. Click **Sign out** to leave curator mode.
 
+## Using suggestions
+
+- Public page: `suggestions.html` — anyone can post improvement ideas (anonymous).
+- Only the curator can reply; replies are public. Curator can also delete.
+- After updating `firestore.rules`, **Publish** again in Firebase (adds `suggestions`).
+
 ## Using announcements
 
 - Public list: `announcements.html` (also linked from Select / Formulas / Explorer).

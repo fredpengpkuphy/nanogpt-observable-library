@@ -119,9 +119,11 @@ h1, h2, h3,
 
 .curator-bar-inner {
   display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  padding: 0.55rem 1.75rem;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.28rem 1rem;
+  min-height: 0;
 }
 
 .curator-bar-main {
@@ -129,13 +131,19 @@ h1, h2, h3,
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.65rem 1rem;
+  gap: 0.35rem 0.75rem;
   width: 100%;
+}
+
+.curator-bar-btn {
+  padding: 0.18rem 0.5rem !important;
+  font-size: 0.75rem !important;
+  line-height: 1.2;
 }
 
 .curator-link {
   color: #ffe6b8;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 600;
   text-decoration: none;
   border-bottom: 1px solid rgba(232, 200, 136, 0.45);
@@ -324,26 +332,89 @@ h1, h2, h3,
   color: #b54a3a;
 }
 
-.announce-page .site-announcement {
+.announce-page .site-announcement,
+.suggest-page .site-announcement {
   display: none !important;
+}
+
+.suggest-replies {
+  margin-top: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.suggest-reply {
+  padding: 0.55rem 0.7rem;
+  border-left: 3px solid rgba(126, 184, 201, 0.65);
+  background: rgba(126, 184, 201, 0.08);
+  border-radius: 0 8px 8px 0;
+}
+
+.suggest-reply p {
+  margin: 0.25rem 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.45;
+  font-size: 0.9rem;
+}
+
+.suggest-reply-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.65rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.suggest-reply-label {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5a8a98;
+}
+
+.suggest-reply-form {
+  margin-top: 0.55rem;
+}
+
+.suggest-reply-form textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  font-size: 0.88rem;
+  color: var(--text);
+  background: var(--bg-card);
+  resize: vertical;
+  min-height: 3rem;
+  box-sizing: border-box;
+}
+
+.suggest-del-btn {
+  padding: 0.1rem 0.35rem !important;
+  font-size: 0.7rem !important;
+  color: #b54a3a;
 }
 
 .curator-bar-status {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.45rem 0.75rem;
+  gap: 0.35rem 0.65rem;
 }
 
 .curator-pill {
   display: inline-flex;
   align-items: center;
-  padding: 0.2rem 0.55rem;
+  padding: 0.12rem 0.45rem;
   border-radius: 999px;
   border: 1px solid rgba(232, 200, 136, 0.55);
   background: rgba(232, 200, 136, 0.16);
   color: #e8c888;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -356,13 +427,21 @@ h1, h2, h3,
 }
 
 .curator-hint {
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.72);
+  display: none;
 }
 
 .curator-form {
-  flex: 1 1 16rem;
+  flex: 1 1 auto;
   justify-content: flex-end;
+  gap: 0.3rem;
+}
+
+.curator-form input {
+  flex: 0 1 9rem;
+  max-width: 11rem;
+  min-width: 5rem;
+  padding: 0.2rem 0.4rem !important;
+  font-size: 0.75rem !important;
 }
 
 body.curator-mode .app-header {

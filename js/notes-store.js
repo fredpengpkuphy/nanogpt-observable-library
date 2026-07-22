@@ -8,9 +8,14 @@
  *     { uid, text, parentId|null, createdAt }
  *   announcements/{id}
  *     { text, uid, createdAt, updatedAt }
+ *   suggestions/{id}
+ *     { text, uid, createdAt }
+ *   suggestions/{id}/replies/{id}
+ *     { text, uid, createdAt }  // curator-only
  *
  * Visitors sign in anonymously under the hood (no public username).
- * Only the curator (email/password) may delete notes/comments or manage announcements.
+ * Only the curator (email/password) may delete notes/comments, manage announcements,
+ * or reply to site suggestions.
  */
 const NotesStore = (() => {
   let app = null;
@@ -524,6 +529,133 @@ const NotesStore = (() => {
     return clean;
   }
 
+  async function loadSuggestionReplies(docRef) {
+    const snap = await docRef.collection("replies").orderBy("createdAt", "asc").get();
+    return snap.docs.map((d) => {
+      const data = d.data() || {};
+      return {
+        id: d.id,
+        text: String(data.text || "").trim(),
+        createdAt: data.createdAt || null,
+      };
+    });
+  }
+
+  async function listSuggestions() {
+    await init();
+    if (!backendReady) return [];
+    const snap = await db.collection("suggestions").orderBy("createdAt", "desc").get();
+    const items = [];
+    for (const doc of snap.docs) {
+      const data = doc.data() || {};
+      const text = String(data.text || "").trim();
+      if (!text) continue;
+      items.push({
+        id: doc.id,
+        text,
+        createdAt: data.createdAt || null,
+        replies: await loadSuggestionReplies(doc.ref),
+      });
+    }
+    return items;
+  }
+
+  function watchSuggestions(cb) {
+    let unsub = null;
+    let cancelled = false;
+    init().then(() => {
+      if (cancelled) return;
+      if (!backendReady) {
+        cb([]);
+        return;
+      }
+      unsub = db
+        .collection("suggestions")
+        .orderBy("createdAt", "desc")
+        .onSnapshot(
+          async (snap) => {
+            const items = [];
+            for (const doc of snap.docs) {
+              const data = doc.data() || {};
+              const text = String(data.text || "").trim();
+              if (!text) continue;
+              items.push({
+                id: doc.id,
+                text,
+                createdAt: data.createdAt || null,
+                replies: await loadSuggestionReplies(doc.ref),
+              });
+            }
+            if (!cancelled) cb(items);
+          },
+          (err) => {
+            console.warn("watchSuggestions", err);
+            cb([]);
+          }
+        );
+    });
+    return () => {
+      cancelled = true;
+      if (unsub) unsub();
+    };
+  }
+
+  async function createSuggestion(text) {
+    await init();
+    if (!backendReady) throw new Error("Notes backend is not configured yet.");
+    await waitForUid();
+    if (!myUid) throw new Error("Not signed in.");
+    const clean = String(text || "").trim().slice(0, 2000);
+    if (!clean) throw new Error("Suggestion is empty.");
+    const ref = await db.collection("suggestions").add({
+      text: clean,
+      uid: myUid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    return { id: ref.id, text: clean, replies: [] };
+  }
+
+  async function replyToSuggestion(suggestionId, text) {
+    await init();
+    if (!backendReady) throw new Error("Notes backend is not configured yet.");
+    if (!adminMode) throw new Error("Only the curator can reply to suggestions.");
+    const clean = String(text || "").trim().slice(0, 2000);
+    if (!clean) throw new Error("Reply is empty.");
+    const parent = db.collection("suggestions").doc(suggestionId);
+    const parentSnap = await parent.get();
+    if (!parentSnap.exists) throw new Error("Suggestion not found.");
+    const ref = await parent.collection("replies").add({
+      text: clean,
+      uid: myUid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    return { id: ref.id, text: clean };
+  }
+
+  async function deleteSuggestion(id) {
+    await init();
+    if (!backendReady) throw new Error("Notes backend is not configured yet.");
+    if (!adminMode) throw new Error("Only the curator can delete suggestions.");
+    const parent = db.collection("suggestions").doc(id);
+    const replies = await parent.collection("replies").get();
+    const batch = db.batch();
+    replies.docs.forEach((d) => batch.delete(d.ref));
+    batch.delete(parent);
+    await batch.commit();
+  }
+
+  async function deleteSuggestionReply(suggestionId, replyId) {
+    await init();
+    if (!backendReady) throw new Error("Notes backend is not configured yet.");
+    if (!adminMode) throw new Error("Only the curator can delete replies.");
+    await db
+      .collection("suggestions")
+      .doc(suggestionId)
+      .collection("replies")
+      .doc(replyId)
+      .delete();
+  }
+
   function isAdmin() {
     return adminMode;
   }
@@ -549,6 +681,12 @@ const NotesStore = (() => {
     getAnnouncement,
     watchAnnouncement,
     setAnnouncement,
+    listSuggestions,
+    watchSuggestions,
+    createSuggestion,
+    replyToSuggestion,
+    deleteSuggestion,
+    deleteSuggestionReply,
     signInAdmin,
     signOutAdmin,
     isAdmin,

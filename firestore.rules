@@ -53,6 +53,29 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Site improvement suggestions — public read/create; curator-only replies/delete.
+    match /suggestions/{suggestionId} {
+      allow read: if true;
+
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && validText();
+
+      allow update: if false;
+      allow delete: if isAdmin();
+
+      match /replies/{replyId} {
+        allow read: if true;
+
+        allow create: if isAdmin()
+          && request.resource.data.uid == request.auth.uid
+          && validText();
+
+        allow update: if false;
+        allow delete: if isAdmin();
+      }
+    }
+
     // Multi announcements — anyone can read; only curator can write.
     match /announcements/{announcementId} {
       allow read: if true;

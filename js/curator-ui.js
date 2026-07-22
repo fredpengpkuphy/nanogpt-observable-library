@@ -1,10 +1,10 @@
 /**
- * Site-wide curator (admin) chrome — works on any page with #curatorBar.
- * Enter via ?admin=1 on the homepage, select page, or explorer.
- * Announcements are managed on announcements.html.
+ * Site-wide curator (admin) chrome — compact top bar on pages with #curatorBar.
+ * Enter via ?admin=1. Announcements / Suggestions are managed on their pages.
  */
 const CuratorUI = (() => {
   let noteIsAdmin = false;
+  let signInExpanded = false;
 
   function isAdminEntry() {
     try {
@@ -69,44 +69,64 @@ const CuratorUI = (() => {
     if (noteIsAdmin) {
       document.body.classList.add("curator-mode");
       const announceHref = withAdminParam("announcements.html");
+      const suggestHref = withAdminParam("suggestions.html");
       inner.innerHTML = `
         <div class="curator-bar-main">
           <div class="curator-bar-status">
-            <span class="curator-pill">Curator mode</span>
-            <span class="curator-hint">Delete notes · manage announcements</span>
-            <a class="curator-link" href="${announceHref}">Announcements →</a>
+            <span class="curator-pill">Curator</span>
+            <a class="curator-link" href="${announceHref}">Announcements</a>
+            <a class="curator-link" href="${suggestHref}">Suggestions</a>
           </div>
-          <button type="button" class="chart-btn" id="notesAdminSignOut">Sign out</button>
+          <button type="button" class="chart-btn curator-bar-btn" id="notesAdminSignOut">Sign out</button>
         </div>`;
       inner.querySelector("#notesAdminSignOut")?.addEventListener("click", async () => {
         clearAdminEntry();
+        signInExpanded = false;
         await NotesStore.signOutAdmin();
       });
-    } else {
+    } else if (signInExpanded) {
       document.body.classList.remove("curator-mode");
       inner.innerHTML = `
-        <div class="curator-bar-status">
-          <span class="curator-pill curator-pill-muted">Curator sign-in</span>
-          <span class="curator-hint">One login for the whole site</span>
-        </div>
-        <form class="notes-admin-form curator-form" id="notesAdminForm">
-          <input type="email" id="adminEmail" placeholder="email" autocomplete="username" required />
-          <input type="password" id="adminPass" placeholder="password" autocomplete="current-password" required />
-          <button type="submit" class="chart-btn">Sign in</button>
-          <span class="notes-admin-status" id="adminStatus"></span>
-        </form>`;
+        <div class="curator-bar-main">
+          <span class="curator-pill curator-pill-muted">Curator</span>
+          <form class="notes-admin-form curator-form" id="notesAdminForm">
+            <input type="email" id="adminEmail" placeholder="email" autocomplete="username" required />
+            <input type="password" id="adminPass" placeholder="password" autocomplete="current-password" required />
+            <button type="submit" class="chart-btn curator-bar-btn">Sign in</button>
+            <button type="button" class="chart-btn curator-bar-btn" id="adminSignInCancel">Cancel</button>
+            <span class="notes-admin-status" id="adminStatus"></span>
+          </form>
+        </div>`;
+      inner.querySelector("#adminSignInCancel")?.addEventListener("click", () => {
+        signInExpanded = false;
+        render();
+      });
       inner.querySelector("#notesAdminForm")?.addEventListener("submit", async (e) => {
         e.preventDefault();
         const email = inner.querySelector("#adminEmail").value.trim();
         const pass = inner.querySelector("#adminPass").value;
         const status = inner.querySelector("#adminStatus");
-        status.textContent = "Signing in…";
+        status.textContent = "…";
         try {
           await NotesStore.signInAdmin(email, pass);
           status.textContent = "";
         } catch (err) {
           status.textContent = err.message || String(err);
         }
+      });
+      inner.querySelector("#adminEmail")?.focus();
+    } else {
+      document.body.classList.remove("curator-mode");
+      inner.innerHTML = `
+        <div class="curator-bar-main">
+          <div class="curator-bar-status">
+            <span class="curator-pill curator-pill-muted">Curator</span>
+          </div>
+          <button type="button" class="chart-btn curator-bar-btn" id="adminSignInOpen">Sign in</button>
+        </div>`;
+      inner.querySelector("#adminSignInOpen")?.addEventListener("click", () => {
+        signInExpanded = true;
+        render();
       });
     }
   }
@@ -117,6 +137,7 @@ const CuratorUI = (() => {
       try {
         sessionStorage.setItem("notesAdminEntry", "1");
       } catch (_) {}
+      signInExpanded = false;
     }
     render();
     document.dispatchEvent(
