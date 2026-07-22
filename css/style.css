@@ -1449,11 +1449,84 @@ h1, h2, h3,
   color: var(--accent);
 }
 
-.note-issue {
-  display: inline-block;
-  margin-top: 0.3rem;
+.notes-rail-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.notes-identity {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--accent);
+}
+
+.notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.notes-admin {
+  border: 1px dashed rgba(232, 200, 136, 0.45);
+  border-radius: 8px;
+  padding: 0.45rem 0.5rem;
+  background: rgba(232, 200, 136, 0.08);
+}
+
+.notes-admin-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.notes-admin-form input {
+  flex: 1 1 6rem;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.3rem 0.4rem;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--text);
+  background: var(--bg-card);
+}
+
+.notes-admin-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #e8c888;
+  margin-right: auto;
+}
+
+.notes-admin-status {
+  flex-basis: 100%;
   font-size: 0.68rem;
   color: var(--muted);
+}
+
+.note-delete {
+  border: none;
+  background: none;
+  color: rgba(255, 138, 128, 0.85);
+  cursor: pointer;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+}
+
+.note-delete:hover {
+  color: #ff6b5e;
+}
+
+.note-identity {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .note-modal {

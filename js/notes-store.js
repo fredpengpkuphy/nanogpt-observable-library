@@ -1,109 +1,241 @@
 /**
- * Chart notes backed by GitHub Issues (public, persistent).
- * Issue title: [note] <runId> · step <n>
- * Issue body starts with a JSON meta fence, then free-text note.
+ * Chart notes backed by Firebase (Firestore + Auth).
+ *
+ * Collections
+ *   notes/{id}       { runId, specId, context, step, uid, handle, text, createdAt }
+ *   handles/{uid}    { number, handle, createdAt }   – locks a handle to a browser
+ *   meta/counter     { next }                        – allocates the next number
+ *
+ * Identity
+ *   Every visitor is signed in with Firebase Anonymous Auth. Firebase keeps the
+ *   same uid in this browser across sessions, so their handle (explorer_001) is
+ *   stable and reused on every curve. The admin signs in with email/password.
  */
-
 const NotesStore = (() => {
-  const META_RE = /```note-meta\s*([\s\S]*?)```/;
+  let app = null;
+  let auth = null;
+  let db = null;
+
+  let readyPromise = null;
+  let backendReady = false;
+  let authReadyPromise = null;
+  let authReadyResolve = null;
+  let lastAuthError = null;
+
+  let myUid = null;
+  let myHandle = null;
+  let adminMode = false;
+
+  const authListeners = new Set();
+
+  function resetAuthReady() {
+    authReadyPromise = new Promise((resolve) => {
+      authReadyResolve = resolve;
+    });
+  }
+
+  function markAuthReady() {
+    if (authReadyResolve) {
+      authReadyResolve();
+      authReadyResolve = null;
+    }
+  }
+
+  async function waitForUid(timeoutMs = 8000) {
+    if (myUid) return myUid;
+    await init();
+    if (myUid) return myUid;
+    await Promise.race([
+      authReadyPromise || Promise.resolve(),
+      new Promise((r) => setTimeout(r, timeoutMs)),
+    ]);
+    if (myUid) return myUid;
+    if (lastAuthError) {
+      throw new Error(
+        "Anonymous sign-in failed. Enable Anonymous in Firebase Authentication → Sign-in method. (" +
+          lastAuthError +
+          ")"
+      );
+    }
+    throw new Error(
+      "Still signing in. Check that Anonymous auth is enabled in Firebase, then refresh the page."
+    );
+  }
 
   function cfg() {
-    return window.NOTES_CONFIG || { enabled: false, github: {} };
+    return window.NOTES_CONFIG || {};
+  }
+  function fb() {
+    return cfg().firebase || {};
+  }
+  function adminUid() {
+    return cfg().adminUid || "";
   }
 
-  function gh() {
-    return cfg().github || {};
+  function configured() {
+    const f = fb();
+    return Boolean(
+      f.apiKey && f.projectId && f.appId && typeof firebase !== "undefined"
+    );
   }
 
-  function apiBase() {
-    const { owner, repo } = gh();
-    return `https://api.github.com/repos/${owner}/${repo}`;
+  function padHandle(n) {
+    const prefix = cfg().handlePrefix || "explorer_";
+    const pad = Number(cfg().handlePad) || 3;
+    return prefix + String(n).padStart(pad, "0");
   }
 
-  function headers(write = false) {
-    const h = {
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
+  function emitAuth() {
+    const state = {
+      ready: backendReady,
+      uid: myUid,
+      handle: adminMode ? "admin" : myHandle,
+      isAdmin: adminMode,
     };
-    if (write && gh().token) h.Authorization = `Bearer ${gh().token}`;
-    return h;
-  }
-
-  function encodeMeta(meta) {
-    return "```note-meta\n" + JSON.stringify(meta, null, 2) + "\n```\n\n";
-  }
-
-  function parseIssue(issue) {
-    const body = issue.body || "";
-    const m = body.match(META_RE);
-    let meta = {};
-    let text = body;
-    if (m) {
+    authListeners.forEach((fn) => {
       try {
-        meta = JSON.parse(m[1]);
-      } catch (_) {
-        meta = {};
-      }
-      text = body.slice(m.index + m[0].length).trim();
+        fn(state);
+      } catch (_) {}
+    });
+  }
+
+  function onAuthChange(fn) {
+    authListeners.add(fn);
+    // Fire immediately with current state.
+    fn({ ready: backendReady, uid: myUid, handle: adminMode ? "admin" : myHandle, isAdmin: adminMode });
+    return () => authListeners.delete(fn);
+  }
+
+  /** Allocate (or reuse) this browser's stable handle via a counter transaction. */
+  async function ensureHandle(uid) {
+    const handleRef = db.collection("handles").doc(uid);
+    const existing = await handleRef.get();
+    if (existing.exists && existing.data().handle) {
+      return existing.data().handle;
     }
-    // Fallback: title like "[note] <runId> · step <n>" when meta fence is missing.
-    if (!Number.isFinite(Number(meta.step))) {
-      const tm = String(issue.title || "").match(
-        /^\[note\]\s*(.+?)\s*[·•]\s*step\s*(\d+)/i
-      );
-      if (tm) {
-        meta.runId = meta.runId || tm[1].trim();
-        meta.step = Number(tm[2]);
+    const counterRef = db.collection("meta").doc("counter");
+    return db.runTransaction(async (tx) => {
+      // Re-check inside the transaction to avoid double allocation.
+      const hSnap = await tx.get(handleRef);
+      if (hSnap.exists && hSnap.data().handle) return hSnap.data().handle;
+      const cSnap = await tx.get(counterRef);
+      const next = (cSnap.exists ? Number(cSnap.data().next) : 1) || 1;
+      const handle = padHandle(next);
+      tx.set(counterRef, { next: next + 1 }, { merge: true });
+      tx.set(handleRef, {
+        number: next,
+        handle,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      return handle;
+    });
+  }
+
+  async function handleAuthedUser(user) {
+    myUid = user.uid;
+    lastAuthError = null;
+    if (user.uid === adminUid() && !user.isAnonymous) {
+      adminMode = true;
+      myHandle = "admin";
+    } else {
+      adminMode = false;
+      try {
+        myHandle = await ensureHandle(user.uid);
+      } catch (err) {
+        console.warn("Handle allocation failed", err);
+        myHandle = null;
       }
+    }
+    emitAuth();
+    markAuthReady();
+  }
+
+  async function init() {
+    if (readyPromise) return readyPromise;
+    resetAuthReady();
+    readyPromise = (async () => {
+      if (!configured()) {
+        backendReady = false;
+        lastAuthError = "Firebase is not configured";
+        emitAuth();
+        markAuthReady();
+        return;
+      }
+      app = firebase.apps?.length ? firebase.app() : firebase.initializeApp(fb());
+      auth = firebase.auth();
+      db = firebase.firestore();
+      try {
+        await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+      } catch (_) {}
+
+      backendReady = true;
+
+      // React to every auth change (initial load, admin sign-in/out).
+      auth.onAuthStateChanged(async (user) => {
+        if (user) {
+          await handleAuthedUser(user);
+        } else {
+          myUid = null;
+          myHandle = null;
+          adminMode = false;
+          emitAuth();
+          try {
+            await auth.signInAnonymously();
+          } catch (err) {
+            lastAuthError = err.code || err.message || String(err);
+            console.warn("Anonymous sign-in failed", err);
+            markAuthReady();
+          }
+        }
+      });
+
+      // Kick off anonymous sign-in if nobody is signed in yet.
+      if (!auth.currentUser) {
+        try {
+          await auth.signInAnonymously();
+        } catch (err) {
+          lastAuthError = err.code || err.message || String(err);
+          console.warn("Anonymous sign-in failed", err);
+          markAuthReady();
+        }
+      } else {
+        await handleAuthedUser(auth.currentUser);
+      }
+    })();
+    return readyPromise;
+  }
+
+  function parseDoc(doc) {
+    const d = doc.data() || {};
+    let created;
+    if (d.createdAt && typeof d.createdAt.toDate === "function") {
+      created = d.createdAt.toDate().toISOString();
+    } else {
+      created = new Date().toISOString();
     }
     return {
-      id: String(issue.number),
-      issueNumber: issue.number,
-      issueUrl: issue.html_url,
-      runId: meta.runId || "",
-      specId: meta.specId || "",
-      context: meta.context || "spec",
-      step: Number(meta.step),
-      author: meta.author || issue.user?.login || "anonymous",
-      text,
-      createdAt: issue.created_at,
+      id: doc.id,
+      runId: d.runId || "",
+      specId: d.specId || "",
+      context: d.context || "spec",
+      step: Number(d.step),
+      uid: d.uid || "",
+      handle: d.handle || "explorer_000",
+      author: d.handle || "explorer_000",
+      text: d.text || "",
+      createdAt: created,
     };
-  }
-
-  /** Accept labeled notes OR untitled-form notes missing the label. */
-  function isNoteIssue(issue) {
-    if (!issue || issue.pull_request) return false;
-    const want = gh().label || "chart-note";
-    const labels = (issue.labels || []).map((l) => (typeof l === "string" ? l : l.name));
-    if (labels.includes(want)) return true;
-    if (/^\[note\]/i.test(issue.title || "")) return true;
-    if (META_RE.test(issue.body || "")) return true;
-    return false;
   }
 
   async function listNotes() {
-    if (!cfg().enabled) return [];
-    const issues = [];
-    // Do not require the chart-note label: the GitHub "new issue" form drops
-    // unknown labels, so notes would never appear if the label is missing.
-    for (let page = 1; page <= 20; page += 1) {
-      const url =
-        `${apiBase()}/issues?state=open` +
-        `&per_page=100&page=${page}&sort=created&direction=desc`;
-      const res = await fetch(url, { headers: headers(false) });
-      if (!res.ok) {
-        console.warn("NotesStore.listNotes failed", res.status);
-        break;
-      }
-      const batch = await res.json();
-      if (!Array.isArray(batch) || !batch.length) break;
-      issues.push(...batch);
-      if (batch.length < 100) break;
-    }
-    return issues
-      .filter(isNoteIssue)
-      .map(parseIssue)
-      .filter((n) => Number.isFinite(n.step));
+    await init();
+    if (!backendReady) return [];
+    const snap = await db
+      .collection("notes")
+      .orderBy("createdAt", "desc")
+      .limit(1000)
+      .get();
+    return snap.docs.map(parseDoc).filter((n) => Number.isFinite(n.step));
   }
 
   function filterNotes(notes, { runId, specId, context }) {
@@ -115,48 +247,102 @@ const NotesStore = (() => {
     );
   }
 
-  function buildIssuePayload({ runId, specId, context, step, author, text }) {
-    const meta = {
+  async function createNote({ runId, specId, context, step, text }) {
+    await init();
+    if (!backendReady) throw new Error("Notes backend is not configured yet.");
+    await waitForUid();
+    if (!myUid) throw new Error("Not signed in.");
+    const clean = String(text || "").trim().slice(0, 2000);
+    if (!clean) throw new Error("Note is empty.");
+    let handle = adminMode ? "curator" : myHandle;
+    if (!handle && !adminMode) {
+      try {
+        handle = await ensureHandle(myUid);
+        myHandle = handle;
+        emitAuth();
+      } catch (err) {
+        throw new Error(
+          "Could not assign handle. Check Firestore rules were published. (" +
+            (err.code || err.message || String(err)) +
+            ")"
+        );
+      }
+    }
+    if (!handle) throw new Error("No handle assigned yet — try again in a moment.");
+    const payload = {
       runId,
       specId,
       context: context || "spec",
       step: Math.round(step),
-      author: (author || "anonymous").slice(0, 64),
+      uid: myUid,
+      handle,
+      text: clean,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     };
-    const title = `[note] ${runId} · step ${meta.step}`;
-    const body = encodeMeta(meta) + String(text || "").trim();
-    return { title, body, labels: [gh().label || "chart-note"] };
+    const ref = await db.collection("notes").add(payload);
+    return {
+      mode: "api",
+      note: {
+        id: ref.id,
+        runId,
+        specId,
+        context: context || "spec",
+        step: Math.round(step),
+        uid: myUid,
+        handle,
+        author: handle,
+        text: clean,
+        createdAt: new Date().toISOString(),
+      },
+    };
   }
 
-  async function createNote(note) {
-    if (!cfg().enabled) throw new Error("Notes are disabled");
-    const payload = buildIssuePayload(note);
-    if (!gh().token) {
-      const q = new URLSearchParams({
-        title: payload.title,
-        body: payload.body,
-        labels: payload.labels.join(","),
-      });
-      const url = `https://github.com/${gh().owner}/${gh().repo}/issues/new?${q}`;
-      window.open(url, "_blank", "noopener");
-      return { mode: "github-form", url };
+  async function deleteNote(id) {
+    await init();
+    if (!backendReady) throw new Error("Notes backend is not configured yet.");
+    if (!adminMode) throw new Error("Only the curator can delete notes.");
+    await db.collection("notes").doc(id).delete();
+  }
+
+  async function signInAdmin(email, password) {
+    await init();
+    if (!backendReady) throw new Error("Notes backend is not configured yet.");
+    const cred = await auth.signInWithEmailAndPassword(email, password);
+    if (cred.user.uid !== adminUid()) {
+      await auth.signOut();
+      throw new Error("This account is not the curator.");
     }
-    const res = await fetch(`${apiBase()}/issues`, {
-      method: "POST",
-      headers: { ...headers(true), "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`GitHub API ${res.status}: ${err.slice(0, 200)}`);
-    }
-    const issue = await res.json();
-    return { mode: "api", note: parseIssue(issue) };
+    return true;
   }
 
-  function hasWriteToken() {
-    return Boolean(gh().token);
+  async function signOutAdmin() {
+    await init();
+    if (!backendReady) return;
+    await auth.signOut(); // onAuthStateChanged re-signs in anonymously
   }
 
-  return { listNotes, filterNotes, createNote, hasWriteToken, cfg };
+  function isAdmin() {
+    return adminMode;
+  }
+  function currentHandle() {
+    return adminMode ? "curator" : myHandle;
+  }
+  function isReady() {
+    return backendReady;
+  }
+
+  return {
+    init,
+    onAuthChange,
+    listNotes,
+    filterNotes,
+    createNote,
+    deleteNote,
+    signInAdmin,
+    signOutAdmin,
+    isAdmin,
+    currentHandle,
+    isReady,
+    cfg,
+  };
 })();

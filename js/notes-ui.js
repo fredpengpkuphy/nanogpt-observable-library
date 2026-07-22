@@ -7,6 +7,16 @@ let notesReady = false;
 let pendingNoteStep = null;
 let noteClickTimer = null;
 let noteClickBoundCanvas = null;
+let noteIsAdmin = false;
+let noteMyHandle = null;
+
+function isNoteAdminEntry() {
+  try {
+    return new URLSearchParams(location.search).has("admin");
+  } catch (_) {
+    return false;
+  }
+}
 
 function noteContextKey() {
   if (fullOverlayMode === "loss") {
@@ -45,6 +55,18 @@ async function refreshNotes() {
   updateNotesHint();
   if (fullOverlayOpen && chartIsAlive(fullChart)) {
     applyNoteAnnotations(fullChart);
+  }
+}
+
+/** Delete a note (admin only), then refresh the visible list. */
+async function deleteNoteById(id) {
+  if (!id) return;
+  try {
+    await NotesStore.deleteNote(id);
+    allNotes = allNotes.filter((n) => n.id !== id);
+    if (chartIsAlive(fullChart)) applyNoteAnnotations(fullChart);
+  } catch (err) {
+    alert(err.message || String(err));
   }
 }
 
@@ -136,7 +158,7 @@ function applyNoteAnnotations(chart) {
 }
 
 function renderNotesRail(notes) {
-  const rail = document.getElementById("notesRail");
+  const rail = document.getElementById("notesList") || document.getElementById("notesRail");
   if (!rail) return;
   if (!notes.length) {
     rail.innerHTML = `<p class="notes-rail-empty">No notes yet. Click the chart to add one.</p>`;
@@ -146,16 +168,22 @@ function renderNotesRail(notes) {
   rail.innerHTML = sorted
     .map(
       (n) => `
-    <article class="note-card" data-step="${n.step}">
+    <article class="note-card" data-step="${n.step}" data-id="${escapeHtml(n.id)}">
       <header>
         <span class="note-step">step ${n.step}</span>
         <span class="note-author">${escapeHtml(n.author)}</span>
+        ${noteIsAdmin ? `<button type="button" class="note-delete" data-id="${escapeHtml(n.id)}" title="Delete note">✕</button>` : ""}
       </header>
       <p>${escapeHtml(n.text)}</p>
-      <a class="note-issue" href="${n.issueUrl}" target="_blank" rel="noopener">GitHub #${n.issueNumber}</a>
     </article>`
     )
     .join("");
+  rail.querySelectorAll(".note-delete").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (confirm("Delete this note?")) deleteNoteById(btn.dataset.id);
+    });
+  });
   rail.querySelectorAll(".note-card").forEach((card) => {
     card.addEventListener("click", () => {
       const step = Number(card.dataset.step);
@@ -319,15 +347,25 @@ function openNoteModal(step, { viewOnly = false } = {}) {
         existing
           .map(
             (n) => `
-        <article class="note-card">
+        <article class="note-card" data-id="${escapeHtml(n.id)}">
           <header>
             <span class="note-author">${escapeHtml(n.author)}</span>
             <time>${new Date(n.createdAt).toLocaleString()}</time>
+            ${noteIsAdmin ? `<button type="button" class="note-delete" data-id="${escapeHtml(n.id)}" title="Delete note">✕</button>` : ""}
           </header>
           <p>${escapeHtml(n.text)}</p>
         </article>`
           )
           .join("");
+      listEl.querySelectorAll(".note-delete").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          if (confirm("Delete this note?")) {
+            await deleteNoteById(btn.dataset.id);
+            openNoteModal(step, { viewOnly });
+          }
+        });
+      });
     } else {
       listEl.hidden = true;
       listEl.innerHTML = "";
@@ -335,9 +373,12 @@ function openNoteModal(step, { viewOnly = false } = {}) {
   }
 
   if (form) form.hidden = viewOnly;
-  const authorEl = document.getElementById("noteAuthor");
+  const identityEl = document.getElementById("noteIdentity");
+  if (identityEl) {
+    const h = noteMyHandle || (NotesStore.currentHandle && NotesStore.currentHandle());
+    identityEl.textContent = h ? `Posting anonymously as ${h}` : "Assigning your handle…";
+  }
   const textEl = document.getElementById("noteText");
-  if (authorEl) authorEl.value = localStorage.getItem("noteAuthor") || "";
   if (textEl) textEl.value = "";
 
   modal.removeAttribute("hidden");
@@ -363,7 +404,6 @@ function closeNoteModal() {
 async function submitNote(evt) {
   evt.preventDefault();
   const text = document.getElementById("noteText").value.trim();
-  const author = document.getElementById("noteAuthor").value.trim() || "anonymous";
   const status = document.getElementById("noteModalStatus");
   const submitBtn = document.getElementById("noteSubmitBtn");
   if (!text) {
@@ -373,7 +413,6 @@ async function submitNote(evt) {
   }
   if (pendingNoteStep == null) return;
 
-  localStorage.setItem("noteAuthor", author);
   const key = noteContextKey();
   submitBtn.disabled = true;
   status.hidden = false;
@@ -385,17 +424,12 @@ async function submitNote(evt) {
       specId: key.specId,
       context: key.context,
       step: pendingNoteStep,
-      author,
       text,
     });
-    if (result.mode === "api") {
-      allNotes.unshift(result.note);
-      status.textContent = "Published.";
-      if (chartIsAlive(fullChart)) applyNoteAnnotations(fullChart);
-      setTimeout(closeNoteModal, 500);
-    } else {
-      status.textContent = "Continue in the new tab to publish, then refresh notes.";
-    }
+    allNotes.unshift(result.note);
+    status.textContent = "Published.";
+    if (chartIsAlive(fullChart)) applyNoteAnnotations(fullChart);
+    setTimeout(closeNoteModal, 500);
   } catch (err) {
     status.textContent = err.message || String(err);
   } finally {
@@ -403,7 +437,71 @@ async function submitNote(evt) {
   }
 }
 
+function renderAdminBar() {
+  const bar = document.getElementById("notesAdmin");
+  if (!bar) return;
+  if (!isNoteAdminEntry()) {
+    bar.hidden = true;
+    bar.innerHTML = "";
+    return;
+  }
+  bar.hidden = false;
+  if (noteIsAdmin) {
+    bar.innerHTML = `
+      <span class="notes-admin-tag">Curator mode</span>
+      <button type="button" class="chart-btn" id="notesAdminSignOut">Sign out</button>`;
+    bar.querySelector("#notesAdminSignOut")?.addEventListener("click", async () => {
+      await NotesStore.signOutAdmin();
+    });
+  } else {
+    bar.innerHTML = `
+      <form class="notes-admin-form" id="notesAdminForm">
+        <input type="email" id="adminEmail" placeholder="curator email" autocomplete="username" required />
+        <input type="password" id="adminPass" placeholder="password" autocomplete="current-password" required />
+        <button type="submit" class="chart-btn">Sign in</button>
+        <span class="notes-admin-status" id="adminStatus"></span>
+      </form>`;
+    bar.querySelector("#notesAdminForm")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = bar.querySelector("#adminEmail").value.trim();
+      const pass = bar.querySelector("#adminPass").value;
+      const status = bar.querySelector("#adminStatus");
+      status.textContent = "Signing in…";
+      try {
+        await NotesStore.signInAdmin(email, pass);
+        status.textContent = "";
+      } catch (err) {
+        status.textContent = err.message || String(err);
+      }
+    });
+  }
+}
+
+/** Reflect the current identity / admin state across the notes UI. */
+function onNotesAuthChange(state) {
+  noteIsAdmin = !!state.isAdmin;
+  noteMyHandle = state.isAdmin ? null : state.handle;
+  renderAdminBar();
+  const identityEl = document.getElementById("notesRailIdentity");
+  if (identityEl) {
+    identityEl.textContent = state.isAdmin
+      ? "curator"
+      : state.handle
+      ? `you: ${state.handle}`
+      : "";
+  }
+  // Re-render notes so delete buttons appear/disappear with admin state.
+  if (fullOverlayOpen && chartIsAlive(fullChart)) {
+    renderNotesRail(notesForCurrentChart());
+  }
+}
+
 function wireNotesUi() {
+  if (typeof NotesStore !== "undefined") {
+    NotesStore.onAuthChange(onNotesAuthChange);
+    NotesStore.init();
+  }
+  renderAdminBar();
   document.getElementById("noteModalClose")?.addEventListener("click", closeNoteModal);
   document.getElementById("noteModalCancel")?.addEventListener("click", closeNoteModal);
   document.getElementById("noteModal")?.addEventListener("click", (e) => {
