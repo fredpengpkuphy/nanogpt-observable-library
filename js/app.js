@@ -58,6 +58,7 @@ let manifestCache = new Map();
 let lossLogByRun = new Map();
 let compareRuns = false;
 let compareLossRuns = false;
+let setupResidualMode = false;
 let selectedRuns = new Set();
 let runsLoading = false;
 let manifestLoadGen = 0;
@@ -146,6 +147,12 @@ function wireEvents() {
   });
   document.getElementById("compareRuns")?.addEventListener("change", async (e) => {
     await setCompareRuns(e.target.checked);
+  });
+  document.getElementById("curveResidual")?.addEventListener("change", (e) => {
+    setSetupResidualMode(e.target.checked);
+  });
+  document.getElementById("lossResidual")?.addEventListener("change", (e) => {
+    setSetupResidualMode(e.target.checked);
   });
   document.getElementById("pickAllRuns")?.addEventListener("click", async () => {
     selectedRuns = new Set(availableRuns.map((r) => r.run_id));
@@ -326,9 +333,13 @@ async function setCompareRuns(on) {
       selectedRuns = new Set(availableRuns.map((r) => r.run_id));
     }
     await ensureSelectedRunManifests();
+    if (setupResidualMode) await ensureBaselineManifest();
+  } else if (!compareLossRuns) {
+    setupResidualMode = false;
   }
   const spec = activeSpec();
   updateCompareToggle(spec);
+  updateResidualToggles();
   if (spec) renderChart(spec);
 }
 
@@ -353,12 +364,121 @@ function selectedRunIds() {
   return [...selectedRuns];
 }
 
+/** Prefer the run whose id/label is "baseline"; else current run; else first selected. */
+function resolveBaselineRunId(selectedIds = selectedRunIds()) {
+  const ids = selectedIds.length ? selectedIds : availableRuns.map((r) => r.run_id);
+  if (ids.includes("baseline")) return "baseline";
+  const labeled = availableRuns.find(
+    (r) => ids.includes(r.run_id) && /^baseline$/i.test(String(r.label || "").trim())
+  );
+  if (labeled) return labeled.run_id;
+  const soft = availableRuns.find(
+    (r) => ids.includes(r.run_id) && /baseline/i.test(String(r.label || r.run_id))
+  );
+  if (soft) return soft.run_id;
+  // Residual mode still needs baseline data even if not checked — look globally.
+  if (availableRuns.some((r) => r.run_id === "baseline")) return "baseline";
+  const globalSoft = availableRuns.find((r) => /baseline/i.test(String(r.label || r.run_id)));
+  if (globalSoft) return globalSoft.run_id;
+  if (ids.includes(runId)) return runId;
+  return ids[0] || null;
+}
+
+async function ensureBaselineManifest() {
+  const bid = resolveBaselineRunId();
+  if (!bid) return;
+  await ensureRunManifest(bid);
+  await ensureLossLogForRun(bid);
+}
+
+function pointStepKey(p) {
+  if (p && Number.isFinite(p._step)) return p._step;
+  if (p && Number.isFinite(p.x)) return p.x;
+  return null;
+}
+
+/** y_other − y_baseline at matching steps (keeps plot-x / _step from other). */
+function residualAgainstBaseline(points, baselinePoints) {
+  const baseMap = new Map();
+  for (const p of baselinePoints || []) {
+    const key = pointStepKey(p);
+    if (key == null || !Number.isFinite(p.y)) continue;
+    baseMap.set(key, p.y);
+  }
+  const out = [];
+  for (const p of points || []) {
+    const key = pointStepKey(p);
+    if (key == null || !Number.isFinite(p.y) || !baseMap.has(key)) continue;
+    out.push({
+      x: p.x,
+      y: p.y - baseMap.get(key),
+      _step: Number.isFinite(p._step) ? p._step : key,
+    });
+  }
+  return out;
+}
+
+function zeroBaselinePoints(baselinePoints) {
+  return (baselinePoints || []).map((p) => ({
+    x: p.x,
+    y: 0,
+    _step: Number.isFinite(p._step) ? p._step : pointStepKey(p),
+  }));
+}
+
+function setSetupResidualMode(on) {
+  setupResidualMode = !!on;
+  updateResidualToggles();
+  if (setupResidualMode) {
+    ensureBaselineManifest().then(() => {
+      const spec = activeSpec();
+      if (spec && compareRuns) renderChart(spec);
+      if (compareLossRuns) {
+        renderLossChart();
+        if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
+      }
+      if (fullOverlayOpen && fullOverlayMode === "spec" && spec) renderFullChart(spec);
+    });
+  } else {
+    const spec = activeSpec();
+    if (spec && compareRuns) renderChart(spec);
+    if (compareLossRuns) {
+      renderLossChart();
+      if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
+    }
+    if (fullOverlayOpen && fullOverlayMode === "spec" && spec) renderFullChart(spec);
+  }
+}
+
+function updateResidualToggles() {
+  for (const [wrapId, inputId, active] of [
+    ["curveResidualWrap", "curveResidual", compareRuns && canCompareRuns()],
+    ["lossResidualWrap", "lossResidual", compareLossRuns && canCompareRuns()],
+  ]) {
+    const wrap = document.getElementById(wrapId);
+    const input = document.getElementById(inputId);
+    if (!wrap || !input) continue;
+    wrap.hidden = !active;
+    if (!active) {
+      // keep setupResidualMode if the other compare mode still needs it
+      input.checked = false;
+    } else {
+      input.checked = setupResidualMode;
+    }
+  }
+  if (!compareRuns && !compareLossRuns) setupResidualMode = false;
+}
+
 async function setCompareLossRuns(on) {
   compareLossRuns = on;
   if (on) {
     await Promise.all(selectedRunIds().map((rid) => ensureLossLogForRun(rid)));
+    if (setupResidualMode) await ensureBaselineManifest();
+  } else if (!compareRuns) {
+    setupResidualMode = false;
   }
   updateLossCompareToggle();
+  updateResidualToggles();
   syncLossRangeInputs();
   renderLossChart();
   if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
@@ -373,9 +493,10 @@ function updateLossCompareToggle() {
   if (!ok) {
     compareLossRuns = false;
     input.checked = false;
-    return;
+  } else {
+    input.checked = compareLossRuns;
   }
-  input.checked = compareLossRuns;
+  updateResidualToggles();
 }
 
 async function fetchJson(url) {
@@ -703,6 +824,7 @@ function updateCompareToggle(spec) {
   if (!canLayers || compareRuns) {
     if (layerInput) layerInput.checked = false;
     if (layerPickWrap) layerPickWrap.hidden = true;
+    updateResidualToggles();
     return;
   }
   if (layerInput) layerInput.checked = compareLayers;
@@ -713,6 +835,7 @@ function updateCompareToggle(spec) {
   } else if (layerPickWrap) {
     layerPickWrap.hidden = true;
   }
+  updateResidualToggles();
 }
 
 function renderRunPicker() {
@@ -878,21 +1001,28 @@ function chartScaleOptions({
   scaleMode = "linear",
   xTitle = "Step",
   yTitle = "Value",
+  residual = false,
 } = {}) {
   const axis = "rgba(255, 255, 255, 0.78)";
   const grid = "rgba(255, 255, 255, 0.12)";
-  const log = scaleMode === "loglog";
+  // Residuals cross zero — y must stay linear. X may still be log for loss.
+  const logX = !residual && scaleMode === "loglog";
+  const logY = !residual && scaleMode === "loglog";
   return {
     x: {
-      type: log ? "logarithmic" : "linear",
-      title: { display: true, text: log ? `${xTitle} (log)` : xTitle, color: axis },
-      ticks: log ? logXAxisTickConfig(axis) : { color: axis },
-      ...(log ? { afterBuildTicks: afterBuildLogXTicks } : {}),
+      type: logX ? "logarithmic" : "linear",
+      title: { display: true, text: logX ? `${xTitle} (log)` : xTitle, color: axis },
+      ticks: logX ? logXAxisTickConfig(axis) : { color: axis },
+      ...(logX ? { afterBuildTicks: afterBuildLogXTicks } : {}),
       grid: { color: grid },
     },
     y: {
-      type: log ? "logarithmic" : "linear",
-      title: { display: true, text: log ? `${yTitle} (log)` : yTitle, color: axis },
+      type: logY ? "logarithmic" : "linear",
+      title: {
+        display: true,
+        text: residual ? yTitle : logY ? `${yTitle} (log)` : yTitle,
+        color: axis,
+      },
       ticks: { color: axis },
       grid: { color: grid },
     },
@@ -927,7 +1057,10 @@ function chartCommonOptions({
   enablePan = true,
   scaleMode = "linear",
   yTitle = "Value",
+  residual = false,
 } = {}) {
+  // Residuals can be negative — never use log-y for residual plots.
+  const effectiveScale = residual ? "linear" : scaleMode;
   const opts = {
     responsive: true,
     maintainAspectRatio: false,
@@ -951,8 +1084,28 @@ function chartCommonOptions({
         },
       },
       zoom: zoomPluginOptions({ enablePan }),
+      ...(residual
+        ? {
+            annotation: {
+              annotations: {
+                baselineZero: {
+                  type: "line",
+                  yMin: 0,
+                  yMax: 0,
+                  borderColor: "rgba(255, 255, 255, 0.35)",
+                  borderWidth: 1,
+                  borderDash: [4, 4],
+                },
+              },
+            },
+          }
+        : {}),
     },
-    scales: chartScaleOptions({ scaleMode, yTitle }),
+    scales: chartScaleOptions({
+      scaleMode: effectiveScale,
+      yTitle: residual ? "Δ vs baseline" : yTitle,
+      residual,
+    }),
   };
   if (typeof onClick === "function") opts.onClick = onClick;
   return opts;
@@ -1107,10 +1260,43 @@ function setCurveOverlayChrome(show) {
 
 function buildLineDatasets(spec) {
   if (compareRuns && canCompareRuns()) {
+    const residual = setupResidualMode;
+    const baselineId = residual ? resolveBaselineRunId() : null;
+    let baselinePoints = null;
+    if (residual) {
+      if (!baselineId) {
+        return { empty: true, emptyMessage: "No baseline setup found for residuals" };
+      }
+      const baseCache = manifestCache.get(baselineId);
+      const baseSpec = baseCache?.specById?.get(spec.id);
+      if (!baseSpec?.series?.steps?.length) {
+        return {
+          empty: true,
+          emptyMessage: `Baseline (${runLabel(baselineId)}) has no matching series`,
+        };
+      }
+      baselinePoints = pointsFromSeries(baseSpec.series);
+    }
+
     const datasets = [];
     const missing = [];
+    if (residual && baselinePoints) {
+      datasets.push({
+        label: `${runLabel(baselineId)} (0)`,
+        data: zeroBaselinePoints(baselinePoints),
+        borderColor: "rgba(255, 255, 255, 0.55)",
+        backgroundColor: "transparent",
+        borderWidth: 1.5,
+        borderDash: [5, 4],
+        pointRadius: 0,
+        tension: 0,
+        fill: false,
+      });
+    }
+
     for (const run of availableRuns) {
       if (!selectedRuns.has(run.run_id)) continue;
+      if (residual && run.run_id === baselineId) continue;
       const cache = manifestCache.get(run.run_id);
       const other = cache?.specById?.get(spec.id);
       if (!other?.series?.steps?.length) {
@@ -1119,9 +1305,15 @@ function buildLineDatasets(spec) {
       }
       const color = runColor(run.run_id);
       const isCurrent = run.run_id === runId;
+      const raw = pointsFromSeries(other.series);
+      const data = residual ? residualAgainstBaseline(raw, baselinePoints) : raw;
+      if (residual && !data.length) {
+        missing.push(runLabel(run.run_id));
+        continue;
+      }
       datasets.push({
-        label: runLabel(run.run_id),
-        data: pointsFromSeries(other.series),
+        label: residual ? `Δ ${runLabel(run.run_id)}` : runLabel(run.run_id),
+        data,
         borderColor: color,
         backgroundColor: `${color}22`,
         borderWidth: isCurrent ? 2.5 : 1.75,
@@ -1131,7 +1323,7 @@ function buildLineDatasets(spec) {
         fill: false,
       });
     }
-    if (!datasets.length) {
+    if (!datasets.length || (residual && datasets.length <= 1 && missing.length)) {
       return {
         empty: true,
         emptyMessage: runsLoading
@@ -1141,9 +1333,16 @@ function buildLineDatasets(spec) {
             : "Select at least one setup above",
       };
     }
+    if (residual && datasets.length === 1) {
+      return {
+        empty: true,
+        emptyMessage: "Select another setup besides baseline to plot residuals",
+      };
+    }
     return {
       legend: true,
       datasets,
+      residual,
       missingNote: missing.length ? `missing in ${missing.join(", ")}` : "",
     };
   }
@@ -1189,13 +1388,23 @@ function buildLineDatasets(spec) {
 }
 
 function chartTitleFor(spec) {
-  if (compareRuns && canCompareRuns()) return `${spec.label} · setup compare`;
+  if (compareRuns && canCompareRuns()) {
+    return setupResidualMode
+      ? `${spec.label} · residuals vs baseline`
+      : `${spec.label} · setup compare`;
+  }
   if (compareLayers && canCompareLayers(spec)) return `${spec.label} · layer compare`;
   return spec.label;
 }
 
 function chartInfoFor(spec, lineData = null) {
   if (compareRuns && canCompareRuns()) {
+    if (setupResidualMode) {
+      const bid = resolveBaselineRunId();
+      let base = `baseline: ${runLabel(bid)} = 0`;
+      if (lineData?.missingNote) base = `${base} · ${lineData.missingNote}`;
+      return base;
+    }
     const labels = availableRuns
       .filter((r) => selectedRuns.has(r.run_id))
       .map((r) => runLabel(r.run_id));
@@ -1312,6 +1521,7 @@ function renderChart(spec) {
       options: chartCommonOptions({
         legend: lineData.legend,
         scaleMode: curveScaleMode,
+        residual: !!lineData.residual,
       }),
     });
     attachDoubleClickReset(canvas);
@@ -1477,18 +1687,24 @@ function filterLossPoints(points) {
 function lossChartScaleOptions() {
   const axis = "rgba(255, 255, 255, 0.78)";
   const grid = "rgba(255, 255, 255, 0.12)";
-  const log = lossScaleMode === "loglog";
+  const residual = setupResidualMode && compareLossRuns;
+  const logX = lossScaleMode === "loglog";
+  const logY = !residual && lossScaleMode === "loglog";
   return {
     x: {
-      type: log ? "logarithmic" : "linear",
-      title: { display: true, text: log ? "Step (log)" : "Step", color: axis },
-      ticks: log ? logXAxisTickConfig(axis) : { color: axis },
-      ...(log ? { afterBuildTicks: afterBuildLogXTicks } : {}),
+      type: logX ? "logarithmic" : "linear",
+      title: { display: true, text: logX ? "Step (log)" : "Step", color: axis },
+      ticks: logX ? logXAxisTickConfig(axis) : { color: axis },
+      ...(logX ? { afterBuildTicks: afterBuildLogXTicks } : {}),
       grid: { color: grid },
     },
     y: {
-      type: log ? "logarithmic" : "linear",
-      title: { display: true, text: log ? "Loss (log)" : "Loss", color: axis },
+      type: logY ? "logarithmic" : "linear",
+      title: {
+        display: true,
+        text: residual ? "Δ Loss vs baseline" : logY ? "Loss (log)" : "Loss",
+        color: axis,
+      },
       ticks: { color: axis },
       grid: { color: grid },
     },
@@ -1496,12 +1712,14 @@ function lossChartScaleOptions() {
 }
 
 function lossChartOptions({ enablePan = true, onClick = null } = {}) {
+  const residual = setupResidualMode && compareLossRuns;
   const opts = chartCommonOptions({
     legend: true,
     enablePan,
     onClick,
-    scaleMode: lossScaleMode,
-    yTitle: "Loss",
+    scaleMode: residual ? "linear" : lossScaleMode,
+    yTitle: residual ? "Δ Loss vs baseline" : "Loss",
+    residual,
   });
   opts.scales = lossChartScaleOptions();
   return opts;
@@ -1540,36 +1758,84 @@ function buildLossDatasets() {
   const logs = lossLogsForChart();
   if (!logs.length) return null;
   const datasets = [];
+  const residual = setupResidualMode && compareLossRuns && canCompareRuns();
 
   if (compareLossRuns && canCompareRuns()) {
-    for (const item of logs) {
-      const color = runColor(item.run_id);
-      const isCurrent = item.run_id === runId;
-      if (lossViewMode === "both" || lossViewMode === "train") {
+    let baselineItem = null;
+    if (residual) {
+      const bid = resolveBaselineRunId();
+      baselineItem =
+        logs.find((x) => x.run_id === bid) ||
+        (() => {
+          const log = lossLogByRun.get(bid);
+          return log && !log.error
+            ? { run_id: bid, label: runLabel(bid), log }
+            : null;
+        })();
+      if (!baselineItem) return null;
+    }
+
+    if (residual && baselineItem) {
+      const modes = [];
+      if (lossViewMode === "both" || lossViewMode === "train") modes.push(["train", "train"]);
+      if (lossViewMode === "both" || lossViewMode === "val") modes.push(["val", "val"]);
+      for (const [key, tag] of modes) {
+        const basePts = filterLossPoints(baselineItem.log[key]);
         datasets.push({
-          label: `${item.label} · train`,
-          data: filterLossPoints(item.log.train),
-          borderColor: color,
-          backgroundColor: `${color}22`,
-          borderWidth: isCurrent ? 2.5 : 1.75,
-          borderDash: [],
+          label: `${baselineItem.label} · ${tag} (0)`,
+          data: zeroBaselinePoints(basePts),
+          borderColor: "rgba(255, 255, 255, 0.55)",
+          backgroundColor: "transparent",
+          borderWidth: 1.5,
+          borderDash: [5, 4],
           pointRadius: 0,
-          tension: 0.2,
+          tension: 0,
           fill: false,
         });
       }
+    }
+
+    for (const item of logs) {
+      if (residual && item.run_id === baselineItem.run_id) continue;
+      const color = runColor(item.run_id);
+      const isCurrent = item.run_id === runId;
+      if (lossViewMode === "both" || lossViewMode === "train") {
+        const raw = filterLossPoints(item.log.train);
+        const data = residual
+          ? residualAgainstBaseline(raw, filterLossPoints(baselineItem.log.train))
+          : raw;
+        if (data.length) {
+          datasets.push({
+            label: residual ? `Δ ${item.label} · train` : `${item.label} · train`,
+            data,
+            borderColor: color,
+            backgroundColor: `${color}22`,
+            borderWidth: isCurrent ? 2.5 : 1.75,
+            borderDash: [],
+            pointRadius: 0,
+            tension: 0.2,
+            fill: false,
+          });
+        }
+      }
       if (lossViewMode === "both" || lossViewMode === "val") {
-        datasets.push({
-          label: `${item.label} · val`,
-          data: filterLossPoints(item.log.val),
-          borderColor: color,
-          backgroundColor: `${color}22`,
-          borderWidth: isCurrent ? 2.5 : 1.75,
-          borderDash: [6, 3],
-          pointRadius: 0,
-          tension: 0.2,
-          fill: false,
-        });
+        const raw = filterLossPoints(item.log.val);
+        const data = residual
+          ? residualAgainstBaseline(raw, filterLossPoints(baselineItem.log.val))
+          : raw;
+        if (data.length) {
+          datasets.push({
+            label: residual ? `Δ ${item.label} · val` : `${item.label} · val`,
+            data,
+            borderColor: color,
+            backgroundColor: `${color}22`,
+            borderWidth: isCurrent ? 2.5 : 1.75,
+            borderDash: [6, 3],
+            pointRadius: 0,
+            tension: 0.2,
+            fill: false,
+          });
+        }
       }
     }
     if (!datasets.length) return null;
@@ -1781,6 +2047,7 @@ function renderFullChart(spec) {
       onClick: fullscreenNoteClickHandler,
       enablePan: false,
       scaleMode: curveScaleMode,
+      residual: !!lineData.residual,
     }),
   });
   bindFullscreenCanvasInteractions(canvas);
