@@ -250,4 +250,10 @@ function escapeHtml(text) {
     .replaceAll('"', "&quot;");
 }
 
-document.addEventListener("DOMContentLoaded", bootReference);
+document.addEventListener("DOMContentLoaded", async () => {
+  if (typeof MaintenanceGate !== "undefined") {
+    const ok = await MaintenanceGate.wire();
+    if (!ok) return;
+  }
+  await bootReference();
+});

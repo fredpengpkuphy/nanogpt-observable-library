@@ -55,5 +55,12 @@ function escapeHtml(text) {
     .replaceAll('"', "&quot;");
 }
 
-bootSelect();
-if (typeof CuratorUI !== "undefined") CuratorUI.wire();
+(async function startSelect() {
+  if (typeof CuratorUI !== "undefined") CuratorUI.wire();
+  if (typeof MaintenanceGate !== "undefined") {
+    const ok = await MaintenanceGate.wire();
+    if (!ok) return;
+  }
+  await bootSelect();
+})();
+

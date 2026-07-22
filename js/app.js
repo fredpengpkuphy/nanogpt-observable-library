@@ -2284,4 +2284,10 @@ function escapeHtml(text) {
     .replaceAll('"', "&quot;");
 }
 
-boot();
+(async function startApp() {
+  if (typeof MaintenanceGate !== "undefined") {
+    const ok = await MaintenanceGate.wire();
+    if (!ok) return;
+  }
+  await boot();
+})();

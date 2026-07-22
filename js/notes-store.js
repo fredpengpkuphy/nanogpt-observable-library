@@ -689,6 +689,52 @@ const NotesStore = (() => {
       .delete();
   }
 
+  async function getMaintenanceMode() {
+    await init();
+    if (!backendReady) return { enabled: false };
+    const snap = await db.collection("meta").doc("siteMaintenance").get();
+    if (!snap.exists) return { enabled: false };
+    return { enabled: !!snap.data().enabled };
+  }
+
+  function watchMaintenanceMode(cb) {
+    let unsub = null;
+    let cancelled = false;
+    init().then(() => {
+      if (cancelled) return;
+      if (!backendReady) {
+        cb({ enabled: false });
+        return;
+      }
+      unsub = db.collection("meta").doc("siteMaintenance").onSnapshot(
+        (snap) => {
+          cb({ enabled: snap.exists ? !!snap.data().enabled : false });
+        },
+        (err) => {
+          console.warn("watchMaintenanceMode", err);
+          cb({ enabled: false });
+        }
+      );
+    });
+    return () => {
+      cancelled = true;
+      if (unsub) unsub();
+    };
+  }
+
+  async function setMaintenanceMode(enabled) {
+    await init();
+    if (!backendReady) throw new Error("Notes backend is not configured yet.");
+    if (!adminMode) throw new Error("Only the curator can change maintenance mode.");
+    const on = !!enabled;
+    await db.collection("meta").doc("siteMaintenance").set({
+      enabled: on,
+      uid: myUid,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    return on;
+  }
+
   function isAdmin() {
     return adminMode;
   }
@@ -720,6 +766,9 @@ const NotesStore = (() => {
     replyToSuggestion,
     deleteSuggestion,
     deleteSuggestionReply,
+    getMaintenanceMode,
+    watchMaintenanceMode,
+    setMaintenanceMode,
     signInAdmin,
     signOutAdmin,
     isAdmin,

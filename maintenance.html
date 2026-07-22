@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Under maintenance — nanoGPT Observable Library</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=33">
+</head>
+<body class="maintenance-page">
+  <div class="curator-bar" id="curatorBar" hidden>
+    <div class="curator-bar-inner" id="curatorBarInner"></div>
+  </div>
+  <main class="maintenance-shell">
+    <p class="maintenance-kicker">nanoGPT Observable Library</p>
+    <h1>网站正在维护中</h1>
+    <p class="maintenance-lead">
+      The explorer is temporarily unavailable while we update the site.
+      Please check back soon.
+    </p>
+    <div class="maintenance-actions">
+      <a class="header-link" href="index.html">← Back to home</a>
+      <a class="header-link" href="announcements.html">Announcements</a>
+      <a class="header-link" id="maintEnterSite" href="select.html" hidden>Enter site →</a>
+    </div>
+    <p class="maintenance-admin-hint" id="maintAdminHint" hidden>
+      Curator signed in — you can enter the site while maintenance mode is on.
+    </p>
+  </main>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="js/notes-config.js?v=3"></script>
+  <script src="js/notes-store.js?v=11"></script>
+  <script src="js/announcement-banner.js?v=2"></script>
+  <script src="js/curator-ui.js?v=6"></script>
+  <script>
+    (function () {
+      if (typeof CuratorUI !== "undefined") CuratorUI.wire();
+      else if (typeof AnnouncementBanner !== "undefined") AnnouncementBanner.wire();
+
+      const enter = document.getElementById("maintEnterSite");
+      const hint = document.getElementById("maintAdminHint");
+      function syncAdmin() {
+        const admin = typeof CuratorUI !== "undefined" && CuratorUI.isAdmin();
+        if (enter) {
+          enter.hidden = !admin;
+          if (admin && typeof CuratorUI.withAdminParam === "function") {
+            enter.href = CuratorUI.withAdminParam("select.html");
+          }
+        }
+        if (hint) hint.hidden = !admin;
+      }
+      document.addEventListener("curator-auth", syncAdmin);
+      syncAdmin();
+
+      if (typeof NotesStore !== "undefined") {
+        NotesStore.watchMaintenanceMode((mode) => {
+          if (!mode.enabled) {
+            const href =
+              typeof CuratorUI !== "undefined"
+                ? CuratorUI.withAdminParam("select.html")
+                : "select.html";
+            location.replace(href);
+          }
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

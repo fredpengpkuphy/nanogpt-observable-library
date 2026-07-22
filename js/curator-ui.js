@@ -1,10 +1,12 @@
 /**
  * Site-wide curator (admin) chrome — compact top bar on pages with #curatorBar.
- * Enter via ?admin=1. Announcements / Suggestions are managed on their pages.
+ * Enter via ?admin=1. Announcements / Suggestions / maintenance on their controls.
  */
 const CuratorUI = (() => {
   let noteIsAdmin = false;
   let signInExpanded = false;
+  let maintenanceOn = false;
+  let maintBusy = false;
 
   function isAdminEntry() {
     try {
@@ -52,6 +54,16 @@ const CuratorUI = (() => {
     return bar;
   }
 
+  async function refreshMaintenance() {
+    if (typeof NotesStore === "undefined") return;
+    try {
+      const mode = await NotesStore.getMaintenanceMode();
+      maintenanceOn = !!mode.enabled;
+    } catch (_) {
+      maintenanceOn = false;
+    }
+  }
+
   function render() {
     ensureBar();
     const bar = document.getElementById("curatorBar");
@@ -70,12 +82,17 @@ const CuratorUI = (() => {
       document.body.classList.add("curator-mode");
       const announceHref = withAdminParam("announcements.html");
       const suggestHref = withAdminParam("suggestions.html");
+      const maintLabel = maintenanceOn ? "Maintenance ON" : "Maintenance OFF";
+      const maintClass = maintenanceOn
+        ? "chart-btn curator-bar-btn curator-maint-on"
+        : "chart-btn curator-bar-btn";
       inner.innerHTML = `
         <div class="curator-bar-main">
           <div class="curator-bar-status">
             <span class="curator-pill">Curator</span>
             <a class="curator-link" href="${announceHref}">Announcements</a>
             <a class="curator-link" href="${suggestHref}">Suggestions</a>
+            <button type="button" class="${maintClass}" id="maintToggle" title="Block public access to the explorer">${maintLabel}</button>
           </div>
           <button type="button" class="chart-btn curator-bar-btn" id="notesAdminSignOut">Sign out</button>
         </div>`;
@@ -83,6 +100,21 @@ const CuratorUI = (() => {
         clearAdminEntry();
         signInExpanded = false;
         await NotesStore.signOutAdmin();
+      });
+      inner.querySelector("#maintToggle")?.addEventListener("click", async () => {
+        if (maintBusy) return;
+        maintBusy = true;
+        const btn = inner.querySelector("#maintToggle");
+        if (btn) btn.disabled = true;
+        try {
+          maintenanceOn = await NotesStore.setMaintenanceMode(!maintenanceOn);
+          render();
+        } catch (err) {
+          alert(err.message || "Could not update maintenance mode.");
+          if (btn) btn.disabled = false;
+        } finally {
+          maintBusy = false;
+        }
       });
     } else if (signInExpanded) {
       document.body.classList.remove("curator-mode");
@@ -138,8 +170,10 @@ const CuratorUI = (() => {
         sessionStorage.setItem("notesAdminEntry", "1");
       } catch (_) {}
       signInExpanded = false;
+      refreshMaintenance().then(() => render());
+    } else {
+      render();
     }
-    render();
     document.dispatchEvent(
       new CustomEvent("curator-auth", { detail: { isAdmin: noteIsAdmin, handle: state.handle } })
     );
@@ -151,6 +185,12 @@ const CuratorUI = (() => {
     NotesStore.init();
     render();
     if (typeof AnnouncementBanner !== "undefined") AnnouncementBanner.wire();
+    NotesStore.watchMaintenanceMode((mode) => {
+      const next = !!mode.enabled;
+      if (next === maintenanceOn) return;
+      maintenanceOn = next;
+      if (noteIsAdmin) render();
+    });
   }
 
   function isAdmin() {

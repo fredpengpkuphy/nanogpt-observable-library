@@ -64,6 +64,13 @@ Pages domain (e.g. `yourname.github.io`) and `localhost` are listed.
 - **You (curator)**: open any page with `?admin=1`, sign in with email/password.
   You'll see delete controls on notes. Click **Sign out** to leave curator mode.
 
+## Using maintenance mode
+
+- Curator bar → **Maintenance ON/OFF** toggles public access to Select / Explorer / Formulas.
+- Public users who click **Start Exploration** (or open those pages) see `maintenance.html`.
+- Announcements / Suggestions stay reachable. Curator can still enter after signing in.
+- Publish updated `firestore.rules` after deploy (`meta/siteMaintenance`).
+
 ## Using suggestions
 
 - Public page: `suggestions.html` — anyone can post improvement ideas (anonymous).
