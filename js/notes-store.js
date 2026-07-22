@@ -691,17 +691,10 @@ const NotesStore = (() => {
 
   async function getMaintenanceMode() {
     await init();
-    if (!backendReady) return { enabled: false, available: false };
-    try {
-      const snap = await db.collection("meta").doc("siteMaintenance").get();
-      return {
-        enabled: snap.exists ? !!snap.data().enabled : false,
-        available: true,
-      };
-    } catch (err) {
-      console.warn("getMaintenanceMode", err);
-      return { enabled: false, available: false };
-    }
+    if (!backendReady) return { enabled: false };
+    const snap = await db.collection("meta").doc("siteMaintenance").get();
+    if (!snap.exists) return { enabled: false };
+    return { enabled: !!snap.data().enabled };
   }
 
   function watchMaintenanceMode(cb) {
@@ -710,19 +703,16 @@ const NotesStore = (() => {
     init().then(() => {
       if (cancelled) return;
       if (!backendReady) {
-        cb({ enabled: false, available: false });
+        cb({ enabled: false });
         return;
       }
       unsub = db.collection("meta").doc("siteMaintenance").onSnapshot(
         (snap) => {
-          cb({
-            enabled: snap.exists ? !!snap.data().enabled : false,
-            available: true,
-          });
+          cb({ enabled: snap.exists ? !!snap.data().enabled : false });
         },
         (err) => {
           console.warn("watchMaintenanceMode", err);
-          cb({ enabled: false, available: false });
+          cb({ enabled: false });
         }
       );
     });
@@ -742,33 +732,12 @@ const NotesStore = (() => {
       uid: myUid,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
-    // Verify the public-readable flag actually stuck (rules must allow public read).
-    const verify = await getMaintenanceMode();
-    if (!verify.available) {
-      throw new Error(
-        "Saved, but public clients cannot read the flag. Publish the latest firestore.rules in Firebase Console."
-      );
-    }
-    if (verify.enabled !== on) {
-      throw new Error("Maintenance flag did not save correctly. Try again.");
-    }
     return on;
-  }
-
-  /** Resolve once auth has settled (or timeout). */
-  async function whenAuthReady(timeoutMs = 6000) {
-    await init();
-    if (myUid || lastAuthError || !backendReady) return;
-    await Promise.race([
-      authReadyPromise || Promise.resolve(),
-      new Promise((r) => setTimeout(r, timeoutMs)),
-    ]);
   }
 
   function isAdmin() {
     return adminMode;
   }
-
   function isReady() {
     return backendReady;
   }
@@ -776,7 +745,6 @@ const NotesStore = (() => {
   return {
     init,
     onAuthChange,
-    whenAuthReady,
     listNotes,
     filterNotes,
     createNote,
