@@ -361,6 +361,29 @@ function openReplyBox(noteId, parentId, anchorBtn) {
   });
 }
 
+function ceilNoteStepToData(value) {
+  if (!Number.isFinite(value)) return null;
+  const steps = chartIsAlive(fullChart) ? collectChartSteps(fullChart) : [];
+  if (!steps.length) return Math.round(value);
+  if (typeof ceilToAvailableStep === "function") {
+    return ceilToAvailableStep(value, steps);
+  }
+  for (const s of steps) {
+    if (s >= value) return s;
+  }
+  return steps[steps.length - 1];
+}
+
+function snapRailNoteStepInput() {
+  const stepEl = document.getElementById("railNoteStep");
+  if (!stepEl || stepEl.value.trim() === "") return null;
+  const n = Number(stepEl.value);
+  if (!Number.isFinite(n)) return null;
+  const snapped = ceilNoteStepToData(n);
+  if (snapped != null) stepEl.value = String(snapped);
+  return snapped;
+}
+
 async function submitRailNote(evt) {
   evt.preventDefault();
   const textEl = document.getElementById("railNoteText");
@@ -391,7 +414,8 @@ async function submitRailNote(evt) {
       status.textContent = "Step must be a number (or leave blank).";
       return;
     }
-    step = n;
+    step = ceilNoteStepToData(n);
+    if (stepEl && step != null) stepEl.value = String(step);
   }
   submitBtn.disabled = true;
   status.hidden = false;
@@ -611,6 +635,8 @@ function wireNotesUi() {
   }
   renderAdminBar();
   document.getElementById("railNoteForm")?.addEventListener("submit", submitRailNote);
+  document.getElementById("railNoteStep")?.addEventListener("change", snapRailNoteStepInput);
+  document.getElementById("railNoteStep")?.addEventListener("blur", snapRailNoteStepInput);
   document.getElementById("noteModalClose")?.addEventListener("click", closeNoteModal);
   document.getElementById("noteModalCancel")?.addEventListener("click", closeNoteModal);
   document.getElementById("noteModal")?.addEventListener("click", (e) => {
