@@ -351,15 +351,48 @@ const NotesStore = (() => {
     await batch.commit();
   }
 
+  function friendlyAdminSignInError(err) {
+    const code = String(err && err.code ? err.code : "");
+    if (
+      code === "auth/invalid-credential" ||
+      code === "auth/wrong-password" ||
+      code === "auth/user-not-found" ||
+      code === "auth/invalid-email" ||
+      code === "auth/invalid-login-credentials"
+    ) {
+      return "Wrong email or password.";
+    }
+    if (code === "auth/too-many-requests") {
+      return "Too many attempts. Try again later.";
+    }
+    if (code === "auth/network-request-failed") {
+      return "Network error. Check your connection.";
+    }
+    if (code === "auth/user-disabled") {
+      return "This account is disabled.";
+    }
+    if (err && err.message === "This account is not the curator.") {
+      return err.message;
+    }
+    if (err && err.message === "Notes backend is not configured yet.") {
+      return err.message;
+    }
+    return "Sign-in failed. Please try again.";
+  }
+
   async function signInAdmin(email, password) {
     await init();
     if (!backendReady) throw new Error("Notes backend is not configured yet.");
-    const cred = await auth.signInWithEmailAndPassword(email, password);
-    if (cred.user.uid !== adminUid()) {
-      await auth.signOut();
-      throw new Error("This account is not the curator.");
+    try {
+      const cred = await auth.signInWithEmailAndPassword(email, password);
+      if (cred.user.uid !== adminUid()) {
+        await auth.signOut();
+        throw new Error("This account is not the curator.");
+      }
+      return true;
+    } catch (err) {
+      throw new Error(friendlyAdminSignInError(err));
     }
-    return true;
   }
 
   async function signOutAdmin() {
