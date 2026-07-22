@@ -106,10 +106,6 @@
                 <span id="chartInfo"></span>
               </div>
               <div class="chart-actions">
-                <div class="loss-view-toggle" id="curveScaleToggle" hidden title="Axis scale">
-                  <button type="button" class="chart-btn curve-scale-btn active" data-scale="linear">Linear</button>
-                  <button type="button" class="chart-btn curve-scale-btn" data-scale="loglog">Log–log</button>
-                </div>
                 <button type="button" class="chart-btn" id="resetZoomBtn" hidden title="Reset zoom">Reset</button>
                 <button type="button" class="chart-btn" id="expandBtn" hidden title="Expand">⤢ Expand</button>
                 <label class="compare-toggle" id="compareRunsWrap" hidden>
@@ -172,10 +168,6 @@
           <div class="loss-view-toggle" id="lossScaleToggleFull" hidden>
             <button type="button" class="chart-btn loss-scale-btn" data-scale="linear">Linear</button>
             <button type="button" class="chart-btn loss-scale-btn" data-scale="loglog">Log–log</button>
-          </div>
-          <div class="loss-view-toggle" id="curveScaleToggleFull" hidden title="Axis scale">
-            <button type="button" class="chart-btn curve-scale-btn" data-scale="linear">Linear</button>
-            <button type="button" class="chart-btn curve-scale-btn" data-scale="loglog">Log–log</button>
           </div>
           <div class="loss-range loss-range-compact" id="lossRangeFull" hidden>
             <input type="number" id="lossStepMinFull" min="0" step="1" placeholder="min" />
@@ -241,6 +233,6 @@
   <script src="js/curator-ui.js?v=2"></script>
   <script src="js/notes-ui.js?v=11"></script>
   <script src="js/observable_defs.js?v=5"></script>
-  <script src="js/app.js?v=24"></script>
+  <script src="js/app.js?v=25"></script>
 </body>
 </html>

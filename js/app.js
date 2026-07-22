@@ -75,8 +75,9 @@ let lossLog = null;
 let lossViewMode = "both";
 /** @type {"linear" | "loglog"} */
 let lossScaleMode = "linear";
-/** @type {"linear" | "loglog"} */
+/** @type {"linear" | "loglog"} — observables temporarily locked to linear. */
 let curveScaleMode = "linear";
+const CURVE_LOGLOG_ENABLED = false;
 let lossStepMin = null;
 let lossStepMax = null;
 let fullChart = null;
@@ -969,12 +970,12 @@ function setChartChrome(hasSeriesChart) {
   document.getElementById("chartHint").hidden = !hasSeriesChart;
   document.getElementById("expandBtn").hidden = !hasSeriesChart;
   const scale = document.getElementById("curveScaleToggle");
-  if (scale) scale.hidden = !hasSeriesChart;
+  if (scale) scale.hidden = !hasSeriesChart || !CURVE_LOGLOG_ENABLED;
   updateCurveScaleButtons();
 }
 
 function pointsFromSeries(series) {
-  const log = curveScaleMode === "loglog";
+  const log = CURVE_LOGLOG_ENABLED && curveScaleMode === "loglog";
   const pts = [];
   for (let i = 0; i < series.steps.length; i += 1) {
     const step = series.steps[i];
@@ -1002,6 +1003,10 @@ function updateCurveScaleButtons() {
 }
 
 function setCurveScaleMode(mode) {
+  if (!CURVE_LOGLOG_ENABLED) {
+    curveScaleMode = "linear";
+    return;
+  }
   if (!["linear", "loglog"].includes(mode)) return;
   curveScaleMode = mode;
   updateCurveScaleButtons();
@@ -1012,8 +1017,8 @@ function setCurveScaleMode(mode) {
 
 function setCurveOverlayChrome(show) {
   const el = document.getElementById("curveScaleToggleFull");
-  if (el) el.hidden = !show;
-  if (show) updateCurveScaleButtons();
+  if (el) el.hidden = !show || !CURVE_LOGLOG_ENABLED;
+  if (show && CURVE_LOGLOG_ENABLED) updateCurveScaleButtons();
 }
 
 function buildLineDatasets(spec) {
