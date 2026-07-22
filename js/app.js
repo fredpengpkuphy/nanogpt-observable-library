@@ -783,34 +783,70 @@ function collectPlotXsFromChart(chart) {
 }
 
 /**
- * Keep first/last and a few more spaced in log space so late steps do not pile up.
+ * Prefer tidy steps: 1, 2, 5 × 10^n (e.g. 20000 over 19400). Lower is better.
+ */
+function stepUglyScore(v) {
+  if (!(v > 0)) return 0;
+  const exp = Math.floor(Math.log10(v) + 1e-12);
+  const mant = v / Math.pow(10, exp);
+  const d = Math.min(
+    Math.abs(mant - 1),
+    Math.abs(mant - 2),
+    Math.abs(mant - 5),
+    Math.abs(mant - 10)
+  );
+  const sig = String(Math.round(v)).replace(/0+$/, "").length;
+  return d * 80 + Math.max(0, sig - 1) * 3;
+}
+
+function isTidyStep(v) {
+  return stepUglyScore(v) < 8;
+}
+
+/**
+ * Keep first/last; fill with tidy data steps spaced in log space.
+ * Avoids dense late-axis clutter and prefers round labels like 20000.
  */
 function thinLogAxisTicks(values, maxTicks = 8) {
-  if (values.length <= maxTicks) return values;
+  if (!values.length) return [];
+  if (values.length <= 2) return values;
+
   const first = values[0];
   const last = values[values.length - 1];
-  if (!(first > 0) || !(last > 0) || first === last) return [first, last].filter((v, i, a) => a.indexOf(v) === i);
+  if (first === last) return [first];
 
-  const picked = [first];
+  const middle = values.filter((v) => v !== first && v !== last);
+  const tidy = middle.filter(isTidyStep).sort((a, b) => a - b);
+  const pool = tidy.length ? tidy : middle;
+
+  if (pool.length === 0) return [first, last];
+
+  const innerSlots = Math.max(0, maxTicks - 2);
+  if (pool.length <= innerSlots) {
+    return [first, ...pool, last];
+  }
+
+  const picked = [];
   const logMin = Math.log(first);
   const logMax = Math.log(last);
-  for (let i = 1; i < maxTicks - 1; i += 1) {
-    const target = logMin + ((logMax - logMin) * i) / (maxTicks - 1);
+  for (let i = 1; i <= innerSlots; i += 1) {
+    const target = Math.exp(logMin + ((logMax - logMin) * i) / (innerSlots + 1));
     let best = null;
-    let bestDist = Infinity;
-    for (const v of values) {
-      if (v <= picked[picked.length - 1]) continue;
-      if (v >= last) continue;
-      const d = Math.abs(Math.log(v) - target);
-      if (d < bestDist) {
+    let bestScore = Infinity;
+    for (const v of pool) {
+      if (picked.includes(v)) continue;
+      // Prefer closeness in log space, then tidiness (20000 >> 19400).
+      const dist = Math.abs(Math.log(v) - Math.log(target));
+      const score = dist * 12 + stepUglyScore(v);
+      if (score < bestScore) {
         best = v;
-        bestDist = d;
+        bestScore = score;
       }
     }
     if (best != null) picked.push(best);
   }
-  if (picked[picked.length - 1] !== last) picked.push(last);
-  return picked;
+  picked.sort((a, b) => a - b);
+  return [first, ...picked, last];
 }
 
 /**
