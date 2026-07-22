@@ -40,20 +40,10 @@ function createRunCard(run) {
 
   const meta = document.createElement("div");
   meta.className = "run-card-meta";
-  meta.innerHTML = `
-    <span>${run.n_specs ?? "—"} observables</span>
-    <span>${run.n_curves ?? "—"} PNG curves</span>
-    <span>${run.n_series ?? "—"} time series</span>
-  `;
-
-  const prov = run.provenance || {};
-  const sub = document.createElement("div");
-  sub.className = "run-card-sub";
-  sub.textContent = [prov.torch, prov.python].filter(Boolean).join(" · ") || "nanoGPT baseline run";
+  meta.innerHTML = `<span>${run.n_specs ?? "—"} observables</span>`;
 
   btn.appendChild(title);
   btn.appendChild(meta);
-  btn.appendChild(sub);
   return btn;
 }
 

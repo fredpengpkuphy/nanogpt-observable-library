@@ -422,10 +422,9 @@ async function resolveRunLabel() {
 }
 
 async function renderHeader() {
-  const m = manifest.model;
   const label = await resolveRunLabel();
   document.getElementById("runSubtitle").textContent =
-    `${label} · ${m.name} · ${m.n_layer} layers · ${m.n_embd} dim · ${manifest.n_specs} observables`;
+    `${manifest.n_specs ?? "—"} observables`;
   document.getElementById("runBadge").textContent = label;
   document.title = `${label} · nanoGPT Observable Explorer`;
 }
@@ -1196,24 +1195,24 @@ function chartTitleFor(spec) {
 }
 
 function chartInfoFor(spec, lineData = null) {
-  const scaleLabel = curveScaleMode === "loglog" ? "log–log" : "linear";
-  let base;
   if (compareRuns && canCompareRuns()) {
     const labels = availableRuns
       .filter((r) => selectedRuns.has(r.run_id))
       .map((r) => runLabel(r.run_id));
-    base = `${spec.role} · ${labels.join(" vs ") || "no setup"} · every ${spec.every} steps`;
+    let base = labels.join(" vs ") || "no setup";
     if (lineData?.missingNote) base = `${base} · ${lineData.missingNote}`;
-  } else if (compareLayers && canCompareLayers(spec)) {
-    const labels = familyMembers(spec)
-      .filter((m) => selectedLayers.has(m.layer))
-      .sort((a, b) => a.layer - b.layer)
-      .map((m) => `L${m.layer}`).join(", ") || "no layers selected";
-    base = `${spec.role} · ${labels} · every ${spec.every} steps`;
-  } else {
-    base = `${spec.selector} · every ${spec.every} steps`;
+    return base;
   }
-  return `${base} · ${scaleLabel}`;
+  if (compareLayers && canCompareLayers(spec)) {
+    return (
+      familyMembers(spec)
+        .filter((m) => selectedLayers.has(m.layer))
+        .sort((a, b) => a.layer - b.layer)
+        .map((m) => `L${m.layer}`)
+        .join(", ") || "no layers selected"
+    );
+  }
+  return "";
 }
 
 function renderSpecDefinition(spec) {
