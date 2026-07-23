@@ -47,6 +47,19 @@ python3 -m http.server 8080
 - **http://localhost:8080/select.html** — choose a training run
 - **http://localhost:8080/explorer.html?run=…** — architecture explorer
 
+## Observable definition audit
+
+The reference formulas are generated from the same source/transform/reduction/
+temporal pipeline implemented in `observable_lib.py`. Re-run the complete
+1821-record structural and formula-coverage audit with:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/audit_observables.ps1
+```
+
+This writes the per-observable machine-readable result to
+`data/observable_audit.json` and a short summary to `OBSERVABLE_AUDIT.md`.
+
 ## 4. GitHub Pages
 
 Push this folder as the repo root. Entry point is the landing page `index.html`.  

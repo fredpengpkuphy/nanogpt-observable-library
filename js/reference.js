@@ -122,6 +122,7 @@ function applyFilters() {
       o.ui_module,
       o.role,
       ...(o.transforms || []),
+      ...(o.temporal || []).flat(Infinity).map(String),
     ]
       .join(" ")
       .toLowerCase();
@@ -215,6 +216,19 @@ function renderCard(obs) {
   const transforms = (obs.transforms || []).length
     ? (obs.transforms || []).join(" → ")
     : "—";
+  const temporal = (obs.temporal || []).length
+    ? (obs.temporal || [])
+        .map((entry) =>
+          typeof formatTemporalEntry === "function"
+            ? formatTemporalEntry(entry)
+            : String(entry)
+        )
+        .join(" → ")
+    : (
+        typeof temporalOpsFromCanonicalId === "function"
+          ? temporalOpsFromCanonicalId(obs).join(" → ")
+          : ""
+      ) || "—";
   const layer =
     obs.layer === null || obs.layer === undefined ? "—" : `L${obs.layer}`;
 
@@ -237,6 +251,7 @@ function renderCard(obs) {
     <div class="ref-obs-meta">
       <span>${escapeHtml(obs.label || "")}</span>
       <span>transforms: ${escapeHtml(transforms)}</span>
+      <span>temporal: ${escapeHtml(temporal)}</span>
     </div>
   `;
   return article;

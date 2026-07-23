@@ -45,9 +45,33 @@ def parse_layer_role(ui_module: str) -> tuple[int | None, str]:
     return int(m.group(1)), m.group(2)
 
 
-def family_id(source_kind: str, role: str, reduction: str, transforms: list) -> str:
+def _temporal_label(temporal: list) -> str:
+    parts = []
+    for entry in temporal or []:
+        if isinstance(entry, (list, tuple)) and len(entry) >= 1:
+            name = str(entry[0])
+            params = entry[1] if len(entry) > 1 and isinstance(entry[1], dict) else {}
+            args = ",".join(f"{key}={value}" for key, value in params.items())
+            parts.append(f"{name}({args})")
+        elif isinstance(entry, str):
+            parts.append(entry)
+    return ">".join(parts)
+
+
+def family_id(
+    source_kind: str,
+    role: str,
+    reduction: str,
+    transforms: list,
+    temporal: list,
+) -> str:
     t = ">".join(transforms) if transforms else "-"
-    return f"{source_kind}|{role}|{reduction}|{t}"
+    base = f"{source_kind}|{role}|{reduction}|{t}"
+    tp = _temporal_label(temporal)
+    # Preserve historical family ids for the overwhelmingly common
+    # non-temporal case; append the pipeline only when it distinguishes a
+    # temporal family.
+    return f"{base}|{tp}" if tp else base
 
 
 def module_label(ui_module: str) -> str:
@@ -133,8 +157,12 @@ def build_manifest(obs_dir: Path, run_id: str, curve_paths: dict[str, str]) -> d
         ui_module = selector_to_ui_module(spec["selector"])
         layer, role = parse_layer_role(ui_module)
         transforms = spec.get("transforms") or []
+        temporal = spec.get("temporal") or []
         transform_label = ">".join(transforms) if transforms else None
-        fid = family_id(spec["source_kind"], role, spec["reduction"], transforms)
+        temporal_label = _temporal_label(temporal) or None
+        fid = family_id(
+            spec["source_kind"], role, spec["reduction"], transforms, temporal
+        )
         cid = spec["canonical_id"]
         entry = {
             "id": cid,
@@ -146,8 +174,9 @@ def build_manifest(obs_dir: Path, run_id: str, curve_paths: dict[str, str]) -> d
             "selector": spec["selector"],
             "reduction": spec["reduction"],
             "transforms": transforms,
+            "temporal": temporal,
             "every": spec.get("every", 1),
-            "label": _spec_label(spec, transform_label),
+            "label": _spec_label(spec, transform_label, temporal_label),
             "curve_png": curve_paths.get(cid),
             "series": series_map.get(cid),
         }
@@ -172,6 +201,7 @@ def build_manifest(obs_dir: Path, run_id: str, curve_paths: dict[str, str]) -> d
             "source_kind": members[0]["source_kind"],
             "reduction": members[0]["reduction"],
             "transforms": members[0]["transforms"],
+            "temporal": members[0]["temporal"],
             "label": members[0]["label"],
             "spec_ids": [m["id"] for m in members],
             "n_layers": len(members),
@@ -197,10 +227,16 @@ def build_manifest(obs_dir: Path, run_id: str, curve_paths: dict[str, str]) -> d
     }
 
 
-def _spec_label(spec: dict, transform_label: str | None) -> str:
+def _spec_label(
+    spec: dict,
+    transform_label: str | None,
+    temporal_label: str | None,
+) -> str:
     parts = [spec["source_kind"], spec["reduction"]]
     if transform_label:
         parts.insert(1, transform_label)
+    if temporal_label:
+        parts.append(temporal_label)
     return " · ".join(parts)
 
 

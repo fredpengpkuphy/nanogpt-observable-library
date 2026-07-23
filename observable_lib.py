@@ -494,6 +494,10 @@ def _tp_identity(state: dict, x: float, **params) -> float:
 @register_temporal("delta")
 def _tp_delta(state: dict, x: float, **params) -> float:
     """与上一次取值之差。"""
+    # A temporal chain commonly begins with delta, whose first output is NaN.
+    # Do not let a non-finite upstream value replace the last valid baseline.
+    if not math.isfinite(x):
+        return float("nan")
     prev = state.get("prev", None)
     state["prev"] = x
     if prev is None:
@@ -503,6 +507,10 @@ def _tp_delta(state: dict, x: float, **params) -> float:
 
 @register_temporal("ema")
 def _tp_ema(state: dict, x: float, alpha: float = 0.9, **params) -> float:
+    # Initialize and update only from finite values.  Previously, the first NaN
+    # produced by delta permanently poisoned delta->ema observables.
+    if not math.isfinite(x):
+        return float("nan")
     s = state.get("s", None)
     s = x if s is None else alpha * s + (1 - alpha) * x
     state["s"] = s
@@ -512,6 +520,8 @@ def _tp_ema(state: dict, x: float, alpha: float = 0.9, **params) -> float:
 @register_temporal("slope")
 def _tp_slope(state: dict, x: float, window: int = 5, **params) -> float:
     """最近 window 个点的线性斜率（对时间下标做最小二乘）。"""
+    if not math.isfinite(x):
+        return float("nan")
     buf = state.setdefault("buf", deque(maxlen=window))
     buf.append(x)
     n = len(buf)
@@ -529,6 +539,8 @@ def _tp_slope(state: dict, x: float, window: int = 5, **params) -> float:
 @register_temporal("rolling_std")
 def _tp_rolling_std(state: dict, x: float, window: int = 5, **params) -> float:
     """最近 window 个观测值的总体标准差。"""
+    if not math.isfinite(x):
+        return float("nan")
     buf = state.setdefault("buf", deque(maxlen=window))
     buf.append(x)
     if len(buf) < 2:
@@ -542,6 +554,8 @@ def _tp_rolling_std(state: dict, x: float, window: int = 5, **params) -> float:
 @register_temporal("curvature")
 def _tp_curvature(state: dict, x: float, **params) -> float:
     """三点二阶差分，近似曲线曲率。"""
+    if not math.isfinite(x):
+        return float("nan")
     hist = state.setdefault("hist", deque(maxlen=3))
     hist.append(x)
     if len(hist) < 3:
@@ -704,7 +718,6 @@ def nanoGPT_observable_packs(every_cheap: int = 50,
              every=every_medium, cost="cheap"),
         Pack("layer0_mlp_fc_mean_dynamics", "activation", r"transformer\.h\.0\.mlp\.c_fc$",
              reductions=("mean",),
-             transforms=("center",),
              temporal=(("delta", {}), ("slope", {"window": 5})),
              every=every_medium, cost="medium"),
         # ---- per-block phenomenology: attention entropy / sink (§4.2) ----

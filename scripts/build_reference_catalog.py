@@ -46,6 +46,7 @@ def build_catalog(
                 "source_kind": s.get("source_kind") or "",
                 "reduction": s.get("reduction") or "",
                 "transforms": s.get("transforms") or [],
+                "temporal": s.get("temporal") or [],
                 "ui_module": s.get("ui_module") or "",
                 "layer": s.get("layer"),
                 "role": s.get("role") or "",
