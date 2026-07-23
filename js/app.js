@@ -51,6 +51,14 @@ const RUN_COLORS = [
   "#9fd4e4", "#e8c888", "#8fd9a4", "#f0a8b6", "#b8d4f0", "#7ecfc4",
 ];
 
+// Logarithmic axes cannot represent zero. Keep step 0 separate from the
+// genuine step 1 instead of mapping both to x=1.
+const LOG_ZERO_PLOT_X = 0.1;
+
+function plotXForStep(step, logarithmic) {
+  return logarithmic && step === 0 ? LOG_ZERO_PLOT_X : step;
+}
+
 let manifest = null;
 let runId = null;
 let availableRuns = [];
@@ -1128,8 +1136,8 @@ function logXAxisTickConfig(axisColor) {
     callback(value) {
       const v = Number(value);
       if (!Number.isFinite(v)) return "";
-      // step 0 is plotted at x=1 → show "0" on the axis
-      if (Math.abs(v - 1) < 1e-12) return "0";
+      // step 0 uses a small positive sentinel on the logarithmic axis.
+      if (Math.abs(v - LOG_ZERO_PLOT_X) < 1e-12) return "0";
       if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
       return String(v);
     },
@@ -1366,8 +1374,8 @@ function pointsFromSeries(series) {
     const y = series.values[i];
     if (!Number.isFinite(step) || !Number.isFinite(y)) continue;
     if (log && !(y > 0)) continue;
-    // Log-x cannot use 0: only step 0 is plotted as 1; all other steps stay unchanged.
-    const plotX = log && step === 0 ? 1 : step;
+    // Log-x cannot use 0; all genuine positive steps stay unchanged.
+    const plotX = plotXForStep(step, log);
     pts.push({ x: plotX, y, _step: step });
   }
   return pts;
@@ -1795,6 +1803,15 @@ function ceilToAvailableStep(value, steps) {
   return steps[steps.length - 1];
 }
 
+/** Largest data step <= value (clamp to the first step if before the start). */
+function floorToAvailableStep(value, steps) {
+  if (!Number.isFinite(value) || !steps.length) return null;
+  for (let i = steps.length - 1; i >= 0; i -= 1) {
+    if (steps[i] <= value) return steps[i];
+  }
+  return steps[0];
+}
+
 function syncLossRangeInputs() {
   const bounds = lossDataBounds();
   if (lossLog?.error) return;
@@ -1820,9 +1837,9 @@ function applyLossStepRange() {
   let max = maxEl.value === "" ? null : Number(maxEl.value);
   if (min != null && !Number.isFinite(min)) min = null;
   if (max != null && !Number.isFinite(max)) max = null;
-  // Snap typed values up to the next step that actually has data.
+  // Snap the lower bound up and the upper bound down to actual data steps.
   if (min != null) min = ceilToAvailableStep(min, steps);
-  if (max != null) max = ceilToAvailableStep(max, steps);
+  if (max != null) max = floorToAvailableStep(max, steps);
   if (min != null && max != null && min > max) [min, max] = [max, min];
   lossStepMin = min;
   lossStepMax = max;
@@ -1849,8 +1866,8 @@ function filterLossPoints(points) {
       return Number.isFinite(p.x) && Number.isFinite(p.y);
     })
     .map((p) => {
-      // Log-x cannot use 0: only step 0 is plotted as 1; other steps unchanged.
-      const plotX = log && p.x === 0 ? 1 : p.x;
+      // Log-x cannot use 0; all genuine positive steps stay unchanged.
+      const plotX = plotXForStep(p.x, log);
       return { x: plotX, y: p.y, _step: p.x };
     });
 }
@@ -2194,7 +2211,8 @@ function renderFullChart(spec) {
     infoEl.textContent = lineData?.empty
       ? (lineData.emptyMessage || "Select layers to compare above")
       : "No curve data yet.";
-    // Do not destroy an existing healthy chart when a transient empty state appears.
+    // Never leave a stale chart visible after the selection becomes empty.
+    destroyFullChart();
     return;
   }
   if (!lineDataHasPoints(lineData)) {

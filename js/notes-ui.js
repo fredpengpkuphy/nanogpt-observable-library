@@ -55,7 +55,7 @@ function isNoteModalOpen() {
 
 async function refreshNotes() {
   try {
-    allNotes = await NotesStore.listNotes();
+    allNotes = await NotesStore.listNotes(noteContextKey());
     notesReady = true;
   } catch (err) {
     console.warn(err);
@@ -140,7 +140,11 @@ function nearestStep(chart, pixelX) {
   let bestDist = Infinity;
   for (const s of steps) {
     const plotX =
-      xScale.type === "logarithmic" && s === 0 ? 1 : s;
+      typeof plotXForStep === "function"
+        ? plotXForStep(s, xScale.type === "logarithmic")
+        : xScale.type === "logarithmic" && s === 0
+          ? 0.1
+          : s;
     const d = Math.abs(plotX - xVal);
     if (d < bestDist) {
       best = s;
@@ -152,9 +156,12 @@ function nearestStep(chart, pixelX) {
 
 function plotXForNoteStep(chart, step) {
   if (!Number.isFinite(step)) return step;
-  // Only step 0 is remapped for log-x; everything else stays as-is.
-  if (chart?.scales?.x?.type === "logarithmic" && step === 0) return 1;
-  return step;
+  const logarithmic = chart?.scales?.x?.type === "logarithmic";
+  return typeof plotXForStep === "function"
+    ? plotXForStep(step, logarithmic)
+    : logarithmic && step === 0
+      ? 0.1
+      : step;
 }
 
 function noteAnnotationConfig(notes, chart) {
@@ -207,7 +214,9 @@ function applyNoteAnnotations(chart) {
 
 function formatNoteTime(iso) {
   try {
-    return new Date(iso).toLocaleString();
+    if (!iso) return "";
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
   } catch (_) {
     return "";
   }
@@ -220,16 +229,23 @@ function stepLabel(step) {
 function buildCommentTree(comments) {
   const list = comments || [];
   const byParent = new Map();
+  const knownIds = new Set(list.map((c) => c.id));
+  const renderedIds = new Set();
   for (const c of list) {
-    const key = c.parentId || "";
+    const key = c.parentId && knownIds.has(c.parentId) ? c.parentId : "";
     if (!byParent.has(key)) byParent.set(key, []);
     byParent.get(key).push(c);
   }
-  function renderLevel(parentId, depth) {
+  function renderLevel(parentId, depth, ancestors = new Set()) {
+    if (depth > 20) return "";
     const kids = byParent.get(parentId || "") || [];
     return kids
       .map((c) => {
-        const nested = renderLevel(c.id, depth + 1);
+        if (ancestors.has(c.id) || renderedIds.has(c.id)) return "";
+        renderedIds.add(c.id);
+        const nextAncestors = new Set(ancestors);
+        nextAncestors.add(c.id);
+        const nested = renderLevel(c.id, depth + 1, nextAncestors);
         return `
         <div class="note-comment ${depth ? "note-comment-reply" : ""}" data-comment-id="${escapeHtml(c.id)}">
           <div class="note-comment-head">
@@ -249,7 +265,16 @@ function buildCommentTree(comments) {
       })
       .join("");
   }
-  return renderLevel(null, 0);
+  let html = renderLevel(null, 0);
+  // Cycles have no natural root. Promote one member of each malformed
+  // component so the remaining comments stay visible and recursion terminates.
+  for (const comment of list) {
+    if (renderedIds.has(comment.id)) continue;
+    if (!byParent.has("")) byParent.set("", []);
+    byParent.get("").push(comment);
+    html += renderLevel(null, 0);
+  }
+  return html;
 }
 
 function renderNotesRail(notes) {

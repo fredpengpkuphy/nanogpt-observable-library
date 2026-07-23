@@ -16,6 +16,21 @@ import shutil
 from pathlib import Path
 
 _LAYER_RE = re.compile(r"^h\.(\d+)\.(.+)$")
+_PATH_PART_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _validate_path_part(value: str, field: str) -> str:
+    value = str(value)
+    if not value or not _PATH_PART_RE.fullmatch(value):
+        raise ValueError(f"unsafe {field}: {value!r}")
+    return value
+
+
+def _validate_filename(value: str) -> str:
+    value = str(value)
+    if Path(value).name != value or value in (".", ".."):
+        raise ValueError(f"unsafe curve filename: {value!r}")
+    return value
 
 
 def selector_to_ui_module(selector: str) -> str:
@@ -29,8 +44,9 @@ def selector_to_ui_module(selector: str) -> str:
 
 def curve_tree_relpath(source_kind: str, selector: str, curve_filename: str) -> str:
     """Relative path under ``curves/`` for one PNG."""
+    source_kind = _validate_path_part(source_kind, "source_kind")
     ui = selector_to_ui_module(selector)
-    fname = curve_filename
+    fname = _validate_filename(curve_filename)
 
     if ui in ("wte", "wpe"):
         return f"{source_kind}/embeddings/{ui}/{fname}"
@@ -41,10 +57,14 @@ def curve_tree_relpath(source_kind: str, selector: str, curve_filename: str) -> 
     m = _LAYER_RE.match(ui)
     if m:
         layer = int(m.group(1))
-        role = m.group(2).replace(".", "/")
+        role_parts = [
+            _validate_path_part(part, "selector component")
+            for part in m.group(2).split(".")
+        ]
+        role = "/".join(role_parts)
         return f"{source_kind}/blocks/layer_{layer:02d}/{role}/{fname}"
 
-    safe = ui.replace(".", "_")
+    safe = re.sub(r"[^A-Za-z0-9_-]+", "_", ui).strip("_") or "unknown"
     return f"{source_kind}/other/{safe}/{fname}"
 
 
@@ -79,6 +99,10 @@ def organize_curves(
             continue
         rel = curve_tree_relpath(spec["source_kind"], spec["selector"], fname)
         dest = dest_curve_root / rel
+        try:
+            dest.resolve().relative_to(dest_curve_root.resolve())
+        except ValueError as exc:
+            raise ValueError(f"curve destination escapes root: {rel!r}") from exc
         dest.parent.mkdir(parents=True, exist_ok=True)
         if copy:
             shutil.copy2(src, dest)

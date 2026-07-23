@@ -36,6 +36,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from curve_tree import organize_curves, selector_to_ui_module  # noqa: E402
 
 _LAYER_RE = re.compile(r"^h\.(\d+)\.(.+)$")
+_RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+
+
+def validate_run_id(run_id: str) -> str:
+    if (
+        not run_id
+        or run_id in (".", "..")
+        or not _RUN_ID_RE.fullmatch(run_id)
+    ):
+        raise ValueError(f"unsafe run id: {run_id!r}")
+    return run_id
 
 
 def parse_layer_role(ui_module: str) -> tuple[int | None, str]:
@@ -136,7 +147,7 @@ def module_label(ui_module: str) -> str:
 
 def find_run_ids(obs_dir: Path, explicit: str | None) -> list[str]:
     if explicit:
-        return [explicit]
+        return [validate_run_id(explicit)]
     specs_files = sorted(obs_dir.glob("run_*_specs.json"), key=os.path.getmtime, reverse=True)
     if not specs_files:
         raise SystemExit(f"No specs found under {obs_dir}")
@@ -145,7 +156,7 @@ def find_run_ids(obs_dir: Path, explicit: str | None) -> list[str]:
 
 def load_series(obs_dir: Path, run_id: str) -> dict[str, dict]:
     obs_path = obs_dir / f"{run_id}_observations.csv"
-    series: dict[str, dict] = defaultdict(lambda: {"steps": [], "values": []})
+    values_by_step: dict[str, dict[int, float]] = defaultdict(dict)
     if not obs_path.exists():
         return {}
     with obs_path.open(newline="", encoding="utf-8") as f:
@@ -161,10 +172,16 @@ def load_series(obs_dir: Path, run_id: str) -> dict[str, dict]:
                 continue
             if row.get("valid") not in (None, "", "ok"):
                 continue
-            bucket = series[spec_id]
-            bucket["steps"].append(step)
-            bucket["values"].append(val)
-    return dict(series)
+            # A resumed run can contain the same step more than once. The last
+            # valid row is the newest value and should win deterministically.
+            values_by_step[spec_id][step] = val
+    return {
+        spec_id: {
+            "steps": sorted(points),
+            "values": [points[step] for step in sorted(points)],
+        }
+        for spec_id, points in values_by_step.items()
+    }
 
 
 def build_manifest(obs_dir: Path, run_id: str, curve_paths: dict[str, str]) -> dict:
@@ -294,6 +311,7 @@ def copy_loss_log(
 
 
 def build_run(obs_dir: Path, run_id: str, *, allow_shared_loss: bool = False) -> dict:
+    run_id = validate_run_id(run_id)
     specs_path = obs_dir / f"{run_id}_specs.json"
     if not specs_path.exists():
         raise SystemExit(f"Missing {specs_path}")
@@ -302,6 +320,7 @@ def build_run(obs_dir: Path, run_id: str, *, allow_shared_loss: bool = False) ->
         specs = json.load(f)["specs"]
 
     dest = VIEWER_DATA / run_id
+    dest.mkdir(parents=True, exist_ok=True)
     curves_root = dest / "curves"
     if curves_root.exists():
         shutil.rmtree(curves_root)

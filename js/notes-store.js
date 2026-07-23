@@ -32,6 +32,7 @@ const NotesStore = (() => {
   let adminMode = false;
 
   const authListeners = new Set();
+  const BATCH_WRITE_LIMIT = 450;
 
   function resetAuthReady() {
     authReadyPromise = new Promise((resolve) => {
@@ -167,7 +168,11 @@ const NotesStore = (() => {
     if (value && typeof value.toDate === "function") {
       return value.toDate().toISOString();
     }
-    return new Date().toISOString();
+    if (typeof value === "string" || typeof value === "number") {
+      const date = new Date(value);
+      if (!Number.isNaN(date.getTime())) return date.toISOString();
+    }
+    return "";
   }
 
   function parseNote(doc) {
@@ -213,15 +218,25 @@ const NotesStore = (() => {
     return snap.docs.map(parseComment);
   }
 
-  async function listNotes() {
+  async function listNotes(filter = null) {
     await init();
     if (!backendReady) return [];
-    const snap = await db
-      .collection("notes")
-      .orderBy("createdAt", "desc")
-      .limit(500)
-      .get();
-    const notes = snap.docs.map(parseNote);
+    let query = db.collection("notes");
+    if (filter?.runId) query = query.where("runId", "==", filter.runId);
+    if (filter?.specId) query = query.where("specId", "==", filter.specId);
+    if (filter?.context) query = query.where("context", "==", filter.context);
+    let snap;
+    try {
+      snap = await query.limit(500).get();
+    } catch (err) {
+      // Older projects may need a composite index for the precise query.
+      // A run-only query remains correct after the client-side filter.
+      if (!filter?.runId) throw err;
+      snap = await db.collection("notes").where("runId", "==", filter.runId).limit(1000).get();
+    }
+    let notes = snap.docs.map(parseNote);
+    if (filter) notes = filterNotes(notes, filter);
+    notes.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     await Promise.all(
       notes.map(async (n) => {
         try {
@@ -233,6 +248,40 @@ const NotesStore = (() => {
       })
     );
     return notes;
+  }
+
+  async function deleteCollection(collectionRef) {
+    while (true) {
+      const snap = await collectionRef.limit(BATCH_WRITE_LIMIT).get();
+      if (snap.empty) return;
+      const batch = db.batch();
+      snap.docs.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+      if (snap.size < BATCH_WRITE_LIMIT) return;
+    }
+  }
+
+  async function readCollection(collectionRef) {
+    const docs = [];
+    let last = null;
+    while (true) {
+      let query = collectionRef
+        .orderBy(firebase.firestore.FieldPath.documentId())
+        .limit(BATCH_WRITE_LIMIT);
+      if (last) query = query.startAfter(last);
+      const snap = await query.get();
+      docs.push(...snap.docs);
+      if (snap.size < BATCH_WRITE_LIMIT) return docs;
+      last = snap.docs[snap.docs.length - 1];
+    }
+  }
+
+  async function deleteRefs(refs) {
+    for (let i = 0; i < refs.length; i += BATCH_WRITE_LIMIT) {
+      const batch = db.batch();
+      refs.slice(i, i + BATCH_WRITE_LIMIT).forEach((ref) => batch.delete(ref));
+      await batch.commit();
+    }
   }
 
   function filterNotes(notes, { runId, specId, context }) {
@@ -319,11 +368,8 @@ const NotesStore = (() => {
     if (!backendReady) throw new Error("Notes backend is not configured yet.");
     if (!adminMode) throw new Error("Only the curator can delete notes.");
     const noteRef = db.collection("notes").doc(id);
-    const comments = await noteRef.collection("comments").limit(400).get();
-    const batch = db.batch();
-    comments.docs.forEach((d) => batch.delete(d.ref));
-    batch.delete(noteRef);
-    await batch.commit();
+    await deleteCollection(noteRef.collection("comments"));
+    await noteRef.delete();
   }
 
   async function deleteComment(noteId, commentId) {
@@ -331,8 +377,8 @@ const NotesStore = (() => {
     if (!backendReady) throw new Error("Notes backend is not configured yet.");
     if (!adminMode) throw new Error("Only the curator can delete comments.");
     const col = db.collection("notes").doc(noteId).collection("comments");
-    const snap = await col.limit(400).get();
-    const all = snap.docs.map((d) => ({ id: d.id, ...d.data(), ref: d.ref }));
+    const docs = await readCollection(col);
+    const all = docs.map((d) => ({ id: d.id, ...d.data(), ref: d.ref }));
     const toDelete = new Set([commentId]);
     let grew = true;
     while (grew) {
@@ -344,11 +390,7 @@ const NotesStore = (() => {
         }
       }
     }
-    const batch = db.batch();
-    for (const c of all) {
-      if (toDelete.has(c.id)) batch.delete(c.ref);
-    }
-    await batch.commit();
+    await deleteRefs(all.filter((c) => toDelete.has(c.id)).map((c) => c.ref));
   }
 
   function friendlyAdminSignInError(err) {
@@ -443,6 +485,7 @@ const NotesStore = (() => {
   function watchAnnouncements(cb) {
     let unsub = null;
     let cancelled = false;
+    let generation = 0;
     init().then(async () => {
       if (cancelled) return;
       if (!backendReady) {
@@ -454,16 +497,19 @@ const NotesStore = (() => {
         .orderBy("createdAt", "desc")
         .onSnapshot(
           async (snap) => {
+            const currentGeneration = ++generation;
             const items = snap.docs.map(mapAnnouncementDoc).filter((a) => a.text);
             if (items.length) {
-              cb(items);
+              if (!cancelled && currentGeneration === generation) cb(items);
               return;
             }
             try {
               const legacy = await readLegacyAnnouncement();
-              cb(legacy ? [legacy] : []);
+              if (!cancelled && currentGeneration === generation) {
+                cb(legacy ? [legacy] : []);
+              }
             } catch (_) {
-              cb([]);
+              if (!cancelled && currentGeneration === generation) cb([]);
             }
           },
           (err) => {
@@ -596,6 +642,7 @@ const NotesStore = (() => {
   function watchSuggestions(cb) {
     let unsub = null;
     let cancelled = false;
+    let generation = 0;
     init().then(() => {
       if (cancelled) return;
       if (!backendReady) {
@@ -607,6 +654,7 @@ const NotesStore = (() => {
         .orderBy("createdAt", "desc")
         .onSnapshot(
           async (snap) => {
+            const currentGeneration = ++generation;
             const items = [];
             for (const doc of snap.docs) {
               const data = doc.data() || {};
@@ -619,7 +667,7 @@ const NotesStore = (() => {
                 replies: await loadSuggestionReplies(doc.ref),
               });
             }
-            if (!cancelled) cb(items);
+            if (!cancelled && currentGeneration === generation) cb(items);
           },
           (err) => {
             console.warn("watchSuggestions", err);
@@ -670,11 +718,8 @@ const NotesStore = (() => {
     if (!backendReady) throw new Error("Notes backend is not configured yet.");
     if (!adminMode) throw new Error("Only the curator can delete suggestions.");
     const parent = db.collection("suggestions").doc(id);
-    const replies = await parent.collection("replies").get();
-    const batch = db.batch();
-    replies.docs.forEach((d) => batch.delete(d.ref));
-    batch.delete(parent);
-    await batch.commit();
+    await deleteCollection(parent.collection("replies"));
+    await parent.delete();
   }
 
   async function deleteSuggestionReply(suggestionId, replyId) {

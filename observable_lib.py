@@ -93,6 +93,7 @@ _WEIGHT_LIKE = ("weight", "grad", "update", "opt_m", "opt_v")
 _TENSOR_SOURCES = _WEIGHT_LIKE + (
     "activation", "preactivation", "logits", "attention", "gelu_activation",
 )
+_USE_DEFAULT_UPDATE_BASELINE = object()
 
 
 def infer_axes(t: torch.Tensor, kind: str) -> Tuple[str, ...]:
@@ -209,7 +210,7 @@ def _r_mean(tt: TypedTensor) -> float:
 
 @register_reduction("std")
 def _r_std(tt: TypedTensor) -> float:
-    return tt.value.detach().float().std().item()
+    return tt.value.detach().float().std(unbiased=False).item()
 
 
 @register_reduction("l2_norm")
@@ -314,7 +315,7 @@ def _r_row_std_mean(tt: TypedTensor) -> float:
     v = tt.value.detach().float()
     if v.dim() != 2:
         return float("nan")
-    return v.std(dim=1).mean().item()
+    return v.std(dim=1, unbiased=False).mean().item()
 
 
 @register_reduction("col_std_mean")
@@ -323,7 +324,7 @@ def _r_col_std_mean(tt: TypedTensor) -> float:
     v = tt.value.detach().float()
     if v.dim() != 2:
         return float("nan")
-    return v.std(dim=0).mean().item()
+    return v.std(dim=0, unbiased=False).mean().item()
 
 
 @register_reduction("trace")
@@ -582,8 +583,17 @@ class ObservableSpec:
         Normal Form (§8.1)：把 spec 序列化成一个字符串当唯一 id，用于去重。
         [SIMPLIFIED] 只做字符串规范化，不做语义等价判断。
         """
-        tp = "|".join(f"{n}({','.join(f'{k}={v}' for k, v in p.items())})"
-                      for n, p in self.temporal)
+        tp_parts = []
+        for name, params in self.temporal:
+            args = ",".join(
+                "{}={}".format(
+                    key,
+                    json.dumps(value, sort_keys=True, separators=(",", ":")),
+                )
+                for key, value in sorted(params.items())
+            )
+            tp_parts.append(f"{name}({args})")
+        tp = "|".join(tp_parts)
         parts = [self.source_kind, self.selector,
                  ">".join(self.transforms) or "-",
                  self.reduction, tp or "-"]
@@ -596,12 +606,39 @@ def check_spec(spec: ObservableSpec) -> Optional[str]:
         return f"unknown source_kind: {spec.source_kind}"
     if spec.reduction not in REDUCTIONS:
         return f"unknown reduction: {spec.reduction}"
+    if not isinstance(spec.every, int) or isinstance(spec.every, bool) or spec.every <= 0:
+        return f"every must be a positive integer: {spec.every!r}"
+    if not isinstance(spec.selector, str) or not spec.selector:
+        return "selector must be a non-empty string"
     for t in spec.transforms:
         if t not in TRANSFORMS:
             return f"unknown transform: {t}"
-    for n, _ in spec.temporal:
+    for n, params in spec.temporal:
         if n not in TEMPORALS:
             return f"unknown temporal: {n}"
+        if not isinstance(params, dict):
+            return f"temporal params for {n} must be a dict"
+        try:
+            json.dumps(params, sort_keys=True)
+        except (TypeError, ValueError):
+            return f"temporal params for {n} must be JSON-serializable"
+        if n in ("slope", "rolling_std") and "window" in params:
+            window = params["window"]
+            if (
+                not isinstance(window, int)
+                or isinstance(window, bool)
+                or window < 2
+            ):
+                return f"{n} window must be an integer >= 2"
+        if n == "ema" and "alpha" in params:
+            alpha = params["alpha"]
+            if (
+                not isinstance(alpha, (int, float))
+                or isinstance(alpha, bool)
+                or not math.isfinite(alpha)
+                or not 0 <= alpha < 1
+            ):
+                return "ema alpha must be finite and in [0, 1)"
     return None
 
 
@@ -846,6 +883,10 @@ class SourceRegistry:
         """记录当前参数，供下一次 update = 当前 - 快照 (§5.2)。[SIMPLIFIED] 近似上一步更新量。"""
         self._prev_params = {n: p.detach().clone() for n, p in self._named_params.items()}
 
+    def snapshot_param(self, target: str) -> Optional[torch.Tensor]:
+        p = self._named_params.get(target)
+        return p.detach().clone() if p is not None else None
+
     def _opt_state_key(self, source_kind: str) -> str:
         return "exp_avg" if source_kind == "opt_m" else "exp_avg_sq"
 
@@ -872,7 +913,12 @@ class SourceRegistry:
         return []
 
     # ---- 取某个 target 的 TypedTensor ----
-    def fetch(self, source_kind: str, target: str) -> Optional[TypedTensor]:
+    def fetch(
+        self,
+        source_kind: str,
+        target: str,
+        update_baseline=_USE_DEFAULT_UPDATE_BASELINE,
+    ) -> Optional[TypedTensor]:
         if source_kind in ("weight", "grad", "update"):
             p = self._named_params.get(target, None)
             if p is None:
@@ -882,7 +928,11 @@ class SourceRegistry:
             elif source_kind == "grad":
                 v = p.grad.detach() if p.grad is not None else None
             else:  # update
-                prev = self._prev_params.get(target, None)
+                prev = (
+                    self._prev_params.get(target, None)
+                    if update_baseline is _USE_DEFAULT_UPDATE_BASELINE
+                    else update_baseline
+                )
                 v = (p.detach() - prev) if prev is not None else None
             if v is None:
                 return None
@@ -1044,6 +1094,7 @@ class ObservableEngine:
         self._temporal_state: Dict[str, dict] = {}  # (canonical_id, i) -> state
         self._failed: set = set()               # 失败过的 spec，隔离后不再重试
         self._curves: Dict[str, List[Tuple[int, float]]] = {}  # spec_id -> [(step, value)]
+        self._update_prev: Dict[Tuple[str, int], torch.Tensor] = {}
         self._specs_by_every: Dict[int, List[ObservableSpec]] = {}
         self._distinct_every: Tuple[int, ...] = ()
 
@@ -1187,7 +1238,16 @@ class ObservableEngine:
 
     # ---- 单条 spec 的 pipeline 执行 (§5.4) ----
     def _run_spec(self, spec: ObservableSpec, step: int) -> Optional[dict]:
-        tt = self.registry.fetch(spec.source_kind, spec.selector)
+        baseline = (
+            self._update_prev.get((spec.selector, spec.every))
+            if spec.source_kind == "update"
+            else None
+        )
+        tt = self.registry.fetch(
+            spec.source_kind,
+            spec.selector,
+            update_baseline=baseline,
+        )
         if tt is None:
             return None
         # Transform*
@@ -1212,13 +1272,13 @@ class ObservableEngine:
         rows = []
         if loss is not None:
             rows.append(self._loss_row(step, loss))
-        update_fired = False
+        update_keys = set()
         for every in self._distinct_every:
             if step % every != 0:
                 continue
             for spec in self._specs_by_every[every]:
                 if spec.source_kind == "update":
-                    update_fired = True
+                    update_keys.add((spec.selector, spec.every))
                 cid = spec.canonical_id()
                 if cid in self._failed:         # Failure isolation (§7.5)
                     continue
@@ -1237,8 +1297,10 @@ class ObservableEngine:
         # 引擎自管 update 基线：只在 update 观测量触发的 step 之后推进快照，
         # 于是 update = 相邻两次观测之间的参数漂移 (§5.2)。第一次触发无基线故跳过。
         # 好处：调用方无需手动 snapshot，且不必每步 clone 全部参数。
-        if update_fired:
-            self.registry.snapshot_params()
+        for key in update_keys:
+            snapshot = self.registry.snapshot_param(key[0])
+            if snapshot is not None:
+                self._update_prev[key] = snapshot
         return rows
 
     def close(self):

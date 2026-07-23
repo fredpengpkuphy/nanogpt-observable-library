@@ -16,18 +16,31 @@ service cloud.firestore {
         && request.resource.data.text.size() <= 2000;
     }
 
+    function isServerCreate() {
+      return request.resource.data.createdAt is timestamp
+        && request.resource.data.createdAt == request.time;
+    }
+
     match /notes/{noteId} {
       allow read: if true;
 
       allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly([
+          "runId", "specId", "context", "step", "uid", "text", "createdAt"
+        ])
         && request.resource.data.uid == request.auth.uid
         && validText()
         && request.resource.data.runId is string
-        && (
-          !("step" in request.resource.data)
-          || request.resource.data.step == null
-          || request.resource.data.step is number
-        );
+        && request.resource.data.runId.size() > 0
+        && request.resource.data.runId.size() <= 200
+        && request.resource.data.specId is string
+        && request.resource.data.specId.size() <= 500
+        && request.resource.data.context in ["spec", "loss"]
+        && (request.resource.data.step == null
+          || (request.resource.data.step is int
+            && request.resource.data.step >= 0
+            && request.resource.data.step <= 1000000000000))
+        && isServerCreate();
 
       allow update, delete: if isAdmin();
 
@@ -35,14 +48,17 @@ service cloud.firestore {
         allow read: if true;
 
         allow create: if request.auth != null
+          && request.resource.data.keys().hasOnly([
+            "noteId", "uid", "text", "parentId", "createdAt"
+          ])
           && request.resource.data.uid == request.auth.uid
           && validText()
           && request.resource.data.noteId == noteId
-          && (
-            !("parentId" in request.resource.data)
-            || request.resource.data.parentId == null
-            || request.resource.data.parentId is string
-          );
+          && (request.resource.data.parentId == null
+            || (request.resource.data.parentId is string
+              && request.resource.data.parentId.size() <= 200
+              && request.resource.data.parentId != commentId))
+          && isServerCreate();
 
         allow update, delete: if isAdmin();
       }
@@ -58,8 +74,12 @@ service cloud.firestore {
       allow read: if true;
 
       allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly([
+          "text", "uid", "createdAt"
+        ])
         && request.resource.data.uid == request.auth.uid
-        && validText();
+        && validText()
+        && isServerCreate();
 
       allow update: if false;
       allow delete: if isAdmin();
@@ -68,8 +88,12 @@ service cloud.firestore {
         allow read: if true;
 
         allow create: if isAdmin()
+          && request.resource.data.keys().hasOnly([
+            "text", "uid", "createdAt"
+          ])
           && request.resource.data.uid == request.auth.uid
-          && validText();
+          && validText()
+          && isServerCreate();
 
         allow update: if false;
         allow delete: if isAdmin();
@@ -80,14 +104,22 @@ service cloud.firestore {
     match /announcements/{announcementId} {
       allow read: if true;
       allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly([
+          "text", "uid", "createdAt", "updatedAt"
+        ])
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 1000
-        && request.resource.data.uid == request.auth.uid;
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
       allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(["text", "updatedAt"])
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
-        && request.resource.data.text.size() <= 1000;
+        && request.resource.data.text.size() <= 1000
+        && request.resource.data.updatedAt == request.time;
       allow delete: if isAdmin();
     }
 

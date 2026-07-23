@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -18,6 +19,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from curve_tree import load_specs_from_obs_dir, organize_curves  # noqa: E402
+
+_RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
 def find_run_ids(obs_dir: Path) -> list[str]:
@@ -56,12 +59,19 @@ def main():
     run_ids = [args.run] if args.run else find_run_ids(obs_dir)
     if not run_ids:
         raise SystemExit(f"No run_*_specs.json under {obs_dir}")
+    if args.in_place and len(run_ids) > 1:
+        raise SystemExit(
+            "--in-place cannot process multiple runs from one flat curve directory; "
+            "pass --run explicitly"
+        )
 
     src_curve = obs_dir / "curve"
     if not src_curve.is_dir():
         raise SystemExit(f"Missing flat curve dir: {src_curve}")
 
     for run_id in run_ids:
+        if run_id in (".", "..") or not _RUN_ID_RE.fullmatch(run_id):
+            raise SystemExit(f"Unsafe run id: {run_id!r}")
         specs = load_specs_from_obs_dir(obs_dir, run_id)
         if args.dest:
             dest_root = args.dest / run_id / "curves"

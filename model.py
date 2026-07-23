@@ -208,7 +208,12 @@ class GPT(nn.Module):
         # model surgery to decrease the block size if necessary
         # e.g. we may load the GPT2 pretrained model checkpoint (block size 1024)
         # but want to use a smaller block size for some smaller, simpler model
-        assert block_size <= self.config.block_size
+        if not isinstance(block_size, int) or isinstance(block_size, bool) or block_size <= 0:
+            raise ValueError("block_size must be a positive integer")
+        if block_size > self.config.block_size:
+            raise ValueError(
+                f"block_size {block_size} exceeds current size {self.config.block_size}"
+            )
         self.config.block_size = block_size
         self.transformer.wpe.weight = nn.Parameter(self.transformer.wpe.weight[:block_size])
         for block in self.transformer.h:
@@ -321,6 +326,22 @@ class GPT(nn.Module):
         the sequence max_new_tokens times, feeding the predictions back into the model each time.
         Most likely you'll want to make sure to be in model.eval() mode of operation for this.
         """
+        if not isinstance(max_new_tokens, int) or isinstance(max_new_tokens, bool) or max_new_tokens < 0:
+            raise ValueError("max_new_tokens must be a non-negative integer")
+        if (
+            not isinstance(temperature, (int, float))
+            or isinstance(temperature, bool)
+            or not math.isfinite(float(temperature))
+            or temperature <= 0
+        ):
+            raise ValueError("temperature must be a positive number")
+        if top_k is not None and (
+            not isinstance(top_k, int)
+            or isinstance(top_k, bool)
+            or top_k <= 0
+        ):
+            raise ValueError("top_k must be a positive integer or None")
+
         for _ in range(max_new_tokens):
             # if the sequence context is growing too long we must crop it at block_size
             idx_cond = idx if idx.size(1) <= self.config.block_size else idx[:, -self.config.block_size:]

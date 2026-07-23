@@ -4,8 +4,8 @@ The chart notes are stored in **Firebase Firestore** instead of GitHub Issues.
 This gives you exactly what you asked for:
 
 - Anyone can post a note, fully **anonymous**.
-- Every visitor keeps **one stable handle** (`explorer_001`, `explorer_002`, …)
-  that stays the same across sessions and across every curve.
+- Firebase keeps one anonymous account per browser profile so posts remain tied
+  to an authenticated UID without exposing a public username.
 - **Only you** (the curator) can delete or edit notes.
 
 The Firebase web config keys are **not secrets** — all access is enforced by the

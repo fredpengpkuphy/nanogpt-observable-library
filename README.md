@@ -59,15 +59,19 @@ After each training run, re-run `build_viewer_data.py` and commit `data/`.
 3. Use **L0–L11** tabs to switch transformer blocks
 4. Click a module (incl. Attention entropy / GELU massive) → observables by source kind
 5. Click a chip → interactive chart (CSV series) or PNG from the tree
-6. Fullscreen a curve → **click any step** to leave a public note (stored as a GitHub Issue)
+6. Fullscreen a curve → **click any step** to leave a public note (stored in Firestore)
 
-## Public notes (GitHub Issues)
+## Public notes (Firebase)
 
-Notes are persisted as Issues labeled `chart-note` in this repository (public).
+Notes, comments, suggestions, announcements, and maintenance state are stored in
+Firebase Firestore. Visitors authenticate anonymously in the background; only the
+configured curator account can edit or delete content.
 
-1. Create the label `chart-note` in the repo (Issues → Labels).
-2. Optional but recommended for seamless posting: create a fine-grained PAT with
-   **Issues: Read and write** on this repo only, then paste it into
-   `js/notes-config.js` → `github.token`.
-3. Without a token, visitors can still **read** notes; submitting opens a prefilled
-   GitHub Issue form (requires a GitHub login).
+See [`NOTES_SETUP.md`](NOTES_SETUP.md) for Firebase setup and publish the included
+`firestore.rules` before enabling public posting.
+
+## Tests
+
+```bash
+python -m unittest discover -s tests -v
+```
