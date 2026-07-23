@@ -1381,6 +1381,7 @@ body.curator-mode .app-header {
 
 .chart-modal-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
@@ -1388,6 +1389,17 @@ body.curator-mode .app-header {
   border-bottom: 1px solid var(--border);
   font-size: 0.82rem;
   color: var(--muted);
+}
+
+.chart-modal-head > .chart-meta-text {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.chart-modal-head > .chart-actions {
+  flex: 1 1 720px;
+  min-width: 0;
+  justify-content: flex-end;
 }
 
 .chart-modal-head #fullChartTitle {
@@ -1399,6 +1411,9 @@ body.curator-mode .app-header {
 .reference-line-controls {
   display: flex;
   flex-wrap: wrap;
+  flex: 1 1 520px;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   gap: 0.35rem;
   padding: 0.25rem 0.35rem;
@@ -1443,12 +1458,20 @@ body.curator-mode .app-header {
 .reference-line-list {
   display: flex;
   flex-wrap: wrap;
+  flex: 1 0 100%;
+  min-width: 0;
   gap: 0.3rem;
+  align-items: center;
   max-width: 100%;
 }
 
 .reference-line-list:empty {
   display: none;
+}
+
+.reference-line-help {
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .reference-line-chip {
@@ -1521,6 +1544,7 @@ body.curator-mode .app-header {
   width: 100% !important;
   height: 100% !important;
   cursor: grab;
+  touch-action: none;
 }
 
 #curveChartFull:active {
@@ -2457,5 +2481,29 @@ body.curator-mode .app-header {
 
   .notes-rail {
     max-height: 220px;
+  }
+}
+
+@media (max-width: 720px) {
+  .chart-overlay {
+    padding: 1.25vh 1.5vw;
+  }
+
+  .chart-modal {
+    width: 97vw;
+    padding-inline: 0.75rem;
+  }
+
+  .chart-modal-head > .chart-actions {
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+
+  .reference-line-controls {
+    flex-basis: 100%;
+  }
+
+  .reference-line-list {
+    width: 100%;
   }
 }

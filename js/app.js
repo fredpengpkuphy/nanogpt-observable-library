@@ -95,7 +95,10 @@ let fullChart = null;
 let fullOverlayOpen = false;
 let fullOverlayMode = null;
 let definitionResizeObserver = null;
-let referenceLineSlopes = [];
+let referenceLines = [];
+let referenceLineDrag = null;
+let referenceLineDragCanvas = null;
+let referenceLineSuppressClick = false;
 /** Snapshot of main-page compare state while fullscreen is open. */
 let fullscreenCompareSnapshot = null;
 
@@ -1208,7 +1211,7 @@ function zoomPluginOptions({ enablePan = true } = {}) {
       mode: "xy",
       drag: { enabled: false },
       onZoomComplete: ({ chart: zoomedChart }) => {
-        if (zoomedChart === fullChart && referenceLineSlopes.length) {
+        if (zoomedChart === fullChart && referenceLines.length) {
           applyReferenceLinesToFullChart();
         }
       },
@@ -1220,7 +1223,7 @@ function zoomPluginOptions({ enablePan = true } = {}) {
       modifierKey: enablePan ? "alt" : null,
       threshold: 10,
       onPanComplete: ({ chart: pannedChart }) => {
-        if (pannedChart === fullChart && referenceLineSlopes.length) {
+        if (pannedChart === fullChart && referenceLines.length) {
           applyReferenceLinesToFullChart();
         }
       },
@@ -1309,41 +1312,50 @@ function referenceLineMode(chartInstance) {
   return logX && logY ? "loglog" : "linear";
 }
 
-function referenceLinePoints(chartInstance, slope) {
+function referenceLinePoints(chartInstance, line) {
   const xScale = chartInstance?.scales?.x;
   const yScale = chartInstance?.scales?.y;
-  let xMin = Number(xScale?.min);
-  let xMax = Number(xScale?.max);
-  let yMin = Number(yScale?.min);
-  let yMax = Number(yScale?.max);
+  const xMin = Number(xScale?.min);
+  const xMax = Number(xScale?.max);
+  const yMin = Number(yScale?.min);
+  const yMax = Number(yScale?.max);
   if (![xMin, xMax, yMin, yMax].every(Number.isFinite) || !(xMax > xMin) || !(yMax > yMin)) {
     return null;
   }
 
-  if (referenceLineMode(chartInstance) === "loglog") {
+  const mode = referenceLineMode(chartInstance);
+  if (mode === "loglog") {
     if (!(xMin > 0) || !(yMin > 0)) return null;
-    const xCenter = Math.sqrt(xMin * xMax);
-    const yCenter = Math.sqrt(yMin * yMax);
+    if (line.mode !== mode || !Number.isFinite(line.intercept)) {
+      const xCenter = Math.sqrt(xMin * xMax);
+      const yCenter = Math.sqrt(yMin * yMax);
+      line.mode = mode;
+      line.intercept = Math.log(yCenter) - line.slope * Math.log(xCenter);
+    }
     const pointAt = (x) => {
-      const logY = Math.log(yCenter) + slope * (Math.log(x) - Math.log(xCenter));
+      const logY = line.intercept + line.slope * Math.log(x);
       return { x, y: Math.exp(Math.max(-700, Math.min(700, logY))) };
     };
     return [pointAt(xMin), pointAt(xMax)];
   }
 
-  const xCenter = (xMin + xMax) / 2;
-  const yCenter = (yMin + yMax) / 2;
+  if (line.mode !== mode || !Number.isFinite(line.intercept)) {
+    const xCenter = (xMin + xMax) / 2;
+    const yCenter = (yMin + yMax) / 2;
+    line.mode = mode;
+    line.intercept = yCenter - line.slope * xCenter;
+  }
   return [
-    { x: xMin, y: yCenter + slope * (xMin - xCenter) },
-    { x: xMax, y: yCenter + slope * (xMax - xCenter) },
+    { x: xMin, y: line.slope * xMin + line.intercept },
+    { x: xMax, y: line.slope * xMax + line.intercept },
   ];
 }
 
-function referenceLineDataset(chartInstance, slope, index) {
-  const points = referenceLinePoints(chartInstance, slope);
+function referenceLineDataset(chartInstance, line, index) {
+  const points = referenceLinePoints(chartInstance, line);
   if (!points || !points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))) return null;
   return {
-    label: `Reference slope ${slope}`,
+    label: `Reference slope ${line.slope}`,
     data: points,
     borderColor: REFERENCE_LINE_COLORS[index % REFERENCE_LINE_COLORS.length],
     borderWidth: 2,
@@ -1353,20 +1365,21 @@ function referenceLineDataset(chartInstance, slope, index) {
     tension: 0,
     fill: false,
     _referenceLine: true,
+    _referenceLineIndex: index,
   };
 }
 
 function updateReferenceLineControls(message = "") {
   const clearBtn = document.getElementById("clearReferenceLinesBtn");
-  if (clearBtn) clearBtn.hidden = referenceLineSlopes.length === 0;
+  if (clearBtn) clearBtn.hidden = referenceLines.length === 0;
   const list = document.getElementById("referenceLineList");
   if (list) {
     list.replaceChildren();
-    referenceLineSlopes.forEach((slope, index) => {
+    referenceLines.forEach((line, index) => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "reference-line-chip";
-      button.title = `Remove reference line with slope ${slope}`;
+      button.title = `Remove reference line with slope ${line.slope}`;
       button.setAttribute("aria-label", button.title);
       button.addEventListener("click", () => removeReferenceLine(index));
 
@@ -1374,7 +1387,7 @@ function updateReferenceLineControls(message = "") {
       swatch.className = "reference-line-swatch";
       swatch.style.color = REFERENCE_LINE_COLORS[index % REFERENCE_LINE_COLORS.length];
       const label = document.createElement("span");
-      label.textContent = `m = ${slope}`;
+      label.textContent = `m = ${line.slope}`;
       const remove = document.createElement("span");
       remove.className = "reference-line-remove";
       remove.textContent = "×";
@@ -1386,16 +1399,16 @@ function updateReferenceLineControls(message = "") {
   const status = document.getElementById("referenceLineStatus");
   if (status) {
     status.textContent = message ||
-      (referenceLineSlopes.length ? `${referenceLineSlopes.length} line${referenceLineSlopes.length === 1 ? "" : "s"}` : "");
+      (referenceLines.length ? `${referenceLines.length} line${referenceLines.length === 1 ? "" : "s"}` : "");
   }
 }
 
-function applyReferenceLinesToFullChart() {
+function applyReferenceLinesToFullChart({ updateControls = true } = {}) {
   if (!fullChart) return;
   fullChart.data.datasets = (fullChart.data.datasets || []).filter((ds) => !ds._referenceLine);
-  if (!referenceLineSlopes.length) {
+  if (!referenceLines.length) {
     fullChart.update("none");
-    updateReferenceLineControls();
+    if (updateControls) updateReferenceLineControls();
     return;
   }
 
@@ -1408,12 +1421,12 @@ function applyReferenceLinesToFullChart() {
   fullChart.options.scales.x.max = xScale.max;
   fullChart.options.scales.y.min = yScale.min;
   fullChart.options.scales.y.max = yScale.max;
-  const datasets = referenceLineSlopes
-    .map((slope, index) => referenceLineDataset(fullChart, slope, index))
+  const datasets = referenceLines
+    .map((line, index) => referenceLineDataset(fullChart, line, index))
     .filter(Boolean);
   fullChart.data.datasets.push(...datasets);
   fullChart.update("none");
-  updateReferenceLineControls();
+  if (updateControls) updateReferenceLineControls();
 }
 
 function addReferenceLine() {
@@ -1430,11 +1443,11 @@ function addReferenceLine() {
     input.focus();
     return;
   }
-  if (referenceLineSlopes.length >= 8) {
+  if (referenceLines.length >= 8) {
     updateReferenceLineControls("Maximum 8 lines");
     return;
   }
-  referenceLineSlopes.push(slope);
+  referenceLines.push({ slope, intercept: null, mode: null });
   input.value = "";
   applyReferenceLinesToFullChart();
   updateReferenceLineControls(
@@ -1443,21 +1456,174 @@ function addReferenceLine() {
 }
 
 function clearReferenceLines() {
-  referenceLineSlopes = [];
+  referenceLines = [];
   applyReferenceLinesToFullChart();
 }
 
 function removeReferenceLine(index) {
-  if (!Number.isInteger(index) || index < 0 || index >= referenceLineSlopes.length) return;
-  referenceLineSlopes.splice(index, 1);
+  if (!Number.isInteger(index) || index < 0 || index >= referenceLines.length) return;
+  referenceLines.splice(index, 1);
   applyReferenceLinesToFullChart();
 }
 
 function resetReferenceLines() {
-  referenceLineSlopes = [];
+  referenceLines = [];
+  referenceLineDrag = null;
+  referenceLineSuppressClick = false;
   const input = document.getElementById("referenceSlope");
   if (input) input.value = "";
   updateReferenceLineControls();
+}
+
+function chartPointFromPointer(chartInstance, event) {
+  const canvas = chartInstance?.canvas;
+  if (!canvas) return null;
+  const rect = canvas.getBoundingClientRect();
+  if (!(rect.width > 0) || !(rect.height > 0)) return null;
+  return {
+    x: ((event.clientX - rect.left) / rect.width) * chartInstance.width,
+    y: ((event.clientY - rect.top) / rect.height) * chartInstance.height,
+  };
+}
+
+function pointToSegmentDistance(point, start, end) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (!(lengthSquared > 0)) return Math.hypot(point.x - start.x, point.y - start.y);
+  const t = Math.max(
+    0,
+    Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared),
+  );
+  return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
+}
+
+function referenceLineIndexAtPointer(event, threshold = 12) {
+  if (!fullChart) return -1;
+  const point = chartPointFromPointer(fullChart, event);
+  const xScale = fullChart.scales?.x;
+  const yScale = fullChart.scales?.y;
+  if (!point || !xScale || !yScale) return -1;
+  let bestIndex = -1;
+  let bestDistance = threshold;
+  for (const dataset of fullChart.data?.datasets || []) {
+    if (!dataset._referenceLine || !Number.isInteger(dataset._referenceLineIndex)) continue;
+    const points = dataset.data || [];
+    if (points.length < 2) continue;
+    const start = {
+      x: xScale.getPixelForValue(points[0].x),
+      y: yScale.getPixelForValue(points[0].y),
+    };
+    const end = {
+      x: xScale.getPixelForValue(points[points.length - 1].x),
+      y: yScale.getPixelForValue(points[points.length - 1].y),
+    };
+    if (![start.x, start.y, end.x, end.y].every(Number.isFinite)) continue;
+    const distance = pointToSegmentDistance(point, start, end);
+    if (distance <= bestDistance) {
+      bestDistance = distance;
+      bestIndex = dataset._referenceLineIndex;
+    }
+  }
+  return bestIndex;
+}
+
+function onReferenceLinePointerDown(event) {
+  if (event.button != null && event.button !== 0) return;
+  const index = referenceLineIndexAtPointer(event);
+  if (index < 0) return;
+  referenceLineDrag = { index, pointerId: event.pointerId };
+  referenceLineSuppressClick = true;
+  if (typeof cancelPendingNoteClick === "function") cancelPendingNoteClick();
+  try { event.currentTarget.setPointerCapture(event.pointerId); } catch (_) { /* optional */ }
+  event.currentTarget.style.cursor = "grabbing";
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}
+
+function onReferenceLinePointerMove(event) {
+  if (!referenceLineDrag) {
+    event.currentTarget.style.cursor =
+      referenceLineIndexAtPointer(event) >= 0 ? "grab" : "crosshair";
+    return;
+  }
+  if (event.pointerId !== referenceLineDrag.pointerId || !fullChart) return;
+  const line = referenceLines[referenceLineDrag.index];
+  const point = chartPointFromPointer(fullChart, event);
+  const xScale = fullChart.scales?.x;
+  const yScale = fullChart.scales?.y;
+  if (!line || !point || !xScale || !yScale) return;
+  const x = xScale.getValueForPixel(point.x);
+  const y = yScale.getValueForPixel(point.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  const mode = referenceLineMode(fullChart);
+  if (mode === "loglog") {
+    if (!(x > 0) || !(y > 0)) return;
+    line.intercept = Math.log(y) - line.slope * Math.log(x);
+  } else {
+    line.intercept = y - line.slope * x;
+  }
+  line.mode = mode;
+  applyReferenceLinesToFullChart({ updateControls: false });
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}
+
+function finishReferenceLineDrag(event, { suppressClick = true } = {}) {
+  if (!referenceLineDrag || event.pointerId !== referenceLineDrag.pointerId) return;
+  const line = referenceLines[referenceLineDrag.index];
+  try { event.currentTarget.releasePointerCapture(event.pointerId); } catch (_) { /* optional */ }
+  referenceLineDrag = null;
+  referenceLineSuppressClick = suppressClick;
+  if (suppressClick) {
+    setTimeout(() => {
+      referenceLineSuppressClick = false;
+    }, 0);
+  }
+  event.currentTarget.style.cursor = "crosshair";
+  updateReferenceLineControls(line ? `Moved m=${line.slope}` : "");
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}
+
+function onReferenceLinePointerUp(event) {
+  finishReferenceLineDrag(event);
+}
+
+function onReferenceLinePointerCancel(event) {
+  finishReferenceLineDrag(event, { suppressClick: false });
+}
+
+function onReferenceLineClick(event) {
+  if (!referenceLineSuppressClick) return;
+  referenceLineSuppressClick = false;
+  if (typeof cancelPendingNoteClick === "function") cancelPendingNoteClick();
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}
+
+function detachReferenceLineDragHandlers() {
+  const canvas = referenceLineDragCanvas;
+  if (!canvas) return;
+  canvas.removeEventListener("pointerdown", onReferenceLinePointerDown, true);
+  canvas.removeEventListener("pointermove", onReferenceLinePointerMove, true);
+  canvas.removeEventListener("pointerup", onReferenceLinePointerUp, true);
+  canvas.removeEventListener("pointercancel", onReferenceLinePointerCancel, true);
+  canvas.removeEventListener("click", onReferenceLineClick, true);
+  canvas.style.cursor = "";
+  referenceLineDragCanvas = null;
+  referenceLineDrag = null;
+}
+
+function attachReferenceLineDragHandlers(canvas) {
+  detachReferenceLineDragHandlers();
+  if (!canvas) return;
+  referenceLineDragCanvas = canvas;
+  canvas.addEventListener("pointerdown", onReferenceLinePointerDown, true);
+  canvas.addEventListener("pointermove", onReferenceLinePointerMove, true);
+  canvas.addEventListener("pointerup", onReferenceLinePointerUp, true);
+  canvas.addEventListener("pointercancel", onReferenceLinePointerCancel, true);
+  canvas.addEventListener("click", onReferenceLineClick, true);
 }
 
 /** Restore axis range from data without destroying the Chart instance. */
@@ -2383,6 +2549,7 @@ function renderLossChart() {
 function destroyFullChart() {
   if (!fullChart) return;
   try {
+    detachReferenceLineDragHandlers();
     if (typeof detachFullscreenNoteHandlers === "function") {
       detachFullscreenNoteHandlers(fullChart);
     }
@@ -2407,6 +2574,7 @@ function bindFullscreenCanvasInteractions(canvas) {
     if (typeof cancelPendingNoteClick === "function") cancelPendingNoteClick();
     safeResetFullChartZoom();
   };
+  attachReferenceLineDragHandlers(canvas);
   if (typeof attachFullscreenNoteHandlers === "function") {
     attachFullscreenNoteHandlers(fullChart);
   }
