@@ -56,6 +56,8 @@ const REFERENCE_LINE_COLORS = ["#f0d080", "#f0a8b6", "#8fd9a4", "#b8d4f0", "#7ec
 // Logarithmic axes cannot represent zero. Keep step 0 separate from the
 // genuine step 1 instead of mapping both to x=1.
 const LOG_ZERO_PLOT_X = 0.1;
+const LOG_SCALE_NON_POSITIVE_MESSAGE =
+  "The selected step range contains zero or negative values, so a logarithmic y-axis cannot be plotted.";
 
 function plotXForStep(step, logarithmic) {
   return logarithmic && step === 0 ? LOG_ZERO_PLOT_X : step;
@@ -1830,6 +1832,9 @@ function tauZeroPlotX() {
 }
 
 function mapPointsToXAxis(rawPoints, logX, logY = logX) {
+  const hasNonPositiveY = logY && rawPoints.some(
+    (p) => Number.isFinite(p._axisX) && Number.isFinite(p.y) && p.y <= 0,
+  );
   const valid = rawPoints.filter(
     (p) => Number.isFinite(p._axisX) && Number.isFinite(p.y) && (!logY || p.y > 0),
   );
@@ -1837,7 +1842,7 @@ function mapPointsToXAxis(rawPoints, logX, logY = logX) {
     xAxisMode === "step"
       ? LOG_ZERO_PLOT_X
       : tauZeroPlotX();
-  return valid
+  const mapped = valid
     .filter((p) => !logX || p._axisX >= 0)
     .map((p) => ({
       x: logX && p._axisX === 0 ? zeroPlotX : p._axisX,
@@ -1846,6 +1851,8 @@ function mapPointsToXAxis(rawPoints, logX, logY = logX) {
       _axisX: p._axisX,
       ...(xAxisMode === "tau" ? { _tau: p._axisX } : {}),
     }));
+  mapped._logYBlocked = hasNonPositiveY;
+  return mapped;
 }
 
 function pointsFromSeries(series, rid = runId) {
@@ -1864,6 +1871,10 @@ function pointsFromSeries(series, rid = runId) {
 
 function lineDataHasPoints(lineData) {
   return !!(lineData?.datasets || []).some((d) => (d.data || []).length);
+}
+
+function datasetsHaveBlockedLogY(datasets) {
+  return !!(datasets || []).some((dataset) => dataset?.data?._logYBlocked);
 }
 
 function updateCurveScaleButtons() {
@@ -2197,6 +2208,12 @@ function renderChart(spec) {
   }
 
   if (lineData) {
+    if (datasetsHaveBlockedLogY(lineData.datasets)) {
+      setChartChrome(true);
+      infoEl.textContent = LOG_SCALE_NON_POSITIVE_MESSAGE;
+      if (fullOverlayOpen && fullOverlayMode === "spec") renderFullChart(spec);
+      return;
+    }
     if (!lineDataHasPoints(lineData)) {
       setChartChrome(true);
       infoEl.textContent =
@@ -2630,12 +2647,15 @@ function buildLossDatasets() {
   return datasets;
 }
 
-function createLossChart(canvas, { enablePan = true, onClick = null } = {}) {
-  const datasets = buildLossDatasets();
-  if (!datasets) return null;
+function createLossChart(
+  canvas,
+  { enablePan = true, onClick = null, datasets = null } = {},
+) {
+  const chartDatasets = datasets || buildLossDatasets();
+  if (!chartDatasets || datasetsHaveBlockedLogY(chartDatasets)) return null;
   return new Chart(canvas, {
     type: "line",
-    data: { datasets },
+    data: { datasets: chartDatasets },
     options: lossChartOptions({ enablePan, onClick }),
   });
 }
@@ -2701,7 +2721,12 @@ function renderLossChart() {
 
   section.hidden = false;
   infoEl.textContent = lossInfoText();
-  lossChart = createLossChart(canvas);
+  const datasets = buildLossDatasets();
+  if (datasetsHaveBlockedLogY(datasets)) {
+    infoEl.textContent = LOG_SCALE_NON_POSITIVE_MESSAGE;
+    return;
+  }
+  lossChart = createLossChart(canvas, { datasets });
   if (!lossChart) {
     infoEl.textContent =
       lossScaleMode === "loglog"
@@ -2765,10 +2790,16 @@ function renderFullLossChart() {
     destroyFullChart();
     return;
   }
+  if (datasetsHaveBlockedLogY(datasets)) {
+    infoEl.textContent = LOG_SCALE_NON_POSITIVE_MESSAGE;
+    destroyFullChart();
+    return;
+  }
   destroyFullChart();
   fullChart = createLossChart(canvas, {
     enablePan: false,
     onClick: fullscreenNoteClickHandler,
+    datasets,
   });
   if (fullChart) {
     bindFullscreenCanvasInteractions(canvas);
@@ -2789,6 +2820,11 @@ function renderFullChart(spec) {
       ? (lineData.emptyMessage || "Select layers to compare above")
       : "No curve data yet.";
     // Never leave a stale chart visible after the selection becomes empty.
+    destroyFullChart();
+    return;
+  }
+  if (datasetsHaveBlockedLogY(lineData.datasets)) {
+    infoEl.textContent = LOG_SCALE_NON_POSITIVE_MESSAGE;
     destroyFullChart();
     return;
   }
