@@ -1185,7 +1185,12 @@ function logXAxisTickConfig(axisColor) {
 }
 
 function afterBuildLogXTicks(axis) {
-  const values = thinLogAxisTicks(collectPlotXsFromChart(axis.chart), 8);
+  const width = Number(axis?.width) || Number(axis?.chart?.width) || 800;
+  const maxTicks =
+    xAxisMode === "tau"
+      ? (width < 520 ? 4 : 6)
+      : (width < 520 ? 5 : 8);
+  const values = thinLogAxisTicks(collectPlotXsFromChart(axis.chart), maxTicks);
   axis.ticks = values.map((value) => ({ value }));
 }
 
@@ -1195,12 +1200,30 @@ function formatXAxisValue(value) {
     return String(Math.round(value));
   }
   const abs = Math.abs(value);
+  if (xAxisMode === "tau") {
+    if (abs !== 0 && (abs < 1e-2 || abs >= 1e3)) return value.toExponential(1);
+    return Number(value.toPrecision(3)).toString();
+  }
   if (abs !== 0 && (abs < 1e-3 || abs >= 1e4)) return value.toExponential(2);
   return Number(value.toPrecision(4)).toString();
 }
 
 function xAxisTitle() {
-  return xAxisMode === "tau" ? "τ = ∫ learning rate" : "Step";
+  return xAxisMode === "tau" ? "τ = Ση" : "Step";
+}
+
+function linearXAxisTickConfig(axisColor) {
+  return {
+    color: axisColor,
+    autoSkip: true,
+    autoSkipPadding: xAxisMode === "tau" ? 14 : 8,
+    maxTicksLimit: xAxisMode === "tau" ? 6 : 9,
+    maxRotation: 0,
+    minRotation: 0,
+    callback(value) {
+      return formatXAxisValue(Number(value));
+    },
+  };
 }
 
 function chartScaleOptions({
@@ -1217,7 +1240,7 @@ function chartScaleOptions({
     x: {
       type: logX ? "logarithmic" : "linear",
       title: { display: true, text: logX ? `${xTitle} (log)` : xTitle, color: axis },
-      ticks: logX ? logXAxisTickConfig(axis) : { color: axis },
+      ticks: logX ? logXAxisTickConfig(axis) : linearXAxisTickConfig(axis),
       ...(logX ? { afterBuildTicks: afterBuildLogXTicks } : {}),
       grid: { color: grid },
     },
@@ -1794,13 +1817,12 @@ function setChartChrome(hasSeriesChart) {
   updateXAxisButtons();
 }
 
-function learningRateIntegralAt(log, step) {
+function learningRateAtStep(log, step) {
   const points = log?.lr;
   if (!Array.isArray(points) || !points.length || !Number.isFinite(step)) return NaN;
-  if (step <= 0) return 0;
-  if (step <= points[0].x) return step * points[0].y;
+  if (step <= points[0].x) return points[0].y;
   const last = points[points.length - 1];
-  if (step >= last.x) return last.tau + (step - last.x) * last.y;
+  if (step >= last.x) return last.y;
 
   let lo = 0;
   let hi = points.length - 1;
@@ -1812,21 +1834,49 @@ function learningRateIntegralAt(log, step) {
   const left = points[lo];
   const right = points[hi];
   const span = right.x - left.x;
-  if (!(span > 0)) return left.tau;
+  if (!(span > 0)) return left.y;
   const fraction = (step - left.x) / span;
-  const lrAtStep = left.y + fraction * (right.y - left.y);
-  return left.tau + (step - left.x) * (left.y + lrAtStep) / 2;
+  return left.y + fraction * (right.y - left.y);
+}
+
+function ensureLearningRatePrefix(log) {
+  if (Array.isArray(log?.lrPrefix)) return log.lrPrefix;
+  const points = log?.lr;
+  if (!Array.isArray(points) || !points.length) return null;
+  const maxStep = Math.max(0, Math.floor(points[points.length - 1].x));
+  const prefix = new Array(maxStep + 1).fill(0);
+  for (let step = 0; step < maxStep; step += 1) {
+    const lr = learningRateAtStep(log, step);
+    prefix[step + 1] = prefix[step] + (Number.isFinite(lr) ? lr : 0);
+  }
+  log.lrPrefix = prefix;
+  return prefix;
+}
+
+function cumulativeLearningRateAt(log, step) {
+  if (!Number.isFinite(step) || step <= 0) return 0;
+  const prefix = ensureLearningRatePrefix(log);
+  if (!prefix) return NaN;
+  const whole = Math.floor(step);
+  const covered = Math.min(whole, prefix.length - 1);
+  let tau = prefix[covered];
+  if (whole > covered) {
+    tau += (whole - covered) * learningRateAtStep(log, covered);
+  }
+  const fraction = step - whole;
+  if (fraction > 0) tau += fraction * learningRateAtStep(log, whole);
+  return tau;
 }
 
 function xAxisValueForStep(step, rid = runId) {
   if (xAxisMode === "step") return step;
-  return learningRateIntegralAt(lossLogByRun.get(rid), step);
+  return cumulativeLearningRateAt(lossLogByRun.get(rid), step);
 }
 
 function tauZeroPlotX() {
   const candidates = [];
   for (const log of lossLogByRun.values()) {
-    const tauAtOne = learningRateIntegralAt(log, 1);
+    const tauAtOne = cumulativeLearningRateAt(log, 1);
     if (Number.isFinite(tauAtOne) && tauAtOne > 0) candidates.push(tauAtOne / 10);
   }
   return candidates.length ? Math.min(...candidates) : Number.EPSILON;
@@ -2320,14 +2370,6 @@ function parseLossCsv(text) {
   const train = toPoints(trainByStep);
   const val = toPoints(valByStep);
   const lr = toPoints(lrByStep);
-  let tau = 0;
-  for (let i = 0; i < lr.length; i += 1) {
-    if (i > 0) {
-      const prev = lr[i - 1];
-      tau += (lr[i].x - prev.x) * (prev.y + lr[i].y) / 2;
-    }
-    lr[i].tau = tau;
-  }
   if (!train.length && !val.length) return null;
   return { train, val, lr };
 }
@@ -2462,7 +2504,7 @@ function lossChartScaleOptions() {
         text: logX ? `${xAxisTitle()} (log)` : xAxisTitle(),
         color: axis,
       },
-      ticks: logX ? logXAxisTickConfig(axis) : { color: axis },
+      ticks: logX ? logXAxisTickConfig(axis) : linearXAxisTickConfig(axis),
       ...(logX ? { afterBuildTicks: afterBuildLogXTicks } : {}),
       grid: { color: grid },
     },
