@@ -84,8 +84,15 @@ let lossStepMax = null;
 let fullChart = null;
 let fullOverlayOpen = false;
 let fullOverlayMode = null;
+let definitionResizeObserver = null;
 /** Snapshot of main-page compare state while fullscreen is open. */
 let fullscreenCompareSnapshot = null;
+
+function displaySpecLabel(spec) {
+  return typeof observableDisplayLabel === "function"
+    ? observableDisplayLabel(spec)
+    : spec?.label || spec?.id || "Observable";
+}
 
 function snapshotCompareState() {
   return {
@@ -808,7 +815,7 @@ function renderSpecGroups(specs) {
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = `spec-chip${spec.id === activeSpecId ? " active" : ""}`;
-      chip.textContent = spec.label;
+      chip.textContent = displaySpecLabel(spec);
       chip.addEventListener("click", () => {
         activeSpecId = spec.id;
         renderSpecGroups(specs);
@@ -1511,7 +1518,7 @@ function buildLineDatasets(spec) {
     return {
       legend: false,
       datasets: [{
-        label: spec.label,
+        label: displaySpecLabel(spec),
         data: pointsFromSeries(spec.series),
         borderColor: color,
         backgroundColor: `${color}22`,
@@ -1526,13 +1533,14 @@ function buildLineDatasets(spec) {
 }
 
 function chartTitleFor(spec) {
+  const label = displaySpecLabel(spec);
   if (compareRuns && canCompareRuns()) {
     return setupResidualMode
-      ? `${spec.label} · residuals vs baseline`
-      : `${spec.label} · setup compare`;
+      ? `${label} · residuals vs baseline`
+      : `${label} · setup compare`;
   }
-  if (compareLayers && canCompareLayers(spec)) return `${spec.label} · layer compare`;
-  return spec.label;
+  if (compareLayers && canCompareLayers(spec)) return `${label} · layer compare`;
+  return label;
 }
 
 function chartInfoFor(spec, lineData = null) {
@@ -1566,6 +1574,7 @@ function renderSpecDefinition(spec) {
   const el = document.getElementById("chartDef");
   if (!el) return;
   if (!spec) {
+    definitionResizeObserver?.disconnect();
     el.hidden = true;
     el.innerHTML = "";
     return;
@@ -1575,6 +1584,7 @@ function renderSpecDefinition(spec) {
     ? buildSpecDirectFormula(spec)
     : null;
   if (!direct?.tex) {
+    definitionResizeObserver?.disconnect();
     el.hidden = true;
     el.innerHTML = "";
     return;
@@ -1584,9 +1594,10 @@ function renderSpecDefinition(spec) {
   if (window.katex) {
     try {
       mathHtml = katex.renderToString(direct.tex, {
-        throwOnError: false,
+        throwOnError: true,
         displayMode: true,
-        output: "html",
+        fleqn: true,
+        output: "htmlAndMathml",
       });
     } catch (_) {
       mathHtml = `<code>${escapeHtml(direct.tex)}</code>`;
@@ -1600,13 +1611,35 @@ function renderSpecDefinition(spec) {
   const desc =
     direct.description ||
     (typeof buildSpecPlainDescription === "function" ? buildSpecPlainDescription(spec) : "");
+  const formulaLineCount = direct.tex.split("\\\\[2pt]").length;
+  el.classList.toggle("chart-def-dense", formulaLineCount >= 5);
   el.innerHTML = [
     `<div class="chart-def-row"><span class="chart-def-label">Definition</span>` +
       `<a class="chart-def-link" href="${href}" target="_blank" rel="noopener">All formulas</a></div>`,
     desc ? `<p class="chart-def-desc">${escapeHtml(desc)}</p>` : "",
-    `<div class="chart-def-eq" title="${escapeHtml(direct.title)}">${mathHtml}</div>`,
+    `<div class="chart-def-math">` +
+      `<div class="chart-def-eq" role="region" tabindex="0" ` +
+        `aria-label="Exact mathematical definition" title="${escapeHtml(direct.title)}">` +
+        `${mathHtml}</div>` +
+      `<p class="chart-def-scroll-hint" hidden>Scroll horizontally to view the complete formula</p>` +
+    `</div>`,
   ].filter(Boolean).join("");
   el.hidden = false;
+
+  const equation = el.querySelector(".chart-def-eq");
+  const hint = el.querySelector(".chart-def-scroll-hint");
+  const updateOverflowState = () => {
+    if (!equation?.isConnected) return;
+    const overflowing = equation.scrollWidth > equation.clientWidth + 1;
+    equation.classList.toggle("is-overflowing", overflowing);
+    if (hint) hint.hidden = !overflowing;
+  };
+  definitionResizeObserver?.disconnect();
+  if (equation && typeof ResizeObserver !== "undefined") {
+    definitionResizeObserver = new ResizeObserver(updateOverflowState);
+    definitionResizeObserver.observe(equation);
+  }
+  requestAnimationFrame(updateOverflowState);
 }
 
 function renderChart(spec) {

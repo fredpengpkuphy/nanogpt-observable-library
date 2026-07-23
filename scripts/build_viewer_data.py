@@ -58,6 +58,30 @@ def _temporal_label(temporal: list) -> str:
     return ">".join(parts)
 
 
+def temporal_from_canonical_id(canonical_id: str) -> list:
+    parts = str(canonical_id or "").split("::", 4)
+    if len(parts) < 5 or not parts[4] or parts[4] == "-":
+        return []
+    temporal = []
+    for raw in parts[4].split("|"):
+        match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)\((.*)\)", raw)
+        if not match:
+            temporal.append([raw, {}])
+            continue
+        params = {}
+        if match.group(2):
+            for pair in match.group(2).split(","):
+                key, sep, value = pair.partition("=")
+                if not sep:
+                    continue
+                try:
+                    params[key.strip()] = json.loads(value)
+                except json.JSONDecodeError:
+                    params[key.strip()] = value.strip()
+        temporal.append([match.group(1), params])
+    return temporal
+
+
 def family_id(
     source_kind: str,
     role: str,
@@ -157,13 +181,13 @@ def build_manifest(obs_dir: Path, run_id: str, curve_paths: dict[str, str]) -> d
         ui_module = selector_to_ui_module(spec["selector"])
         layer, role = parse_layer_role(ui_module)
         transforms = spec.get("transforms") or []
-        temporal = spec.get("temporal") or []
+        cid = spec["canonical_id"]
+        temporal = spec.get("temporal") or temporal_from_canonical_id(cid)
         transform_label = ">".join(transforms) if transforms else None
         temporal_label = _temporal_label(temporal) or None
         fid = family_id(
             spec["source_kind"], role, spec["reduction"], transforms, temporal
         )
-        cid = spec["canonical_id"]
         entry = {
             "id": cid,
             "ui_module": ui_module,

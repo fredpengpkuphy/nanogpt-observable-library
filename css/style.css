@@ -998,12 +998,16 @@ body.curator-mode .app-header {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 0.4rem;
+  min-width: 0;
+  gap: 0.55rem;
   margin-top: 0;
-  padding: 0.65rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
+  padding: 0.75rem 0.85rem 0.85rem;
+  border: 1px solid rgba(159, 212, 228, 0.18);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(159, 212, 228, 0.055), transparent 48%),
+    rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
   font-size: 0.84rem;
   line-height: 1.55;
   color: #ffffff;
@@ -1014,14 +1018,14 @@ body.curator-mode .app-header {
   flex: none;
   width: 100%;
   margin: 0;
-  font-size: 0.86rem;
-  line-height: 1.55;
-  color: #ffffff;
+  max-width: 88ch;
+  font-size: 0.85rem;
+  line-height: 1.58;
+  color: rgba(255, 255, 255, 0.88);
   font-weight: 400;
   font-family: var(--font-body);
   white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .chart-def[hidden] {
@@ -1033,16 +1037,26 @@ body.curator-mode .app-header {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  padding-bottom: 0.42rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .chart-def-label {
   flex-shrink: 0;
   font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(159, 212, 228, 0.78);
   font-family: var(--font-ui);
+}
+
+.chart-def-math {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 9px;
+  background: rgba(5, 10, 14, 0.28);
+  overflow: hidden;
 }
 
 .chart-def-eq {
@@ -1051,23 +1065,62 @@ body.curator-mode .app-header {
   max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 0.15rem 0;
+  overscroll-behavior-x: contain;
+  padding: 0.62rem 0.72rem;
+  font-size: clamp(0.82rem, 0.76rem + 0.18vw, 0.94rem);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(159, 212, 228, 0.42) transparent;
+}
+
+.chart-def-dense .chart-def-eq {
+  font-size: clamp(0.76rem, 0.71rem + 0.16vw, 0.86rem);
+}
+
+.chart-def-eq::-webkit-scrollbar,
+.ref-obs-formula::-webkit-scrollbar {
+  height: 6px;
+}
+
+.chart-def-eq::-webkit-scrollbar-thumb,
+.ref-obs-formula::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(159, 212, 228, 0.4);
+}
+
+.chart-def-eq:focus-visible {
+  outline: 2px solid rgba(159, 212, 228, 0.72);
+  outline-offset: -2px;
 }
 
 .chart-def-eq .katex,
-.ref-obs-formula .katex,
-.katex {
-  font-size: 1.08em;
+.ref-obs-formula .katex {
+  font-size: 1em;
   color: #ffffff;
 }
 
 .chart-def-eq .katex-display {
-  margin: 0.25rem 0;
+  margin: 0;
   text-align: left;
+}
+
+.chart-def-eq .katex-display.fleqn {
+  padding-left: 0;
 }
 
 .chart-def-eq .katex-display > .katex {
   text-align: left;
+}
+
+.chart-def-scroll-hint {
+  margin: 0;
+  padding: 0.28rem 0.72rem 0.38rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
+  color: rgba(255, 255, 255, 0.48);
+  font: 600 0.66rem/1.35 var(--font-ui);
+}
+
+.chart-def-scroll-hint[hidden] {
+  display: none;
 }
 
 .chart-def-sep {
@@ -1077,18 +1130,43 @@ body.curator-mode .app-header {
 }
 
 .chart-def-link {
-  align-self: flex-start;
-  margin-left: 0;
+  align-self: center;
   flex-shrink: 0;
-  font-size: 0.78rem;
+  padding: 0.2rem 0.48rem;
+  border: 1px solid rgba(232, 200, 136, 0.2);
+  border-radius: 999px;
+  background: rgba(232, 200, 136, 0.055);
+  font-size: 0.72rem;
   font-weight: 700;
   color: var(--sand);
   text-decoration: none;
   font-family: var(--font-ui);
 }
 
-.chart-def-link:hover {
-  text-decoration: underline;
+.chart-def-link:hover,
+.chart-def-link:focus-visible {
+  border-color: rgba(232, 200, 136, 0.42);
+  background: rgba(232, 200, 136, 0.1);
+  text-decoration: none;
+}
+
+@media (max-width: 720px) {
+  .chart-def {
+    gap: 0.48rem;
+    padding: 0.65rem;
+    border-radius: 10px;
+  }
+
+  .chart-def-desc {
+    font-size: 0.82rem;
+    line-height: 1.52;
+  }
+
+  .chart-def-eq,
+  .chart-def-dense .chart-def-eq {
+    padding: 0.55rem 0.6rem;
+    font-size: 0.76rem;
+  }
 }
 
 .chart-actions {

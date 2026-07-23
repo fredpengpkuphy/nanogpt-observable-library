@@ -109,6 +109,17 @@ function pipelineOpsForSpec(spec) {
   };
 }
 
+function observableDisplayLabel(spec, knownTemporalOps = null) {
+  const base =
+    spec?.label || `${spec?.source_kind || "observable"} · ${spec?.reduction || ""}`;
+  const temporalOps = knownTemporalOps || pipelineOpsForSpec(spec).temporalOps;
+  if (!temporalOps.length) return base;
+  if (temporalOps.every((op) => base.includes(op))) {
+    return base.replace(temporalOps.join(">"), temporalOps.join(" → "));
+  }
+  return `${base} · ${temporalOps.join(" → ")}`;
+}
+
 function escapeTexPath(sel) {
   return String(sel || "")
     .replace(/\\/g, "\\textbackslash{}")
@@ -120,10 +131,16 @@ function escapeTexPath(sel) {
 function sourceCallTex(spec) {
   const path = escapeTexPath(spec.selector || spec.ui_module || "?");
   const kind = spec.source_kind || "tensor";
+  if (kind === "grad") {
+    return `\\nabla_{\\Theta^{[\\mathtt{${path}}]}}\\mathcal{L}_t`;
+  }
+  if (kind === "update") {
+    return (
+      `(\\Theta_t-\\Theta_{t^-})^{[\\mathtt{${path}}]}`
+    );
+  }
   const map = {
     weight: "\\Theta",
-    grad: "G",
-    update: "U",
     opt_m: "M",
     opt_v: "V",
     activation: "A",
@@ -209,20 +226,22 @@ function applyReductionTex(reduction, x) {
     case "row_std_mean":
       return {
         main:
-          `\\operatorname{row\\,std}(${x})=\\dfrac{1}{r}\\sum_{i=1}^{r}` +
-          `\\sqrt{\\dfrac{1}{c-1}\\sum_{j=1}^{c}` +
-          `\\big((${x})_{ij}-\\overline{x}_{i,:}\\big)^2}`,
+          `\\operatorname{row\\,std}(${x})=` +
+          `\\dfrac{1}{r}\\sum_{i=1}^{r}s_i`,
         details: [
+          `s_i=\\sqrt{\\dfrac{1}{c-1}\\sum_{j=1}^{c}` +
+            `\\big((${x})_{ij}-\\overline{x}_{i,:}\\big)^2}`,
           `\\overline{x}_{i,:}=\\dfrac{1}{c}\\sum_{j=1}^{c}(${x})_{ij}`,
         ],
       };
     case "col_std_mean":
       return {
         main:
-          `\\operatorname{col\\,std}(${x})=\\dfrac{1}{c}\\sum_{j=1}^{c}` +
-          `\\sqrt{\\dfrac{1}{r-1}\\sum_{i=1}^{r}` +
-          `\\big((${x})_{ij}-\\overline{x}_{:,j}\\big)^2}`,
+          `\\operatorname{col\\,std}(${x})=` +
+          `\\dfrac{1}{c}\\sum_{j=1}^{c}s_j`,
         details: [
+          `s_j=\\sqrt{\\dfrac{1}{r-1}\\sum_{i=1}^{r}` +
+            `\\big((${x})_{ij}-\\overline{x}_{:,j}\\big)^2}`,
           `\\overline{x}_{:,j}=\\dfrac{1}{r}\\sum_{i=1}^{r}(${x})_{ij}`,
         ],
       };
@@ -232,47 +251,61 @@ function applyReductionTex(reduction, x) {
           `\\operatorname{erank}(${x})=` +
           `\\exp\\!\\left(-\\sum_{k\\in K}p_k\\log p_k\\right)`,
         details: [
-          `M=\\operatorname{mat}(${x})-\\mathbf{1}\\,\\overline m^{\\!\\top}`,
+          `A=\\operatorname{mat}(${x})\\in\\mathbb{R}^{n\\times F}`,
+          `\\overline a=\\dfrac{1}{n}\\sum_{i=1}^{n}A_{i,:},\\quad ` +
+            `M=A-\\mathbf{1}\\,\\overline a^{\\!\\top}`,
           `K=\\{k:\\sigma_k(M)^2>10^{-12}\\}`,
           `p_k=\\dfrac{\\sigma_k(M)^2}{\\sum_{j\\in K}\\sigma_j(M)^2}`,
-          `\\text{defined when }K\\ne\\varnothing`,
+          `\\text{defined when }n\\ge2\\text{ and }K\\ne\\varnothing`,
         ],
       };
     case "attention_entropy_mean":
       return {
         main:
           `\\operatorname{mean\\,attn\\,entropy}(${x})=` +
-          `\\mathbb{E}_{b,h,q}\\!\\left[-\\sum_{k=0}^{T-1}` +
-          `\\widetilde{${x}}_{b,h,q,k}\\log\\widetilde{${x}}_{b,h,q,k}\\right]`,
-        details: [`\\widetilde{${x}}=\\max(${x},10^{-12})`],
+          `\\mathbb{E}_{b,h,q}[H_{b,h,q}]`,
+        details: [
+          `H_{b,h,q}=-\\sum_{k=0}^{T-1}` +
+            `\\widetilde{${x}}_{b,h,q,k}\\log\\widetilde{${x}}_{b,h,q,k}`,
+          `\\widetilde{${x}}=\\max(${x},10^{-12})`,
+        ],
       };
     case "attention_entropy_min":
       return {
         main:
           `\\operatorname{min\\,attn\\,entropy}(${x})=` +
-          `\\min_{b,h,q}\\!\\left[-\\sum_{k=0}^{T-1}` +
-          `\\widetilde{${x}}_{b,h,q,k}\\log\\widetilde{${x}}_{b,h,q,k}\\right]`,
+          `\\min_{b,h,q}H_{b,h,q}`,
         details: [
+          `H_{b,h,q}=-\\sum_{k=0}^{T-1}` +
+            `\\widetilde{${x}}_{b,h,q,k}\\log\\widetilde{${x}}_{b,h,q,k}`,
           `\\widetilde{${x}}=\\max(${x},\\varepsilon),\\quad\\varepsilon=10^{-12}`,
-          `\\operatorname{min\\,attn\\,entropy}(${x})=` +
-            `-(T-1)\\varepsilon\\log\\varepsilon\\quad(q=0)`,
+          `&0\\le\\operatorname{min\\,attn\\,entropy}(${x})\\le` +
+            `-(T-1)\\varepsilon\\log\\varepsilon,\\quad\\text{using }q=0`,
         ],
       };
     case "attention_sink_first_token":
-      return (
-        `\\operatorname{first\\,token\\,mass}(${x})=` +
-        `\\mathbb{E}_{b,h,\\,q=1,\\ldots,T-1}[(${x})_{b,h,q,0}]`
-      );
+      return {
+        main:
+          `\\operatorname{first\\,token\\,mass}(${x})=` +
+          `\\mathbb{E}_{b,h,\\,q=1,\\ldots,T-1}[(${x})_{b,h,q,0}]`,
+        details: [`\\text{defined when }T\\ge2`],
+      };
     case "attention_sink_domination":
       return (
         `\\operatorname{sink\\,domination}(${x})=` +
         `\\max_{0\\le k<T}\\mathbb{E}_{b,h,\\,q=0,\\ldots,T-1}[(${x})_{b,h,q,k}]`
       );
     case "attention_sink_ratio":
-      return (
-        `\\operatorname{first\\,token\\,ratio}(${x})=` +
-        `T\\,\\mathbb{E}_{b,h,\\,q=1,\\ldots,T-1}[(${x})_{b,h,q,0}]`
-      );
+      return {
+        main:
+          `\\operatorname{first\\,token\\,ratio}(${x})=` +
+          `T\\,\\mathbb{E}_{b,h,\\,q=1,\\ldots,T-1}[(${x})_{b,h,q,0}],` +
+          `\\quad T\\ge2`,
+        details: [
+          `\\operatorname{first\\,token\\,ratio}(${x})=` +
+            `\\mathbb{E}_{b,h,q}[(${x})_{b,h,q,0}],\\quad T=1`,
+        ],
+      };
     case "activation_rate":
       return (
         `\\operatorname{activation\\,rate}(${x})=` +
@@ -302,11 +335,11 @@ function applyReductionTex(reduction, x) {
       return {
         main:
           `\\operatorname{massive\\,neuron\\,frac}(${x})=` +
-          `\\dfrac{1}{F}\\sum_{f=1}^{F}\\mathbf{1}\\!\\left[` +
-          `\\max_{b,q}\\lvert(${x})_{b,q,f}\\rvert>3r\\right]`,
+          `\\dfrac{1}{F}\\sum_{f=1}^{F}\\mathbf{1}[a_f>3r]`,
         details: [
+          `a_f=\\max_{b,\\tau}\\lvert(${x})_{b,\\tau,f}\\rvert`,
           `r=\\operatorname{RMS}(${x})=` +
-            `\\sqrt{(BTF)^{-1}\\sum_{b,q,j}(${x})_{b,q,j}^{2}}`,
+            `\\sqrt{(BTF)^{-1}\\sum_{b,\\tau,j}(${x})_{b,\\tau,j}^{2}}`,
           `\\text{defined when }r>10^{-12}`,
         ],
       };
@@ -322,39 +355,67 @@ function temporalStageTex(raw, inputName, outputName) {
   const args = parseOpArgs(raw);
   if (name === "identity") return `${outputName}_t=${inputName}_t`;
   if (name === "delta") {
-    return `${outputName}_t=\\Delta ${inputName}_t=${inputName}_t-${inputName}_{t-1}`;
+    const previous = `t^{-}_{${inputName}}`;
+    return {
+      main:
+        `${outputName}_t=\\Delta ${inputName}_t=` +
+        `${inputName}_t-${inputName}_{${previous}}`,
+      details: [
+        `${previous}=\\text{previous observation with finite }${inputName}`,
+      ],
+    };
   }
   if (name === "ema") {
     const a = parseNamedArg(args, "alpha") || "0.9";
-    return (
-      `${outputName}_t=\\operatorname{EMA}_{${a}}(${inputName})_t=` +
-      `${a}\\,${outputName}_{t-1}+(1-${a})${inputName}_t`
-    );
+    const previous = `t^{-}_{${inputName}}`;
+    return {
+      main:
+        `${outputName}_t=\\operatorname{EMA}_{${a}}(${inputName})_t=` +
+        `${a}\\,${outputName}_{${previous}}+(1-${a})${inputName}_t`,
+      details: [
+        `${previous}=\\text{previous observation with finite }${inputName}`,
+        `${outputName}_{t_0}=${inputName}_{t_0},\\quad ` +
+          `t_0=\\text{first finite input}`,
+      ],
+    };
   }
   if (name === "slope") {
     const w = parseNamedArg(args, "window") || parseNamedArg(args, "w") || "5";
-    return (
-      `${outputName}_t=` +
-      `\\operatorname{slope}(${inputName}_{t-n+1:t})=` +
-      `\\dfrac{\\sum_{j=0}^{n-1}(j-\\overline j)` +
-      `(${inputName}_{t-n+1+j}-\\overline{${inputName}})}` +
-      `{\\sum_{j=0}^{n-1}(j-\\overline j)^2},\\quad 2\\le n\\le${w}`
-    );
+    return {
+      main:
+        `${outputName}_t=` +
+        `\\operatorname{slope}(u_0,\\ldots,u_{n-1})`,
+      details: [
+        `\\operatorname{slope}(u_0,\\ldots,u_{n-1})=` +
+          `\\dfrac{\\sum_{j=0}^{n-1}(j-\\overline j)(u_j-\\overline u)}{D}`,
+        `D=\\sum_{j=0}^{n-1}(j-\\overline j)^2,\\quad 2\\le n\\le${w}`,
+        `u_0,\\ldots,u_{n-1}=\\text{latest }n\\text{ finite values of }${inputName}`,
+        `\\overline j=\\dfrac{n-1}{2}`,
+        `\\overline u=\\dfrac{1}{n}\\sum_{j=0}^{n-1}u_j`,
+      ],
+    };
   }
   if (name === "rolling_std") {
     const w = parseNamedArg(args, "window") || parseNamedArg(args, "w") || "5";
-    return (
-      `${outputName}_t=` +
-      `\\operatorname{rolling\\,std}(${inputName}_{t-n+1:t})=` +
-      `\\sqrt{\\dfrac{1}{n}\\sum_{j=0}^{n-1}` +
-      `(${inputName}_{t-j}-\\overline{${inputName}})^2},\\quad 2\\le n\\le${w}`
-    );
+    return {
+      main:
+        `${outputName}_t=` +
+        `\\operatorname{rolling\\,std}(u_0,\\ldots,u_{n-1})=` +
+        `\\sqrt{\\dfrac{1}{n}\\sum_{j=0}^{n-1}(u_j-\\overline u)^2},` +
+        `\\quad 2\\le n\\le${w}`,
+      details: [
+        `u_0,\\ldots,u_{n-1}=\\text{latest }n\\text{ finite values of }${inputName}`,
+        `\\overline u=\\dfrac{1}{n}\\sum_{j=0}^{n-1}u_j`,
+      ],
+    };
   }
   if (name === "curvature") {
-    return (
-      `${outputName}_t=\\Delta^2${inputName}_t=` +
-      `${inputName}_t-2${inputName}_{t-1}+${inputName}_{t-2}`
-    );
+    return {
+      main: `${outputName}_t=\\Delta^2${inputName}_t=u_2-2u_1+u_0`,
+      details: [
+        `u_0,u_1,u_2=\\text{latest three finite values of }${inputName}`,
+      ],
+    };
   }
   return `${outputName}_t=${inputName}_t`;
 }
@@ -373,7 +434,12 @@ function buildFormulaLines(prefixLines, scalarTex, scalarDetails, temporalOps) {
   let inputName = scalarName;
   temporalOps.forEach((raw, index) => {
     const outputName = index === temporalOps.length - 1 ? "y" : `z^{(${index + 1})}`;
-    lines.push(temporalStageTex(raw, inputName, outputName));
+    const stage = temporalStageTex(raw, inputName, outputName);
+    if (typeof stage === "string") {
+      lines.push(stage);
+    } else {
+      lines.push(stage.main, ...(stage.details || []));
+    }
     inputName = outputName;
   });
   return `\\begin{aligned}${lines.map(alignFormulaLine).join("\\\\[2pt]")}\\end{aligned}`;
@@ -519,13 +585,13 @@ function reductionMeaningEn(reduction, sourceKind) {
     case "positive_fraction":
       return "reports the fraction of positive values";
     case "entropy": {
-      const caveat = sourceKind === "logits"
-        ? " For logits, this describes score magnitudes rather than prediction uncertainty."
-        : "";
-      return (
-        "measures how evenly the total magnitude is distributed; higher means more diffuse" +
-        caveat
-      );
+      if (sourceKind === "logits") {
+        return (
+          "measures how evenly absolute score magnitudes are distributed; " +
+          "it is not prediction uncertainty"
+        );
+      }
+      return "measures how evenly the total magnitude is distributed; higher means more diffuse";
     }
     case "spectral_norm":
     case "top_singular_value":
@@ -574,8 +640,8 @@ function temporalMeaningEn(raw) {
   const name = parseOpName(raw);
   const args = parseOpArgs(raw);
   if (name === "identity") return "keeps the value unchanged";
-  if (name === "delta") return "measures the change from the previous observation";
-  if (name === "ema") return "smooths the changes with an exponential moving average";
+  if (name === "delta") return "measures the change from the previous available observation";
+  if (name === "ema") return "smooths the values with an exponential moving average";
   if (name === "slope") {
     const w = parseNamedArg(args, "window") || parseNamedArg(args, "w") || "5";
     return `measures the recent trend over the latest ${w} observations`;
@@ -603,12 +669,23 @@ function buildSpecPlainDescription(spec) {
   const { tensorOps, temporalOps } = pipelineOpsForSpec(spec);
   const transform = transformClauseEn(tensorOps, spec);
   const reduction = reductionMeaningEn(spec.reduction, spec.source_kind);
+  const temporalNames = temporalOps.map(parseOpName);
+
+  if (
+    spec.source_kind === "weight" &&
+    spec.reduction === "l2_norm" &&
+    temporalNames.join("|") === "delta|ema"
+  ) {
+    return (
+      `Tracks ${source} at ${place}. It smooths the change in overall magnitude ` +
+      "between available observations."
+    );
+  }
 
   if (isDegenerateCenteredMean(spec, tensorOps)) {
     return (
-      `Tracks ${source} at ${place}. It averages the values after subtracting the batch ` +
-      "average, so the result should be zero. Tiny values are numerical noise; the chart " +
-      "shows their recent trend."
+      `Tracks ${source} at ${place}. Batch-centering makes its overall mean zero apart ` +
+      "from numerical noise; the chart shows the recent slope of that residual."
     );
   }
 
@@ -640,7 +717,7 @@ function buildSpecDirectFormula(spec) {
   const scalarDetails =
     typeof renderedReduction === "string" ? [] : renderedReduction.details || [];
   const tex = buildFormulaLines(lines, scalar, scalarDetails, temporalOps);
-  const title = spec.label || `${spec.source_kind} · ${spec.reduction}`;
+  const title = observableDisplayLabel(spec, temporalOps);
   return { tex, title, description: buildSpecPlainDescription(spec) };
 }
 

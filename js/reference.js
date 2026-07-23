@@ -202,9 +202,10 @@ function renderCard(obs) {
   if (window.katex) {
     try {
       mathHtml = katex.renderToString(tex, {
-        throwOnError: false,
+        throwOnError: true,
         displayMode: true,
-        output: "html",
+        fleqn: true,
+        output: "htmlAndMathml",
       });
     } catch (_) {
       mathHtml = `<code>${escapeHtml(tex)}</code>`;

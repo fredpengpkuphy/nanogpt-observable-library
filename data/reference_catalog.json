@@ -20633,11 +20633,23 @@
     },
     {
       "id": "weight::transformer.wte.weight::-::l2_norm::delta()|ema(alpha=0.95)",
-      "label": "weight · l2_norm",
+      "label": "weight · l2_norm · delta() → ema(alpha=0.95)",
       "selector": "transformer.wte.weight",
       "source_kind": "weight",
       "reduction": "l2_norm",
       "transforms": [],
+      "temporal": [
+        [
+          "delta",
+          {}
+        ],
+        [
+          "ema",
+          {
+            "alpha": 0.95
+          }
+        ]
+      ],
       "ui_module": "wte",
       "layer": null,
       "role": "wte",
@@ -20645,12 +20657,24 @@
     },
     {
       "id": "activation::transformer.h.0.mlp.c_fc::center::mean::delta()|slope(window=5)",
-      "label": "activation · center · mean",
+      "label": "activation · center · mean · delta() → slope(window=5)",
       "selector": "transformer.h.0.mlp.c_fc",
       "source_kind": "activation",
       "reduction": "mean",
       "transforms": [
         "center"
+      ],
+      "temporal": [
+        [
+          "delta",
+          {}
+        ],
+        [
+          "slope",
+          {
+            "window": 5
+          }
+        ]
       ],
       "ui_module": "h.0.mlp.c_fc",
       "layer": 0,
