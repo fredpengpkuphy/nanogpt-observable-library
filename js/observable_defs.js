@@ -318,9 +318,9 @@ function modulePlaceEn(spec) {
   const layerPrefix = L == null ? "" : `layer ${L} `;
 
   if (role === "wte" || sel.includes("wte")) {
-    return "the tied token-embedding / LM-head matrix (wte)";
+    return "the token embedding / LM head (wte)";
   }
-  if (role === "wpe" || sel.includes("wpe")) return "the position-embedding matrix (wpe)";
+  if (role === "wpe" || sel.includes("wpe")) return "the position embedding (wpe)";
   if (role === "ln_f" || sel.includes("ln_f")) return "the final LayerNorm (ln_f)";
   if (role === "lm_head" || sel.includes("lm_head")) return "the LM head";
   if (role === "ln_1" || /\.ln_1/.test(sel)) {
@@ -357,22 +357,16 @@ function modulePlaceEn(spec) {
 function activationObjectEn(spec, isInput) {
   const role = spec.role || "";
   if (isInput) {
-    if (role === "mlp.c_fc") {
-      return "input passed to the up-projection (the ln_2 output), before the affine map";
-    }
-    if (role === "attn.c_attn") {
-      return "input passed to the QKV projection (the ln_1 output), before the affine map";
-    }
-    if (role === "attn.c_proj") {
-      return "concatenated attention-head output passed into c_proj, before the affine map";
-    }
-    return "input tensor passed to this Linear, before its affine map";
+    if (role === "mlp.c_fc") return "the input";
+    if (role === "attn.c_attn") return "the input";
+    if (role === "attn.c_proj") return "the combined attention-head output";
+    return "the module input";
   }
-  if (role === "mlp.c_fc") return "affine up-projection output, before GELU";
-  if (role === "mlp.c_proj") return "affine down-projection output, before dropout";
-  if (role === "attn.c_attn") return "concatenated Q/K/V affine-projection output";
-  if (role === "attn.c_proj") return "attention affine-projection output, before residual dropout";
-  return "output tensor of this Linear";
+  if (role === "mlp.c_fc") return "the output before GELU";
+  if (role === "mlp.c_proj") return "the MLP down-projection output";
+  if (role === "attn.c_attn") return "the combined Q/K/V projection output";
+  if (role === "attn.c_proj") return "the attention output projection";
+  return "the module output";
 }
 
 function sourceObjectEn(spec) {
@@ -380,39 +374,33 @@ function sourceObjectEn(spec) {
   switch (spec.source_kind) {
     case "weight":
       if (role.startsWith("ln_") || role === "ln_f") {
-        return "LayerNorm scale parameter vector Θ_t";
+        return "the LayerNorm scale weights";
       }
       if (role === "wte") {
-        return "tied vocabulary×embedding parameter matrix Θ_t";
+        return "the shared weights";
       }
       if (role === "wpe") {
-        return "position×embedding parameter matrix Θ_t";
+        return "the weights";
       }
-      return "Linear parameter matrix Θ_t (PyTorch layout: out × in)";
+      return "the parameter weights";
     case "grad":
-      return "post-backward parameter gradient G_t=∂ℒ_t/∂Θ_t";
+      return "the training gradients";
     case "update":
-      return (
-        "accumulated parameter change U_t=Θ_t−Θ_{t^-}, where t^- is the previous " +
-        "update-observation instant (possibly several optimizer steps earlier)"
-      );
+      return "the weight change since the previous observation";
     case "opt_m":
-      return "Adam first-moment state M_t (exp_avg; not bias-corrected)";
+      return "Adam's running gradient average";
     case "opt_v":
-      return "Adam second-moment state V_t (exp_avg_sq; not bias-corrected)";
+      return "Adam's running squared-gradient average";
     case "activation":
       return activationObjectEn(spec, false);
     case "preactivation":
       return activationObjectEn(spec, true);
     case "logits":
-      return "raw LM-head logits Z_t over the vocabulary (before softmax)";
+      return "the raw vocabulary scores before softmax";
     case "attention":
-      return (
-        "recomputed pre-dropout causal-softmax probability tensor " +
-        "𝒜_t∈ℝ^{B×H×T×T}, with future-key entries zero"
-      );
+      return "the attention probabilities";
     case "gelu_activation":
-      return "post-GELU MLP hidden tensor H_t∈ℝ^{B×T×F}";
+      return "the activations";
     default:
       return spec.source_kind || "source tensor";
   }
@@ -424,16 +412,16 @@ function transformClauseEn(tensorOps, spec) {
     const name = parseOpName(op);
     if (name === "center") {
       return SAMPLE_AXIS_SOURCES.has(spec?.source_kind)
-        ? "subtracts the batch-axis mean independently at every remaining index"
-        : "subtracts the global element mean";
+        ? "subtracts the batch average"
+        : "subtracts the overall average";
     }
-    if (name === "abs") return "takes elementwise absolute values";
+    if (name === "abs") return "takes absolute values";
     if (name === "normalize") {
       return FEATURE_AXIS_SOURCES.has(spec?.source_kind)
-        ? "L2-normalizes each vector along its feature axis, with denominator clamped to 10⁻¹²"
-        : "globally L2-normalizes the tensor, with denominator clamped to 10⁻¹²";
+        ? "normalizes each feature vector"
+        : "normalizes the whole tensor";
     }
-    if (name === "square") return "squares every element";
+    if (name === "square") return "squares the values";
     return `applies transform ${name}`;
   });
   return `${parts.join(", then ")}, then `;
@@ -442,84 +430,72 @@ function transformClauseEn(tensorOps, spec) {
 function reductionMeaningEn(reduction, sourceKind) {
   switch (reduction) {
     case "mean":
-      return "takes the arithmetic mean over all N elements";
+      return "takes the average value";
     case "std":
-      return "takes PyTorch's sample standard deviation over all elements (correction=1, denominator N−1)";
+      return "measures how widely the values are spread";
     case "min":
-      return "takes the minimum element";
+      return "finds the smallest value";
     case "max":
-      return "takes the maximum element";
+      return "finds the largest value";
     case "l1_norm":
-      return "sums the absolute values (L1 norm)";
+      return "adds the absolute values to measure total magnitude";
     case "l2_norm":
-      return "takes the Euclidean/Frobenius magnitude (L2 norm)";
+      return "measures the overall magnitude";
     case "rms":
-      return "takes RMS=√[(1/N)Σxᵢ²], a size-normalized typical magnitude";
+      return "measures the typical magnitude";
     case "max_abs":
-      return "takes the largest absolute element";
+      return "finds the most extreme magnitude";
     case "sparsity":
-      return "reports the near-zero fraction |x|<10⁻⁶ (threshold sparsity, not exact-zero sparsity)";
+      return "reports the fraction of values that are nearly zero";
     case "positive_fraction":
-      return "reports the x>0 fraction (sign balance; for generic tensors this is not a firing-rate definition)";
+      return "reports the fraction of positive values";
     case "entropy": {
       const caveat = sourceKind === "logits"
-        ? " This is magnitude entropy of raw logits, not predictive entropy of softmax(logits)."
+        ? " For logits, this describes score magnitudes rather than prediction uncertainty."
         : "";
       return (
-        "takes natural-log Shannon entropy of flattened |x| mass, using the implementation's " +
-        "10⁻¹² probability floor (returns NaN when total |x|≤10⁻¹²)." + caveat
+        "measures how evenly the total magnitude is distributed; higher means more diffuse" +
+        caveat
       );
     }
     case "spectral_norm":
     case "top_singular_value":
-      return "takes the largest singular value (matrix operator 2-norm)";
+      return "measures the strongest amplification of the weight matrix";
     case "trace":
-      return "sums the diagonal of a square matrix (returns NaN for a non-square tensor)";
+      return "adds the diagonal values";
     case "row_std_mean":
-      return "averages correction=1 standard deviations within output rows";
+      return "measures the average variation within output rows";
     case "col_std_mean":
-      return "averages correction=1 standard deviations within input columns";
+      return "measures the average variation within input columns";
     case "effective_rank":
-      return (
-        "flattens non-feature axes into samples, centers each feature column, and exponentiates " +
-        "the entropy of normalized squared singular values above 10⁻¹²"
-      );
+      return "estimates how many independent feature directions are being used";
     case "attention_entropy_mean":
-      return (
-        "averages natural-log key-distribution entropy over every batch, head, and query, " +
-        "including q=0 and using a 10⁻¹² floor"
-      );
+      return "measures how spread out attention is on average; higher means more diffuse attention";
     case "attention_entropy_min":
       return (
-        "takes the minimum key-distribution entropy over every batch, head, and query. " +
-        "Because q=0 can attend only to k=0, this metric is structurally pinned near zero and " +
-        "has little diagnostic value in a causal model"
+        "finds the sharpest attention pattern; it stays near zero because the first token " +
+        "attends only to itself, limiting its usefulness"
       );
     case "attention_sink_first_token":
-      return "averages the attention probability assigned to key 0 by non-first queries q=1,…,T−1";
+      return "measures how much later tokens attend to the first token";
     case "attention_sink_domination":
       return (
-        "finds the key position with the largest attention probability averaged over batch, " +
-        "head, and all queries. Causally unavailable query-key pairs enter as zero, so earlier " +
-        "keys have a structural exposure advantage"
+        "measures concentration on one position; earlier positions naturally score higher " +
+        "because more tokens can attend to them"
       );
     case "attention_sink_ratio":
       return (
-        "multiplies first-key mass by T, i.e. compares it with the full-length reference 1/T. " +
-        "This is not a causal-uniform normalization: even uniform attention over each query's " +
-        "available prefix generally gives a value greater than 1"
+        "compares first-token attention with the uniform level; because attention is causal, " +
+        "values above 1 do not by themselves indicate a sink"
       );
     case "activation_rate":
-      return "reports the fraction of post-GELU elements that are strictly positive";
+      return "reports the fraction of post-GELU activations that are positive";
     case "massive_activation_peak_ratio":
-      return "divides the largest absolute activation by the global RMS (returns NaN when RMS≤10⁻¹²)";
+      return "compares the largest activation with the typical activation size";
     case "massive_activation_outlier_fraction":
-      return "reports the element fraction with |x|>3·global-RMS (returns NaN when RMS≤10⁻¹²)";
+      return "reports the fraction of unusually large activations";
     case "massive_neuron_fraction":
-      return (
-        "reports the feature fraction whose maximum |x| over batch×token exceeds 3·global-RMS; " +
-        "this is a peak criterion, not a persistence criterion"
-      );
+      return "reports the fraction of neurons that produce an unusually large activation";
     default:
       return `applies scalar reduction "${reduction}"`;
   }
@@ -528,26 +504,18 @@ function reductionMeaningEn(reduction, sourceKind) {
 function temporalMeaningEn(raw) {
   const name = parseOpName(raw);
   const args = parseOpArgs(raw);
-  if (name === "identity") return "passes the scalar stream through unchanged";
-  if (name === "delta") {
-    return "takes the difference from the previous recorded observation (the first difference is undefined)";
-  }
-  if (name === "ema") {
-    const a = parseNamedArg(args, "alpha") || "0.9";
-    return `applies EMA with α=${a}, initialized by the first finite input`;
-  }
+  if (name === "identity") return "keeps the value unchanged";
+  if (name === "delta") return "measures the change from the previous observation";
+  if (name === "ema") return "smooths the changes with an exponential moving average";
   if (name === "slope") {
     const w = parseNamedArg(args, "window") || parseNamedArg(args, "w") || "5";
-    return (
-      `fits an OLS slope against observation index over up to the latest ${w} finite values ` +
-      "(not against raw training-step distance)"
-    );
+    return `measures the recent trend over the latest ${w} observations`;
   }
   if (name === "rolling_std") {
     const w = parseNamedArg(args, "window") || parseNamedArg(args, "w") || "5";
-    return `takes population standard deviation over up to the latest ${w} finite observations`;
+    return `measures short-term variability over the latest ${w} observations`;
   }
-  if (name === "curvature") return "takes the three-point second difference";
+  if (name === "curvature") return "measures how quickly the trend is changing";
   return `applies temporal operator ${name}`;
 }
 
@@ -567,18 +535,19 @@ function buildSpecPlainDescription(spec) {
   const transform = transformClauseEn(tensorOps, spec);
   const reduction = reductionMeaningEn(spec.reduction, spec.source_kind);
 
-  let text = `At ${place}, reads the ${source}; ${transform}${reduction}.`;
+  if (isDegenerateCenteredMean(spec, tensorOps)) {
+    return (
+      `Tracks ${source} at ${place}. It averages the values after subtracting the batch ` +
+      "average, so the result should be zero. Tiny values are numerical noise; the chart " +
+      "shows their recent trend."
+    );
+  }
+
+  let text = `Tracks ${source} at ${place}. It ${transform}${reduction}.`;
   if (temporalOps.length) {
-    text += ` On the resulting scalar stream, it ${temporalOps
+    text += ` Across observations, it ${temporalOps
       .map(temporalMeaningEn)
       .join(", then ")}.`;
-  }
-  if (isDegenerateCenteredMean(spec, tensorOps)) {
-    text += (
-      " Important: batch-centering makes the subsequent global mean exactly zero in exact " +
-      "arithmetic, so this historical observable is structurally degenerate; nonzero values " +
-      "are floating-point noise."
-    );
   }
   return text;
 }
