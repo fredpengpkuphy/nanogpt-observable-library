@@ -86,9 +86,11 @@ let lossLog = null;
 let lossViewMode = "both";
 /** @type {"linear" | "loglog"} */
 let lossScaleMode = "linear";
-/** @type {"linear" | "loglog"} — observables temporarily locked to linear. */
+/** @type {"linear" | "loglog"} */
 let curveScaleMode = "linear";
-const CURVE_LOGLOG_ENABLED = false;
+const CURVE_LOGLOG_ENABLED = true;
+/** @type {"step" | "tau"} */
+let xAxisMode = "step";
 let lossStepMin = null;
 let lossStepMax = null;
 let fullChart = null;
@@ -310,6 +312,9 @@ function wireEvents() {
   document.querySelectorAll(".curve-scale-btn").forEach((btn) => {
     btn.addEventListener("click", () => setCurveScaleMode(btn.dataset.scale));
   });
+  document.querySelectorAll(".x-axis-btn").forEach((btn) => {
+    btn.addEventListener("click", () => setXAxisMode(btn.dataset.xAxis));
+  });
   document.getElementById("lossApplyRangeBtn")?.addEventListener("click", applyLossStepRange);
   document.getElementById("lossResetRangeBtn")?.addEventListener("click", resetLossStepRange);
   document.getElementById("lossApplyRangeFullBtn")?.addEventListener("click", () => {
@@ -386,6 +391,9 @@ async function ensureSelectedRunManifests() {
   setRunPickStatus("Loading other setups… (large manifests, may take a few seconds)");
   try {
     await Promise.all(ids.map((rid) => ensureRunManifest(rid)));
+    if (xAxisMode === "tau") {
+      await Promise.all(ids.map((rid) => ensureLossLogForRun(rid)));
+    }
     if (gen !== manifestLoadGen) return;
     setRunPickStatus("");
   } catch (err) {
@@ -502,6 +510,8 @@ function residualAgainstBaseline(points, baselinePoints) {
       x: p.x,
       y: p.y - baseMap.get(key),
       _step: Number.isFinite(p._step) ? p._step : key,
+      _axisX: p._axisX,
+      ...(Number.isFinite(p._tau) ? { _tau: p._tau } : {}),
     });
   }
   return out;
@@ -512,6 +522,8 @@ function zeroBaselinePoints(baselinePoints) {
     x: p.x,
     y: 0,
     _step: Number.isFinite(p._step) ? p._step : pointStepKey(p),
+    _axisX: p._axisX,
+    ...(Number.isFinite(p._tau) ? { _tau: p._tau } : {}),
   }));
 }
 
@@ -1071,6 +1083,7 @@ function renderLayerPicker(spec) {
 function collectPlotXsFromChart(chart) {
   const xs = new Set();
   for (const ds of chart?.data?.datasets || []) {
+    if (ds._referenceLine) continue;
     for (const p of ds.data || []) {
       if (p && Number.isFinite(p.x) && p.x > 0) xs.add(p.x);
     }
@@ -1133,7 +1146,7 @@ function thinLogAxisTicks(values, maxTicks = 8) {
       if (picked.includes(v)) continue;
       // Prefer closeness in log space, then tidiness (20000 >> 19400).
       const dist = Math.abs(Math.log(v) - Math.log(target));
-      const score = dist * 12 + stepUglyScore(v);
+      const score = dist * 12 + (xAxisMode === "step" ? stepUglyScore(v) : 0);
       if (score < bestScore) {
         best = v;
         bestScore = score;
@@ -1158,10 +1171,13 @@ function logXAxisTickConfig(axisColor) {
     callback(value) {
       const v = Number(value);
       if (!Number.isFinite(v)) return "";
-      // step 0 uses a small positive sentinel on the logarithmic axis.
-      if (Math.abs(v - LOG_ZERO_PLOT_X) < 1e-12) return "0";
-      if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
-      return String(v);
+      const isZeroSentinel = (this.chart?.data?.datasets || []).some(
+        (ds) => !ds._referenceLine && (ds.data || []).some(
+          (p) => p?._axisX === 0 && Math.abs(p.x - v) <= Math.max(1e-15, Math.abs(v) * 1e-10),
+        ),
+      );
+      if (isZeroSentinel) return "0";
+      return formatXAxisValue(v);
     },
   };
 }
@@ -1171,9 +1187,23 @@ function afterBuildLogXTicks(axis) {
   axis.ticks = values.map((value) => ({ value }));
 }
 
+function formatXAxisValue(value) {
+  if (!Number.isFinite(value)) return "";
+  if (xAxisMode === "step" && Math.abs(value - Math.round(value)) < 1e-9) {
+    return String(Math.round(value));
+  }
+  const abs = Math.abs(value);
+  if (abs !== 0 && (abs < 1e-3 || abs >= 1e4)) return value.toExponential(2);
+  return Number(value.toPrecision(4)).toString();
+}
+
+function xAxisTitle() {
+  return xAxisMode === "tau" ? "τ = ∫ learning rate" : "Step";
+}
+
 function chartScaleOptions({
   scaleMode = "linear",
-  xTitle = "Step",
+  xTitle = xAxisTitle(),
   yTitle = "Value",
   residual = false,
 } = {}) {
@@ -1262,7 +1292,12 @@ function chartCommonOptions({
           title: (items) => {
             if (!items.length) return "";
             const raw = items[0].raw;
-            if (raw && Number.isFinite(raw._step)) return `step ${raw._step}`;
+            if (raw && Number.isFinite(raw._step)) {
+              if (xAxisMode === "tau" && Number.isFinite(raw._tau)) {
+                return `τ ${formatXAxisValue(raw._tau)} · step ${raw._step}`;
+              }
+              return `step ${raw._step}`;
+            }
             return `step ${items[0].parsed.x}`;
           },
         },
@@ -1730,22 +1765,79 @@ function setChartChrome(hasSeriesChart) {
   document.getElementById("expandBtn").hidden = !hasSeriesChart;
   const scale = document.getElementById("curveScaleToggle");
   if (scale) scale.hidden = !hasSeriesChart || !CURVE_LOGLOG_ENABLED;
+  const xAxis = document.getElementById("curveXAxisToggle");
+  if (xAxis) xAxis.hidden = !hasSeriesChart;
   updateCurveScaleButtons();
+  updateXAxisButtons();
 }
 
-function pointsFromSeries(series) {
+function learningRateIntegralAt(log, step) {
+  const points = log?.lr;
+  if (!Array.isArray(points) || !points.length || !Number.isFinite(step)) return NaN;
+  if (step <= 0) return 0;
+  if (step <= points[0].x) return step * points[0].y;
+  const last = points[points.length - 1];
+  if (step >= last.x) return last.tau + (step - last.x) * last.y;
+
+  let lo = 0;
+  let hi = points.length - 1;
+  while (lo + 1 < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (points[mid].x <= step) lo = mid;
+    else hi = mid;
+  }
+  const left = points[lo];
+  const right = points[hi];
+  const span = right.x - left.x;
+  if (!(span > 0)) return left.tau;
+  const fraction = (step - left.x) / span;
+  const lrAtStep = left.y + fraction * (right.y - left.y);
+  return left.tau + (step - left.x) * (left.y + lrAtStep) / 2;
+}
+
+function xAxisValueForStep(step, rid = runId) {
+  if (xAxisMode === "step") return step;
+  return learningRateIntegralAt(lossLogByRun.get(rid), step);
+}
+
+function tauZeroPlotX() {
+  const candidates = [];
+  for (const log of lossLogByRun.values()) {
+    const tauAtOne = learningRateIntegralAt(log, 1);
+    if (Number.isFinite(tauAtOne) && tauAtOne > 0) candidates.push(tauAtOne / 10);
+  }
+  return candidates.length ? Math.min(...candidates) : Number.EPSILON;
+}
+
+function mapPointsToXAxis(rawPoints, logarithmic) {
+  const valid = rawPoints.filter(
+    (p) => Number.isFinite(p._axisX) && Number.isFinite(p.y) && (!logarithmic || p.y > 0),
+  );
+  const zeroPlotX =
+    xAxisMode === "step"
+      ? LOG_ZERO_PLOT_X
+      : tauZeroPlotX();
+  return valid
+    .filter((p) => !logarithmic || p._axisX >= 0)
+    .map((p) => ({
+      x: logarithmic && p._axisX === 0 ? zeroPlotX : p._axisX,
+      y: p.y,
+      _step: p._step,
+      _axisX: p._axisX,
+      ...(xAxisMode === "tau" ? { _tau: p._axisX } : {}),
+    }));
+}
+
+function pointsFromSeries(series, rid = runId) {
   const log = CURVE_LOGLOG_ENABLED && curveScaleMode === "loglog";
-  const pts = [];
+  const raw = [];
   for (let i = 0; i < series.steps.length; i += 1) {
     const step = series.steps[i];
     const y = series.values[i];
     if (!Number.isFinite(step) || !Number.isFinite(y)) continue;
-    if (log && !(y > 0)) continue;
-    // Log-x cannot use 0; all genuine positive steps stay unchanged.
-    const plotX = plotXForStep(step, log);
-    pts.push({ x: plotX, y, _step: step });
+    raw.push({ _axisX: xAxisValueForStep(step, rid), y, _step: step });
   }
-  return pts;
+  return mapPointsToXAxis(raw, log);
 }
 
 function lineDataHasPoints(lineData) {
@@ -1756,6 +1848,34 @@ function updateCurveScaleButtons() {
   document.querySelectorAll(".curve-scale-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.scale === curveScaleMode);
   });
+}
+
+function updateXAxisButtons() {
+  document.querySelectorAll(".x-axis-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.xAxis === xAxisMode);
+  });
+}
+
+async function setXAxisMode(mode) {
+  if (!["step", "tau"].includes(mode) || mode === xAxisMode) return;
+  if (mode === "tau") {
+    const ids = new Set([runId]);
+    if (compareRuns || compareLossRuns) {
+      for (const rid of selectedRunIds()) ids.add(rid);
+    }
+    await Promise.all([...ids].map((rid) => ensureLossLogForRun(rid)));
+    if (![...ids].some((rid) => lossLogByRun.get(rid)?.lr?.length)) return;
+  }
+  xAxisMode = mode;
+  for (const line of referenceLines) {
+    line.intercept = null;
+    line.mode = null;
+  }
+  updateXAxisButtons();
+  renderLossChart();
+  const spec = activeSpec();
+  if (spec) renderChart(spec);
+  if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
 }
 
 function setCurveScaleMode(mode) {
@@ -1774,7 +1894,10 @@ function setCurveScaleMode(mode) {
 function setCurveOverlayChrome(show) {
   const el = document.getElementById("curveScaleToggleFull");
   if (el) el.hidden = !show || !CURVE_LOGLOG_ENABLED;
+  const xAxis = document.getElementById("xAxisToggleFull");
+  if (xAxis) xAxis.hidden = !show;
   if (show && CURVE_LOGLOG_ENABLED) updateCurveScaleButtons();
+  if (show) updateXAxisButtons();
   updateFullscreenCompareChrome();
 }
 
@@ -1795,7 +1918,7 @@ function buildLineDatasets(spec) {
           emptyMessage: `Baseline (${runLabel(baselineId)}) has no matching series`,
         };
       }
-      baselinePoints = pointsFromSeries(baseSpec.series);
+      baselinePoints = pointsFromSeries(baseSpec.series, baselineId);
     }
 
     const datasets = [];
@@ -1825,7 +1948,7 @@ function buildLineDatasets(spec) {
       }
       const color = runColor(run.run_id);
       const isCurrent = run.run_id === runId;
-      const raw = pointsFromSeries(other.series);
+      const raw = pointsFromSeries(other.series, run.run_id);
       const data = residual ? residualAgainstBaseline(raw, baselinePoints) : raw;
       if (residual && !data.length) {
         missing.push(runLabel(run.run_id));
@@ -1877,7 +2000,7 @@ function buildLineDatasets(spec) {
         const color = LAYER_COLORS[m.layer % LAYER_COLORS.length];
         return {
           label: `L${m.layer}`,
-          data: pointsFromSeries(m.series),
+          data: pointsFromSeries(m.series, runId),
           borderColor: color,
           backgroundColor: `${color}22`,
           borderWidth: m.layer === activeLayer ? 2.5 : 1.5,
@@ -1894,7 +2017,7 @@ function buildLineDatasets(spec) {
       legend: false,
       datasets: [{
         label: displaySpecLabel(spec),
-        data: pointsFromSeries(spec.series),
+        data: pointsFromSeries(spec.series, runId),
         borderColor: color,
         backgroundColor: `${color}22`,
         borderWidth: 2.75,
@@ -2128,10 +2251,12 @@ function parseLossCsv(text) {
   const iterIdx = col("iter");
   const trainIdx = col("train_loss");
   const valIdx = col("val_loss");
+  const lrIdx = col("lr");
   if (iterIdx < 0 || trainIdx < 0 || valIdx < 0) return null;
 
   const trainByStep = new Map();
   const valByStep = new Map();
+  const lrByStep = new Map();
   const parseNumber = (raw) => {
     if (raw == null || String(raw).trim() === "") return NaN;
     return Number(raw);
@@ -2142,8 +2267,10 @@ function parseLossCsv(text) {
     const x = parseNumber(cols[iterIdx]);
     const yt = parseNumber(cols[trainIdx]);
     const yv = parseNumber(cols[valIdx]);
+    const lr = lrIdx >= 0 ? parseNumber(cols[lrIdx]) : NaN;
     if (Number.isFinite(x) && Number.isFinite(yt)) trainByStep.set(x, yt);
     if (Number.isFinite(x) && Number.isFinite(yv)) valByStep.set(x, yv);
+    if (Number.isFinite(x) && Number.isFinite(lr) && lr >= 0) lrByStep.set(x, lr);
   }
   const toPoints = (values) =>
     [...values.entries()]
@@ -2151,8 +2278,17 @@ function parseLossCsv(text) {
       .map(([x, y]) => ({ x, y }));
   const train = toPoints(trainByStep);
   const val = toPoints(valByStep);
+  const lr = toPoints(lrByStep);
+  let tau = 0;
+  for (let i = 0; i < lr.length; i += 1) {
+    if (i > 0) {
+      const prev = lr[i - 1];
+      tau += (lr[i].x - prev.x) * (prev.y + lr[i].y) / 2;
+    }
+    lr[i].tau = tau;
+  }
   if (!train.length && !val.length) return null;
-  return { train, val };
+  return { train, val, lr };
 }
 
 async function loadLossLog() {
@@ -2259,20 +2395,16 @@ function resetLossStepRange() {
   if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
 }
 
-function filterLossPoints(points) {
+function filterLossPoints(points, rid = runId) {
   const log = lossScaleMode === "loglog";
-  return points
+  const raw = points
     .filter((p) => {
       if (lossStepMin != null && p.x < lossStepMin) return false;
       if (lossStepMax != null && p.x > lossStepMax) return false;
-      if (log && !(p.y > 0)) return false;
       return Number.isFinite(p.x) && Number.isFinite(p.y);
     })
-    .map((p) => {
-      // Log-x cannot use 0; all genuine positive steps stay unchanged.
-      const plotX = plotXForStep(p.x, log);
-      return { x: plotX, y: p.y, _step: p.x };
-    });
+    .map((p) => ({ _axisX: xAxisValueForStep(p.x, rid), y: p.y, _step: p.x }));
+  return mapPointsToXAxis(raw, log);
 }
 
 function lossChartScaleOptions() {
@@ -2284,7 +2416,11 @@ function lossChartScaleOptions() {
   return {
     x: {
       type: logX ? "logarithmic" : "linear",
-      title: { display: true, text: logX ? "Step (log)" : "Step", color: axis },
+      title: {
+        display: true,
+        text: logX ? `${xAxisTitle()} (log)` : xAxisTitle(),
+        color: axis,
+      },
       ticks: logX ? logXAxisTickConfig(axis) : { color: axis },
       ...(logX ? { afterBuildTicks: afterBuildLogXTicks } : {}),
       grid: { color: grid },
@@ -2371,7 +2507,7 @@ function buildLossDatasets() {
       if (lossViewMode === "both" || lossViewMode === "train") modes.push(["train", "train"]);
       if (lossViewMode === "both" || lossViewMode === "val") modes.push(["val", "val"]);
       for (const [key, tag] of modes) {
-        const basePts = filterLossPoints(baselineItem.log[key]);
+        const basePts = filterLossPoints(baselineItem.log[key], baselineItem.run_id);
         datasets.push({
           label: `${baselineItem.label} · ${tag} (0)`,
           data: zeroBaselinePoints(basePts),
@@ -2391,9 +2527,12 @@ function buildLossDatasets() {
       const color = runColor(item.run_id);
       const isCurrent = item.run_id === runId;
       if (lossViewMode === "both" || lossViewMode === "train") {
-        const raw = filterLossPoints(item.log.train);
+        const raw = filterLossPoints(item.log.train, item.run_id);
         const data = residual
-          ? residualAgainstBaseline(raw, filterLossPoints(baselineItem.log.train))
+          ? residualAgainstBaseline(
+              raw,
+              filterLossPoints(baselineItem.log.train, baselineItem.run_id),
+            )
           : raw;
         if (data.length) {
           datasets.push({
@@ -2410,9 +2549,12 @@ function buildLossDatasets() {
         }
       }
       if (lossViewMode === "both" || lossViewMode === "val") {
-        const raw = filterLossPoints(item.log.val);
+        const raw = filterLossPoints(item.log.val, item.run_id);
         const data = residual
-          ? residualAgainstBaseline(raw, filterLossPoints(baselineItem.log.val))
+          ? residualAgainstBaseline(
+              raw,
+              filterLossPoints(baselineItem.log.val, baselineItem.run_id),
+            )
           : raw;
         if (data.length) {
           datasets.push({
@@ -2438,7 +2580,7 @@ function buildLossDatasets() {
   if (lossViewMode === "both" || lossViewMode === "train") {
     datasets.push({
       label: "Train loss",
-      data: filterLossPoints(item.log.train),
+      data: filterLossPoints(item.log.train, item.run_id),
       borderColor: "#9fd4e4",
       backgroundColor: "rgba(159, 212, 228, 0.2)",
       borderWidth: 2,
@@ -2450,7 +2592,7 @@ function buildLossDatasets() {
   if (lossViewMode === "both" || lossViewMode === "val") {
     datasets.push({
       label: "Val loss",
-      data: filterLossPoints(item.log.val),
+      data: filterLossPoints(item.log.val, item.run_id),
       borderColor: "#e8c888",
       backgroundColor: "rgba(232, 200, 136, 0.2)",
       borderWidth: 2,
@@ -2481,6 +2623,7 @@ function updateLossViewButtons() {
   document.querySelectorAll(".loss-scale-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.scale === lossScaleMode);
   });
+  updateXAxisButtons();
 }
 
 function setLossOverlayChrome(show) {
@@ -2488,6 +2631,8 @@ function setLossOverlayChrome(show) {
   if (el) el.hidden = !show;
   const scale = document.getElementById("lossScaleToggleFull");
   if (scale) scale.hidden = !show;
+  const xAxis = document.getElementById("xAxisToggleFull");
+  if (xAxis) xAxis.hidden = !show;
   const range = document.getElementById("lossRangeFull");
   if (range) range.hidden = !show;
   updateFullscreenCompareChrome();

@@ -132,24 +132,20 @@ function collectChartSteps(chart) {
 function nearestStep(chart, pixelX) {
   const xScale = chart.scales?.x;
   if (!xScale) return null;
-  const xVal = xScale.getValueForPixel(pixelX);
-  if (!Number.isFinite(xVal)) return null;
-  const steps = collectChartSteps(chart);
-  // Prefer matching against true steps (_step); plot may put step 0 at x=1 on log.
-  if (!steps.length) return Math.round(xVal);
-  let best = steps[0];
+  let best = null;
   let bestDist = Infinity;
-  for (const s of steps) {
-    const plotX =
-      typeof plotXForStep === "function"
-        ? plotXForStep(s, xScale.type === "logarithmic")
-        : xScale.type === "logarithmic" && s === 0
-          ? 0.1
-          : s;
-    const d = Math.abs(plotX - xVal);
-    if (d < bestDist) {
-      best = s;
-      bestDist = d;
+  for (const ds of chart.data?.datasets || []) {
+    if (ds._referenceLine) continue;
+    for (const point of ds.data || []) {
+      if (!point || !Number.isFinite(point.x)) continue;
+      const step = Number.isFinite(point._step) ? point._step : point.x;
+      const pointPixel = xScale.getPixelForValue(point.x);
+      if (!Number.isFinite(pointPixel)) continue;
+      const distance = Math.abs(pointPixel - pixelX);
+      if (distance < bestDist) {
+        best = step;
+        bestDist = distance;
+      }
     }
   }
   return best;
@@ -157,7 +153,17 @@ function nearestStep(chart, pixelX) {
 
 function plotXForNoteStep(chart, step) {
   if (!Number.isFinite(step)) return step;
+  for (const ds of chart?.data?.datasets || []) {
+    if (ds._referenceLine) continue;
+    const match = (ds.data || []).find((point) => point?._step === step);
+    if (match && Number.isFinite(match.x)) return match.x;
+  }
   const logarithmic = chart?.scales?.x?.type === "logarithmic";
+  if (typeof xAxisValueForStep === "function" && typeof xAxisMode !== "undefined" && xAxisMode === "tau") {
+    const rid = typeof noteContextKey === "function" ? noteContextKey().runId : runId;
+    const tau = xAxisValueForStep(step, rid);
+    if (Number.isFinite(tau)) return logarithmic && tau === 0 ? Number.EPSILON : tau;
+  }
   return typeof plotXForStep === "function"
     ? plotXForStep(step, logarithmic)
     : logarithmic && step === 0

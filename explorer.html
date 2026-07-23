@@ -57,6 +57,10 @@
               <button type="button" class="chart-btn loss-scale-btn active" data-scale="linear">Linear</button>
               <button type="button" class="chart-btn loss-scale-btn" data-scale="loglog">Log–log</button>
             </div>
+            <div class="loss-view-toggle x-axis-toggle" id="lossXAxisToggle" title="Horizontal axis">
+              <button type="button" class="chart-btn x-axis-btn active" data-x-axis="step">Step</button>
+              <button type="button" class="chart-btn x-axis-btn" data-x-axis="tau">τ</button>
+            </div>
             <label class="compare-toggle" id="compareLossRunsWrap" hidden>
               <input type="checkbox" id="compareLossRuns" />
               <span>Compare setups</span>
@@ -112,6 +116,14 @@
                 <span id="chartInfo"></span>
               </div>
               <div class="chart-actions">
+                <div class="loss-view-toggle" id="curveScaleToggle" title="Axis scale" hidden>
+                  <button type="button" class="chart-btn curve-scale-btn active" data-scale="linear">Linear</button>
+                  <button type="button" class="chart-btn curve-scale-btn" data-scale="loglog">Log–log</button>
+                </div>
+                <div class="loss-view-toggle x-axis-toggle" id="curveXAxisToggle" title="Horizontal axis" hidden>
+                  <button type="button" class="chart-btn x-axis-btn active" data-x-axis="step">Step</button>
+                  <button type="button" class="chart-btn x-axis-btn" data-x-axis="tau">τ</button>
+                </div>
                 <button type="button" class="chart-btn" id="resetZoomBtn" hidden title="Reset zoom">Reset</button>
                 <button type="button" class="chart-btn" id="expandBtn" hidden title="Expand">⤢ Expand</button>
                 <label class="compare-toggle" id="compareRunsWrap" hidden>
@@ -178,6 +190,14 @@
           <div class="loss-view-toggle" id="lossScaleToggleFull" hidden>
             <button type="button" class="chart-btn loss-scale-btn" data-scale="linear">Linear</button>
             <button type="button" class="chart-btn loss-scale-btn" data-scale="loglog">Log–log</button>
+          </div>
+          <div class="loss-view-toggle" id="curveScaleToggleFull" hidden>
+            <button type="button" class="chart-btn curve-scale-btn" data-scale="linear">Linear</button>
+            <button type="button" class="chart-btn curve-scale-btn" data-scale="loglog">Log–log</button>
+          </div>
+          <div class="loss-view-toggle x-axis-toggle" id="xAxisToggleFull" hidden title="Horizontal axis">
+            <button type="button" class="chart-btn x-axis-btn" data-x-axis="step">Step</button>
+            <button type="button" class="chart-btn x-axis-btn" data-x-axis="tau">τ</button>
           </div>
           <div class="loss-range loss-range-compact" id="lossRangeFull" hidden>
             <input type="number" id="lossStepMinFull" min="0" step="1" placeholder="min" />
@@ -286,8 +306,8 @@
   <script src="js/announcement-banner.js?v=2"></script>
   <script src="js/curator-ui.js?v=6"></script>
   <script src="js/maintenance-gate.js?v=1"></script>
-  <script src="js/notes-ui.js?v=16"></script>
+  <script src="js/notes-ui.js?v=17"></script>
   <script src="js/observable_defs.js?v=10"></script>
-  <script src="js/app.js?v=44"></script>
+  <script src="js/app.js?v=45"></script>
 </body>
 </html>
