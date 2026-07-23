@@ -353,10 +353,13 @@ def write_index(run_metas: list[dict]):
 def meta_from_manifest(run_id: str, manifest: dict) -> dict:
     n_series = sum(1 for s in manifest["specs"] if s.get("series"))
     n_curves = sum(1 for s in manifest["specs"] if s.get("curve_png"))
+    n_available = sum(
+        1 for s in manifest["specs"] if s.get("series") or s.get("curve_png")
+    )
     return {
         "run_id": run_id,
         "label": run_id,
-        "n_specs": manifest["n_specs"],
+        "n_specs": n_available,
         "n_curves": n_curves,
         "n_series": n_series,
         "provenance": manifest.get("provenance", {}),

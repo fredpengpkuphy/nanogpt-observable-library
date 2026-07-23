@@ -153,9 +153,10 @@ async function boot() {
       try { Chart.register(annPlugin); } catch (_) { /* already registered */ }
     }
     manifest = await fetchJson(`data/${runId}/manifest.json`);
-    specById = new Map(manifest.specs.map((s) => [s.id, s]));
-    specsByModule = groupSpecsByModule(manifest.specs);
-    specsByFamily = groupSpecsByFamily(manifest.specs);
+    const visibleSpecs = (manifest.specs || []).filter(specHasCurveData);
+    specById = new Map(visibleSpecs.map((s) => [s.id, s]));
+    specsByModule = groupSpecsByModule(visibleSpecs);
+    specsByFamily = groupSpecsByFamily(visibleSpecs);
     manifestCache.set(runId, { specById, model: manifest.model });
     await loadAvailableRuns();
     wireEvents();
@@ -355,7 +356,7 @@ async function ensureRunManifest(rid) {
   if (cached && !cached.error) return cached;
   try {
     const m = await fetchJson(`data/${rid}/manifest.json`);
-    const map = new Map(m.specs.map((s) => [s.id, s]));
+    const map = new Map((m.specs || []).filter(specHasCurveData).map((s) => [s.id, s]));
     const entry = { specById: map, model: m.model };
     manifestCache.set(rid, entry);
     return entry;
@@ -592,6 +593,16 @@ async function fetchText(url) {
   return res.text();
 }
 
+function specHasCurveData(spec) {
+  const series = spec?.series;
+  const hasSeries =
+    Array.isArray(series?.steps) &&
+    Array.isArray(series?.values) &&
+    series.steps.length > 0 &&
+    series.values.length > 0;
+  return hasSeries || Boolean(spec?.curve_png);
+}
+
 function groupSpecsByModule(specs) {
   const map = new Map();
   for (const spec of specs) {
@@ -624,7 +635,7 @@ async function resolveRunLabel() {
 async function renderHeader() {
   const label = await resolveRunLabel();
   document.getElementById("runSubtitle").textContent =
-    `${manifest.n_specs ?? "—"} observables`;
+    `${specById.size} observables`;
   document.getElementById("runBadge").textContent = label;
   document.title = `${label} · nanoGPT Observable Explorer`;
 }

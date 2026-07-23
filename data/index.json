@@ -3,7 +3,7 @@
     {
       "run_id": "baseline",
       "label": "baseline",
-      "n_specs": 1821,
+      "n_specs": 1820,
       "n_curves": 1820,
       "n_series": 1820,
       "has_loss": true,
@@ -16,7 +16,7 @@
     {
       "run_id": "no_learning_rate_warmup",
       "label": "no learning rate warmup",
-      "n_specs": 1821,
+      "n_specs": 1820,
       "n_curves": 1820,
       "n_series": 1820,
       "has_loss": true,
