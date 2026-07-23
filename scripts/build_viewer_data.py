@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import os
 import re
 import shutil
@@ -169,6 +170,8 @@ def load_series(obs_dir: Path, run_id: str) -> dict[str, dict]:
                 step = int(row["step"])
                 val = float(row["value"])
             except (TypeError, ValueError):
+                continue
+            if not math.isfinite(val):
                 continue
             if row.get("valid") not in (None, "", "ok"):
                 continue

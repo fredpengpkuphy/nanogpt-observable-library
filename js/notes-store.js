@@ -33,6 +33,23 @@ const NotesStore = (() => {
 
   const authListeners = new Set();
   const BATCH_WRITE_LIMIT = 450;
+  const READ_CONCURRENCY = 8;
+
+  async function mapConcurrent(items, limit, mapper) {
+    const results = new Array(items.length);
+    let next = 0;
+    async function worker() {
+      while (true) {
+        const index = next;
+        next += 1;
+        if (index >= items.length) return;
+        results[index] = await mapper(items[index], index);
+      }
+    }
+    const workerCount = Math.min(Math.max(1, limit), items.length);
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+    return results;
+  }
 
   function resetAuthReady() {
     authReadyPromise = new Promise((resolve) => {
@@ -237,15 +254,17 @@ const NotesStore = (() => {
     let notes = snap.docs.map(parseNote);
     if (filter) notes = filterNotes(notes, filter);
     notes.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-    await Promise.all(
-      notes.map(async (n) => {
+    await mapConcurrent(
+      notes,
+      READ_CONCURRENCY,
+      async (n) => {
         try {
           n.comments = await listComments(n.id);
         } catch (err) {
           console.warn("listComments failed", n.id, err);
           n.comments = [];
         }
-      })
+      }
     );
     return notes;
   }
@@ -624,19 +643,18 @@ const NotesStore = (() => {
     await init();
     if (!backendReady) return [];
     const snap = await db.collection("suggestions").orderBy("createdAt", "desc").get();
-    const items = [];
-    for (const doc of snap.docs) {
+    const items = await mapConcurrent(snap.docs, READ_CONCURRENCY, async (doc) => {
       const data = doc.data() || {};
       const text = String(data.text || "").trim();
-      if (!text) continue;
-      items.push({
+      if (!text) return null;
+      return {
         id: doc.id,
         text,
         createdAt: data.createdAt || null,
         replies: await loadSuggestionReplies(doc.ref),
-      });
-    }
-    return items;
+      };
+    });
+    return items.filter(Boolean);
   }
 
   function watchSuggestions(cb) {
@@ -655,23 +673,33 @@ const NotesStore = (() => {
         .onSnapshot(
           async (snap) => {
             const currentGeneration = ++generation;
-            const items = [];
-            for (const doc of snap.docs) {
-              const data = doc.data() || {};
-              const text = String(data.text || "").trim();
-              if (!text) continue;
-              items.push({
-                id: doc.id,
-                text,
-                createdAt: data.createdAt || null,
-                replies: await loadSuggestionReplies(doc.ref),
-              });
+            try {
+              const items = await mapConcurrent(
+                snap.docs,
+                READ_CONCURRENCY,
+                async (doc) => {
+                  const data = doc.data() || {};
+                  const text = String(data.text || "").trim();
+                  if (!text) return null;
+                  return {
+                    id: doc.id,
+                    text,
+                    createdAt: data.createdAt || null,
+                    replies: await loadSuggestionReplies(doc.ref),
+                  };
+                }
+              );
+              if (!cancelled && currentGeneration === generation) {
+                cb(items.filter(Boolean));
+              }
+            } catch (err) {
+              console.warn("watchSuggestions replies", err);
+              if (!cancelled && currentGeneration === generation) cb([]);
             }
-            if (!cancelled && currentGeneration === generation) cb(items);
           },
           (err) => {
             console.warn("watchSuggestions", err);
-            cb([]);
+            if (!cancelled) cb([]);
           }
         );
     });

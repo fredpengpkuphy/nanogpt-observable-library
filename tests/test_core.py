@@ -64,6 +64,8 @@ class ViewerDataTests(unittest.TestCase):
                         {"step": 10, "spec_id": "a", "value": 1, "valid": "ok"},
                         {"step": 20, "spec_id": "a", "value": 3, "valid": "ok"},
                         {"step": 30, "spec_id": "a", "value": 9, "valid": "nan"},
+                        {"step": 40, "spec_id": "a", "value": "nan", "valid": "ok"},
+                        {"step": 50, "spec_id": "a", "value": "inf", "valid": "ok"},
                     ]
                 )
             self.assertEqual(
@@ -120,6 +122,21 @@ class ObservableTests(unittest.TestCase):
             self.assertAlmostEqual(values[mean_id], 2.0)
             engine.registry.close()
 
+    def test_engine_requires_freeze_and_safe_run_id(self):
+        model = torch.nn.Linear(1, 1, bias=False)
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ValueError):
+                ObservableEngine(model, out_dir=tmp, run_id="../outside")
+
+            engine = ObservableEngine(model, out_dir=tmp, run_id="safe")
+            engine.add_spec(ObservableSpec("weight", "weight", "mean"))
+            with self.assertRaises(RuntimeError):
+                engine.observe(1)
+            engine.freeze()
+            with self.assertRaises(RuntimeError):
+                engine.add_spec(ObservableSpec("weight", "weight", "std"))
+            engine.registry.close()
+
 
 class ModelValidationTests(unittest.TestCase):
     def setUp(self):
@@ -147,6 +164,17 @@ class ModelValidationTests(unittest.TestCase):
     def test_crop_rejects_non_positive_size(self):
         with self.assertRaises(ValueError):
             self.model.crop_block_size(0)
+
+    def test_forward_rejects_invalid_shapes(self):
+        with self.assertRaises(ValueError):
+            self.model(torch.zeros((0,), dtype=torch.long))
+        with self.assertRaises(ValueError):
+            self.model(torch.zeros((1, 0), dtype=torch.long))
+        with self.assertRaises(ValueError):
+            self.model(
+                torch.zeros((1, 2), dtype=torch.long),
+                torch.zeros((1, 1), dtype=torch.long),
+            )
 
 
 if __name__ == "__main__":

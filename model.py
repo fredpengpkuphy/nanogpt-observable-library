@@ -180,9 +180,22 @@ class GPT(nn.Module):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
     def forward(self, idx, targets=None):
+        if idx.ndim != 2:
+            raise ValueError(f"idx must have shape (batch, time), got {tuple(idx.shape)}")
         device = idx.device
         b, t = idx.size()
-        assert t <= self.config.block_size, f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
+        if t < 1:
+            raise ValueError("idx must contain at least one token")
+        if t > self.config.block_size:
+            raise ValueError(
+                f"Cannot forward sequence of length {t}; "
+                f"block size is {self.config.block_size}"
+            )
+        if targets is not None and targets.shape != idx.shape:
+            raise ValueError(
+                f"targets must match idx shape {tuple(idx.shape)}, "
+                f"got {tuple(targets.shape)}"
+            )
         pos = torch.arange(0, t, dtype=torch.long, device=device)  # shape (t)
 
         # forward the GPT model itself

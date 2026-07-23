@@ -1263,6 +1263,17 @@ function chartCommonOptions({
   return opts;
 }
 
+function finiteMinMax(values) {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const value of values) {
+    if (!Number.isFinite(value)) continue;
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
+  return min === Infinity ? null : { min, max };
+}
+
 /** Restore axis range from data without destroying the Chart instance. */
 function fitChartScalesToData(chart) {
   if (!chart?.data?.datasets?.length) return false;
@@ -1275,10 +1286,11 @@ function fitChartScalesToData(chart) {
     }
   }
   if (!xs.length || !ys.length) return false;
-  const xMin = Math.min(...xs);
-  const xMax = Math.max(...xs);
-  const yMin = Math.min(...ys);
-  const yMax = Math.max(...ys);
+  const xBounds = finiteMinMax(xs);
+  const yBounds = finiteMinMax(ys);
+  if (!xBounds || !yBounds) return false;
+  const { min: xMin, max: xMax } = xBounds;
+  const { min: yMin, max: yMax } = yBounds;
   const xLog = chart.options.scales?.x?.type === "logarithmic";
   const yLog = chart.options.scales?.y?.type === "logarithmic";
   if (xLog) {
@@ -1731,23 +1743,59 @@ function parseLossCsv(text) {
   const lines = text.trim().split(/\r?\n/);
   if (lines.length < 2) return null;
 
-  const headers = lines[0].split(",").map((h) => h.trim());
+  const parseRow = (line) => {
+    const columns = [];
+    let value = "";
+    let quoted = false;
+    for (let i = 0; i < line.length; i += 1) {
+      const char = line[i];
+      if (char === '"') {
+        if (quoted && line[i + 1] === '"') {
+          value += '"';
+          i += 1;
+        } else {
+          quoted = !quoted;
+        }
+      } else if (char === "," && !quoted) {
+        columns.push(value);
+        value = "";
+      } else {
+        value += char;
+      }
+    }
+    columns.push(value);
+    return columns;
+  };
+
+  const headers = parseRow(lines[0])
+    .map((h, index) => (index === 0 ? h.replace(/^\uFEFF/, "") : h).trim());
   const col = (name) => headers.indexOf(name);
   const iterIdx = col("iter");
   const trainIdx = col("train_loss");
   const valIdx = col("val_loss");
   if (iterIdx < 0 || trainIdx < 0 || valIdx < 0) return null;
 
-  const train = [];
-  const val = [];
+  const trainByStep = new Map();
+  const valByStep = new Map();
+  const parseNumber = (raw) => {
+    if (raw == null || String(raw).trim() === "") return NaN;
+    return Number(raw);
+  };
   for (let i = 1; i < lines.length; i += 1) {
-    const cols = lines[i].split(",");
-    const x = Number(cols[iterIdx]);
-    const yt = Number(cols[trainIdx]);
-    const yv = Number(cols[valIdx]);
-    if (Number.isFinite(x) && Number.isFinite(yt)) train.push({ x, y: yt });
-    if (Number.isFinite(x) && Number.isFinite(yv)) val.push({ x, y: yv });
+    if (!lines[i].trim()) continue;
+    const cols = parseRow(lines[i]);
+    const x = parseNumber(cols[iterIdx]);
+    const yt = parseNumber(cols[trainIdx]);
+    const yv = parseNumber(cols[valIdx]);
+    if (Number.isFinite(x) && Number.isFinite(yt)) trainByStep.set(x, yt);
+    if (Number.isFinite(x) && Number.isFinite(yv)) valByStep.set(x, yv);
   }
+  const toPoints = (values) =>
+    [...values.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([x, y]) => ({ x, y }));
+  const train = toPoints(trainByStep);
+  const val = toPoints(valByStep);
   if (!train.length && !val.length) return null;
   return { train, val };
 }
@@ -1778,8 +1826,8 @@ function lossDataBounds() {
   for (const item of logs) {
     for (const p of [...item.log.train, ...item.log.val]) xs.push(p.x);
   }
-  if (!xs.length) return { min: 0, max: 0 };
-  return { min: Math.min(...xs), max: Math.max(...xs) };
+  const bounds = finiteMinMax(xs);
+  return bounds || { min: 0, max: 0 };
 }
 
 /** Sorted unique true steps available in the current loss data. */

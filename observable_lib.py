@@ -1087,9 +1087,16 @@ class ObservableEngine:
         self.out_dir = out_dir
         os.makedirs(out_dir, exist_ok=True)
         self.run_id = run_id or time.strftime("run_%Y%m%d_%H%M%S")
+        if (
+            self.run_id in (".", "..")
+            or not re.fullmatch(r"[A-Za-z0-9_.-]+", self.run_id)
+        ):
+            self.registry.close()
+            raise ValueError(f"unsafe run_id: {self.run_id!r}")
         self.strict = strict  # strict=True 时观测量失败直接抛错 (§7.5)
 
         self.specs: List[ObservableSpec] = []
+        self._frozen = False
         self._seen: set = set()                 # canonical_id 去重
         self._temporal_state: Dict[str, dict] = {}  # (canonical_id, i) -> state
         self._failed: set = set()               # 失败过的 spec，隔离后不再重试
@@ -1116,6 +1123,8 @@ class ObservableEngine:
 
     # ---- 注册：单条 spec 或整个 pack ----
     def add_spec(self, spec: ObservableSpec) -> bool:
+        if self._frozen:
+            raise RuntimeError("cannot add observables after freeze()")
         err = check_spec(spec)
         if err is not None:
             if self.strict:
@@ -1169,6 +1178,7 @@ class ObservableEngine:
                        "curve_dir": self._curve_dir,
                        "n_specs": len(self.specs), "specs": meta},
                       f, indent=2, ensure_ascii=False)
+        self._frozen = True
 
     def dry_run(self, total_steps: int) -> int:
         """§G3：按 every/cost 估算本 run 的 observable 执行次数。"""
@@ -1269,6 +1279,8 @@ class ObservableEngine:
 
     # ---- 训练循环里调用：有 spec 触发时跑 pack，否则只记 loss ----
     def observe(self, step: int, loss: Optional[float] = None):
+        if self.specs and not self._frozen:
+            raise RuntimeError("call freeze() before observe()")
         rows = []
         if loss is not None:
             rows.append(self._loss_row(step, loss))
