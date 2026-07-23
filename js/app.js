@@ -1211,9 +1211,8 @@ function chartScaleOptions({
 } = {}) {
   const axis = "rgba(255, 255, 255, 0.78)";
   const grid = "rgba(255, 255, 255, 0.12)";
-  // Residuals cross zero, so y stays linear; x may still be logarithmic.
-  const logX = scaleMode === "loglinear" || scaleMode === "loglog";
-  const logY = !residual && scaleMode === "loglog";
+  const logX = scaleMode === "loglog";
+  const logY = scaleMode === "loglinear" || scaleMode === "loglog";
   return {
     x: {
       type: logX ? "logarithmic" : "linear",
@@ -1275,8 +1274,7 @@ function chartCommonOptions({
   yTitle = "Value",
   residual = false,
 } = {}) {
-  // Residuals can be negative: preserve log-x but never use log-y.
-  const effectiveScale = residual && scaleMode === "loglog" ? "loglinear" : scaleMode;
+  const effectiveScale = scaleMode;
   const opts = {
     responsive: true,
     maintainAspectRatio: false,
@@ -1347,7 +1345,7 @@ function referenceLineMode(chartInstance) {
   const logX = chartInstance?.scales?.x?.type === "logarithmic";
   const logY = chartInstance?.scales?.y?.type === "logarithmic";
   if (logX && logY) return "loglog";
-  if (logX) return "loglinear";
+  if (logY) return "loglinear";
   return "linear";
 }
 
@@ -1379,14 +1377,17 @@ function referenceLinePoints(chartInstance, line) {
   }
 
   if (mode === "loglinear") {
-    if (!(xMin > 0)) return null;
+    if (!(yMin > 0)) return null;
     if (line.mode !== mode || !Number.isFinite(line.intercept)) {
-      const xCenter = Math.sqrt(xMin * xMax);
-      const yCenter = (yMin + yMax) / 2;
+      const xCenter = (xMin + xMax) / 2;
+      const yCenter = Math.sqrt(yMin * yMax);
       line.mode = mode;
-      line.intercept = yCenter - line.slope * Math.log10(xCenter);
+      line.intercept = Math.log10(yCenter) - line.slope * xCenter;
     }
-    const pointAt = (x) => ({ x, y: line.slope * Math.log10(x) + line.intercept });
+    const pointAt = (x) => ({
+      x,
+      y: Math.pow(10, Math.max(-300, Math.min(300, line.slope * x + line.intercept))),
+    });
     return [pointAt(xMin), pointAt(xMax)];
   }
 
@@ -1615,8 +1616,8 @@ function onReferenceLinePointerMove(event) {
     if (!(x > 0) || !(y > 0)) return;
     line.intercept = Math.log(y) - line.slope * Math.log(x);
   } else if (mode === "loglinear") {
-    if (!(x > 0)) return;
-    line.intercept = y - line.slope * Math.log10(x);
+    if (!(y > 0)) return;
+    line.intercept = Math.log10(y) - line.slope * x;
   } else {
     line.intercept = y - line.slope * x;
   }
@@ -1831,12 +1832,9 @@ function tauZeroPlotX() {
   return candidates.length ? Math.min(...candidates) : Number.EPSILON;
 }
 
-function mapPointsToXAxis(rawPoints, logX, logY = logX) {
-  const hasNonPositiveY = logY && rawPoints.some(
-    (p) => Number.isFinite(p._axisX) && Number.isFinite(p.y) && p.y <= 0,
-  );
+function mapPointsToXAxis(rawPoints, logX) {
   const valid = rawPoints.filter(
-    (p) => Number.isFinite(p._axisX) && Number.isFinite(p.y) && (!logY || p.y > 0),
+    (p) => Number.isFinite(p._axisX) && Number.isFinite(p.y),
   );
   const zeroPlotX =
     xAxisMode === "step"
@@ -1851,14 +1849,11 @@ function mapPointsToXAxis(rawPoints, logX, logY = logX) {
       _axisX: p._axisX,
       ...(xAxisMode === "tau" ? { _tau: p._axisX } : {}),
     }));
-  mapped._logYBlocked = hasNonPositiveY;
   return mapped;
 }
 
 function pointsFromSeries(series, rid = runId) {
-  const logX = CURVE_LOGLOG_ENABLED && curveScaleMode !== "linear";
-  const residual = setupResidualMode && compareRuns;
-  const logY = CURVE_LOGLOG_ENABLED && curveScaleMode === "loglog" && !residual;
+  const logX = CURVE_LOGLOG_ENABLED && curveScaleMode === "loglog";
   const raw = [];
   for (let i = 0; i < series.steps.length; i += 1) {
     const step = series.steps[i];
@@ -1866,15 +1861,22 @@ function pointsFromSeries(series, rid = runId) {
     if (!Number.isFinite(step) || !Number.isFinite(y)) continue;
     raw.push({ _axisX: xAxisValueForStep(step, rid), y, _step: step });
   }
-  return mapPointsToXAxis(raw, logX, logY);
+  return mapPointsToXAxis(raw, logX);
 }
 
 function lineDataHasPoints(lineData) {
   return !!(lineData?.datasets || []).some((d) => (d.data || []).length);
 }
 
-function datasetsHaveBlockedLogY(datasets) {
-  return !!(datasets || []).some((dataset) => dataset?.data?._logYBlocked);
+function scaleUsesLogY(scaleMode) {
+  return scaleMode === "loglinear" || scaleMode === "loglog";
+}
+
+function datasetsHaveBlockedLogY(datasets, scaleMode) {
+  if (!scaleUsesLogY(scaleMode)) return false;
+  return !!(datasets || []).some((dataset) =>
+    (dataset?.data || []).some((point) => Number.isFinite(point?.y) && point.y <= 0),
+  );
 }
 
 function updateCurveScaleButtons() {
@@ -2208,7 +2210,7 @@ function renderChart(spec) {
   }
 
   if (lineData) {
-    if (datasetsHaveBlockedLogY(lineData.datasets)) {
+    if (datasetsHaveBlockedLogY(lineData.datasets, curveScaleMode)) {
       setChartChrome(true);
       infoEl.textContent = LOG_SCALE_NON_POSITIVE_MESSAGE;
       if (fullOverlayOpen && fullOverlayMode === "spec") renderFullChart(spec);
@@ -2435,9 +2437,7 @@ function resetLossStepRange() {
 }
 
 function filterLossPoints(points, rid = runId) {
-  const logX = lossScaleMode !== "linear";
-  const residual = setupResidualMode && compareLossRuns;
-  const logY = lossScaleMode === "loglog" && !residual;
+  const logX = lossScaleMode === "loglog";
   const raw = points
     .filter((p) => {
       if (lossStepMin != null && p.x < lossStepMin) return false;
@@ -2445,15 +2445,15 @@ function filterLossPoints(points, rid = runId) {
       return Number.isFinite(p.x) && Number.isFinite(p.y);
     })
     .map((p) => ({ _axisX: xAxisValueForStep(p.x, rid), y: p.y, _step: p.x }));
-  return mapPointsToXAxis(raw, logX, logY);
+  return mapPointsToXAxis(raw, logX);
 }
 
 function lossChartScaleOptions() {
   const axis = "rgba(255, 255, 255, 0.78)";
   const grid = "rgba(255, 255, 255, 0.12)";
   const residual = setupResidualMode && compareLossRuns;
-  const logX = lossScaleMode !== "linear";
-  const logY = !residual && lossScaleMode === "loglog";
+  const logX = lossScaleMode === "loglog";
+  const logY = scaleUsesLogY(lossScaleMode);
   return {
     x: {
       type: logX ? "logarithmic" : "linear",
@@ -2652,7 +2652,7 @@ function createLossChart(
   { enablePan = true, onClick = null, datasets = null } = {},
 ) {
   const chartDatasets = datasets || buildLossDatasets();
-  if (!chartDatasets || datasetsHaveBlockedLogY(chartDatasets)) return null;
+  if (!chartDatasets || datasetsHaveBlockedLogY(chartDatasets, lossScaleMode)) return null;
   return new Chart(canvas, {
     type: "line",
     data: { datasets: chartDatasets },
@@ -2722,7 +2722,7 @@ function renderLossChart() {
   section.hidden = false;
   infoEl.textContent = lossInfoText();
   const datasets = buildLossDatasets();
-  if (datasetsHaveBlockedLogY(datasets)) {
+  if (datasetsHaveBlockedLogY(datasets, lossScaleMode)) {
     infoEl.textContent = LOG_SCALE_NON_POSITIVE_MESSAGE;
     return;
   }
@@ -2790,7 +2790,7 @@ function renderFullLossChart() {
     destroyFullChart();
     return;
   }
-  if (datasetsHaveBlockedLogY(datasets)) {
+  if (datasetsHaveBlockedLogY(datasets, lossScaleMode)) {
     infoEl.textContent = LOG_SCALE_NON_POSITIVE_MESSAGE;
     destroyFullChart();
     return;
@@ -2823,7 +2823,7 @@ function renderFullChart(spec) {
     destroyFullChart();
     return;
   }
-  if (datasetsHaveBlockedLogY(lineData.datasets)) {
+  if (datasetsHaveBlockedLogY(lineData.datasets, curveScaleMode)) {
     infoEl.textContent = LOG_SCALE_NON_POSITIVE_MESSAGE;
     destroyFullChart();
     return;
