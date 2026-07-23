@@ -1396,6 +1396,49 @@ body.curator-mode .app-header {
   color: var(--text);
 }
 
+.reference-line-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+}
+
+.reference-line-controls[hidden] {
+  display: none !important;
+}
+
+.reference-line-controls label {
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.reference-line-controls input {
+  width: 7rem;
+  min-width: 0;
+  padding: 0.38rem 0.5rem;
+  color: var(--text);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font: inherit;
+}
+
+.reference-line-controls input:focus {
+  outline: 2px solid rgba(159, 212, 228, 0.25);
+  border-color: var(--accent);
+}
+
+.reference-line-status {
+  max-width: 12rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .full-run-pick {
   margin: 0.35rem 0 0.15rem;
   padding: 0.45rem 0.55rem;

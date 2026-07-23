@@ -93,6 +93,7 @@ let fullChart = null;
 let fullOverlayOpen = false;
 let fullOverlayMode = null;
 let definitionResizeObserver = null;
+let referenceLineSlopes = [];
 /** Snapshot of main-page compare state while fullscreen is open. */
 let fullscreenCompareSnapshot = null;
 
@@ -248,6 +249,11 @@ function wireEvents() {
   document.getElementById("fullCloseBtn").addEventListener("click", closeFullscreen);
   document.getElementById("fullResetZoomBtn").addEventListener("click", () => {
     safeResetFullChartZoom();
+  });
+  document.getElementById("addReferenceLineBtn")?.addEventListener("click", addReferenceLine);
+  document.getElementById("clearReferenceLinesBtn")?.addEventListener("click", clearReferenceLines);
+  document.getElementById("referenceSlope")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") addReferenceLine();
   });
   document.getElementById("chartOverlay").addEventListener("click", (e) => {
     if (e.target.id === "chartOverlay") closeFullscreen();
@@ -1199,6 +1205,11 @@ function zoomPluginOptions({ enablePan = true } = {}) {
       pinch: { enabled: true },
       mode: "xy",
       drag: { enabled: false },
+      onZoomComplete: ({ chart: zoomedChart }) => {
+        if (zoomedChart === fullChart && referenceLineSlopes.length) {
+          applyReferenceLinesToFullChart();
+        }
+      },
     },
     pan: {
       // Fullscreen charts disable pan so Hammer does not interfere with note clicks.
@@ -1206,6 +1217,11 @@ function zoomPluginOptions({ enablePan = true } = {}) {
       mode: "xy",
       modifierKey: enablePan ? "alt" : null,
       threshold: 10,
+      onPanComplete: ({ chart: pannedChart }) => {
+        if (pannedChart === fullChart && referenceLineSlopes.length) {
+          applyReferenceLinesToFullChart();
+        }
+      },
     },
     limits: {
       x: { min: "original", max: "original", minRange: 1 },
@@ -1285,12 +1301,141 @@ function finiteMinMax(values) {
   return min === Infinity ? null : { min, max };
 }
 
+function referenceLineMode(chartInstance) {
+  const logX = chartInstance?.scales?.x?.type === "logarithmic";
+  const logY = chartInstance?.scales?.y?.type === "logarithmic";
+  return logX && logY ? "loglog" : "linear";
+}
+
+function referenceLinePoints(chartInstance, slope) {
+  const xScale = chartInstance?.scales?.x;
+  const yScale = chartInstance?.scales?.y;
+  let xMin = Number(xScale?.min);
+  let xMax = Number(xScale?.max);
+  let yMin = Number(yScale?.min);
+  let yMax = Number(yScale?.max);
+  if (![xMin, xMax, yMin, yMax].every(Number.isFinite) || !(xMax > xMin) || !(yMax > yMin)) {
+    return null;
+  }
+
+  if (referenceLineMode(chartInstance) === "loglog") {
+    if (!(xMin > 0) || !(yMin > 0)) return null;
+    const xCenter = Math.sqrt(xMin * xMax);
+    const yCenter = Math.sqrt(yMin * yMax);
+    const pointAt = (x) => {
+      const logY = Math.log(yCenter) + slope * (Math.log(x) - Math.log(xCenter));
+      return { x, y: Math.exp(Math.max(-700, Math.min(700, logY))) };
+    };
+    return [pointAt(xMin), pointAt(xMax)];
+  }
+
+  const xCenter = (xMin + xMax) / 2;
+  const yCenter = (yMin + yMax) / 2;
+  return [
+    { x: xMin, y: yCenter + slope * (xMin - xCenter) },
+    { x: xMax, y: yCenter + slope * (xMax - xCenter) },
+  ];
+}
+
+function referenceLineDataset(chartInstance, slope, index) {
+  const points = referenceLinePoints(chartInstance, slope);
+  if (!points || !points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))) return null;
+  const colors = ["#f0d080", "#f0a8b6", "#8fd9a4", "#b8d4f0", "#7ecfc4"];
+  return {
+    label: `Reference slope ${slope}`,
+    data: points,
+    borderColor: colors[index % colors.length],
+    borderWidth: 2,
+    borderDash: [8, 5],
+    pointRadius: 0,
+    pointHoverRadius: 0,
+    tension: 0,
+    fill: false,
+    _referenceLine: true,
+  };
+}
+
+function updateReferenceLineControls(message = "") {
+  const clearBtn = document.getElementById("clearReferenceLinesBtn");
+  if (clearBtn) clearBtn.hidden = referenceLineSlopes.length === 0;
+  const status = document.getElementById("referenceLineStatus");
+  if (status) {
+    status.textContent = message ||
+      (referenceLineSlopes.length ? `${referenceLineSlopes.length} line${referenceLineSlopes.length === 1 ? "" : "s"}` : "");
+  }
+}
+
+function applyReferenceLinesToFullChart() {
+  if (!fullChart) return;
+  fullChart.data.datasets = (fullChart.data.datasets || []).filter((ds) => !ds._referenceLine);
+  if (!referenceLineSlopes.length) {
+    fullChart.update("none");
+    updateReferenceLineControls();
+    return;
+  }
+
+  const xScale = fullChart.scales?.x;
+  const yScale = fullChart.scales?.y;
+  if (!xScale || !yScale) return;
+  // Preserve the current viewport: steep reference lines should be clipped, not
+  // force the user's data into a much smaller auto-scaled region.
+  fullChart.options.scales.x.min = xScale.min;
+  fullChart.options.scales.x.max = xScale.max;
+  fullChart.options.scales.y.min = yScale.min;
+  fullChart.options.scales.y.max = yScale.max;
+  const datasets = referenceLineSlopes
+    .map((slope, index) => referenceLineDataset(fullChart, slope, index))
+    .filter(Boolean);
+  fullChart.data.datasets.push(...datasets);
+  fullChart.update("none");
+  updateReferenceLineControls();
+}
+
+function addReferenceLine() {
+  const input = document.getElementById("referenceSlope");
+  if (!input || !fullChart) return;
+  if (!input.value.trim()) {
+    updateReferenceLineControls("Enter a slope");
+    input.focus();
+    return;
+  }
+  const slope = Number(input.value);
+  if (!Number.isFinite(slope)) {
+    updateReferenceLineControls("Enter a finite slope");
+    input.focus();
+    return;
+  }
+  if (referenceLineSlopes.length >= 8) {
+    updateReferenceLineControls("Maximum 8 lines");
+    return;
+  }
+  referenceLineSlopes.push(slope);
+  input.value = "";
+  applyReferenceLinesToFullChart();
+  updateReferenceLineControls(
+    `Added m=${slope} (${referenceLineMode(fullChart) === "loglog" ? "log–log" : "linear"})`,
+  );
+}
+
+function clearReferenceLines() {
+  referenceLineSlopes = [];
+  applyReferenceLinesToFullChart();
+}
+
+function resetReferenceLines() {
+  referenceLineSlopes = [];
+  const input = document.getElementById("referenceSlope");
+  if (input) input.value = "";
+  updateReferenceLineControls();
+}
+
 /** Restore axis range from data without destroying the Chart instance. */
 function fitChartScalesToData(chart) {
   if (!chart?.data?.datasets?.length) return false;
   const xs = [];
   const ys = [];
   for (const ds of chart.data.datasets) {
+    if (ds._referenceLine) continue;
     for (const p of ds.data || []) {
       if (p && Number.isFinite(p.x)) xs.push(p.x);
       if (p && Number.isFinite(p.y)) ys.push(p.y);
@@ -1377,6 +1522,8 @@ function safeResetFullChartZoom() {
       const spec = activeSpec();
       if (spec) renderFullChart(spec);
     }
+  } else {
+    applyReferenceLinesToFullChart();
   }
 }
 
@@ -2255,7 +2402,10 @@ function renderFullLossChart() {
     enablePan: false,
     onClick: fullscreenNoteClickHandler,
   });
-  if (fullChart) bindFullscreenCanvasInteractions(canvas);
+  if (fullChart) {
+    bindFullscreenCanvasInteractions(canvas);
+    applyReferenceLinesToFullChart();
+  }
 }
 
 function renderFullChart(spec) {
@@ -2300,6 +2450,7 @@ function renderFullChart(spec) {
     }),
   });
   bindFullscreenCanvasInteractions(canvas);
+  applyReferenceLinesToFullChart();
 }
 
 function openLossFullscreen() {
@@ -2307,6 +2458,8 @@ function openLossFullscreen() {
   fullscreenCompareSnapshot = snapshotCompareState();
   fullOverlayMode = "loss";
   fullOverlayOpen = true;
+  resetReferenceLines();
+  document.getElementById("referenceLineControls").hidden = false;
   setCurveOverlayChrome(false);
   setLossOverlayChrome(true);
   const overlay = document.getElementById("chartOverlay");
@@ -2323,6 +2476,8 @@ function openFullscreen() {
   fullscreenCompareSnapshot = snapshotCompareState();
   fullOverlayMode = "spec";
   fullOverlayOpen = true;
+  resetReferenceLines();
+  document.getElementById("referenceLineControls").hidden = false;
   setLossOverlayChrome(false);
   setCurveOverlayChrome(true);
   const overlay = document.getElementById("chartOverlay");
@@ -2339,6 +2494,8 @@ function closeFullscreen() {
   if (typeof setNotesRailExpanded === "function") setNotesRailExpanded(false);
   fullOverlayOpen = false;
   fullOverlayMode = null;
+  resetReferenceLines();
+  document.getElementById("referenceLineControls").hidden = true;
   setLossOverlayChrome(false);
   setCurveOverlayChrome(false);
   // Fullscreen compare edits must not leak back to the main page.

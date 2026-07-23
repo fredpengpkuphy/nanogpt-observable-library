@@ -119,6 +119,7 @@ function updateNotesHint() {
 function collectChartSteps(chart) {
   const steps = new Set();
   for (const ds of chart.data?.datasets || []) {
+    if (ds._referenceLine) continue;
     for (const p of ds.data || []) {
       if (!p) continue;
       if (Number.isFinite(p._step)) steps.add(p._step);

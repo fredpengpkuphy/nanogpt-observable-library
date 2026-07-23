@@ -197,6 +197,20 @@
             <input type="checkbox" id="fullResidual" />
             <span>Residuals vs baseline</span>
           </label>
+          <div class="reference-line-controls" id="referenceLineControls" hidden>
+            <label for="referenceSlope">Reference slope</label>
+            <input
+              type="number"
+              id="referenceSlope"
+              step="any"
+              inputmode="decimal"
+              placeholder="e.g. -0.5"
+              aria-label="Reference line slope"
+            />
+            <button type="button" class="chart-btn" id="addReferenceLineBtn">Add line</button>
+            <button type="button" class="chart-btn" id="clearReferenceLinesBtn" hidden>Clear</button>
+            <span class="reference-line-status" id="referenceLineStatus" role="status"></span>
+          </div>
           <button type="button" class="chart-btn" id="fullAddNoteBtn" title="Leave a note">Note</button>
           <button type="button" class="chart-btn" id="fullResetZoomBtn" title="Reset zoom">Reset</button>
           <button type="button" class="chart-btn" id="fullCloseBtn" title="Close">✕ Close</button>
@@ -266,8 +280,8 @@
   <script src="js/announcement-banner.js?v=2"></script>
   <script src="js/curator-ui.js?v=6"></script>
   <script src="js/maintenance-gate.js?v=1"></script>
-  <script src="js/notes-ui.js?v=15"></script>
+  <script src="js/notes-ui.js?v=16"></script>
   <script src="js/observable_defs.js?v=10"></script>
-  <script src="js/app.js?v=41"></script>
+  <script src="js/app.js?v=42"></script>
 </body>
 </html>
