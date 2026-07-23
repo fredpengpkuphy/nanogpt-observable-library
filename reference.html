@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=35">
+  <link rel="stylesheet" href="css/style.css?v=36">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 </head>
 <body class="ref-page">
@@ -29,23 +29,74 @@
 
   <main class="ref-shell">
     <section class="panel ref-notation" aria-labelledby="refNotationTitle">
-      <h2 id="refNotationTitle">How to read the formulas</h2>
-      <p>
-        The first line names the observed tensor as <strong>X<sub>t</sub></strong>;
-        the final <strong>y<sub>t</sub></strong> is the value shown on the chart.
-        Intermediate lines show any centering or time-series step.
+      <h2 id="refNotationTitle">How to read a formula</h2>
+      <p class="ref-notation-intro">
+        Read each formula from top to bottom. It describes how one model tensor
+        becomes one chart value; you do not need to memorize the symbols.
       </p>
-      <div class="ref-notation-symbols" aria-label="Formula symbols">
-        <span><strong>t</strong> observation</span>
-        <span><strong>t<sup>−</sup></strong> previous finite observation</span>
-        <span><strong>N</strong> number of values</span>
-        <span><strong>b / h</strong> batch / head index</span>
-        <span><strong>q / k</strong> query / key index</span>
-        <span><strong>τ</strong> token position</span>
-        <span><strong>B / T / F</strong> batch / sequence / feature size</span>
-        <span><strong>r / c</strong> matrix rows / columns</span>
-        <span><strong>mat(X)</strong> features as columns, other axes flattened</span>
+
+      <ol class="ref-reading-steps">
+        <li>
+          <strong>Find what was captured.</strong>
+          <code>X<sub>t</sub></code> is the complete tensor recorded at training
+          step <code>t</code>—for example, a weight matrix or a batch of activations.
+        </li>
+        <li>
+          <strong>Follow any preparation lines.</strong>
+          A formula may center, take absolute values, normalize, or reshape
+          <code>X<sub>t</sub></code>. If there is no such line, the tensor is used directly.
+        </li>
+        <li>
+          <strong>Read the last line as the chart value.</strong>
+          <code>y<sub>t</sub></code> is always a single number. The chart plots the
+          point <code>(training step t, value y<sub>t</sub>)</code>.
+        </li>
+      </ol>
+
+      <div class="ref-formula-example" aria-label="Worked formula example">
+        <h3>Example: mean of a weight matrix</h3>
+        <div class="ref-example-equations">
+          <code>X<sub>t</sub> = W<sub>t</sub> ∈ ℝ<sup>r×c</sup></code>
+          <code>y<sub>t</sub> = (1 / rc) Σ<sub>i=1…r, j=1…c</sub> X<sub>t,i,j</sub></code>
+        </div>
+        <p>
+          At step <code>t</code>, take every entry of the selected weight matrix,
+          average them, and plot that average. Here <code>r×c</code> is simply the
+          matrix shape.
+        </p>
       </div>
+
+      <div class="ref-formula-example" aria-label="Time-series formula example">
+        <h3>When a formula contains a time-series operation</h3>
+        <div class="ref-example-equations">
+          <code>z<sub>t</sub> = reduction(X<sub>t</sub>)</code>
+          <code>y<sub>t</sub> = z<sub>t</sub> − z<sub>t⁻</sub></code>
+        </div>
+        <p>
+          First compute the tensor summary <code>z<sub>t</sub></code>, then compare
+          it with the last earlier <em>recorded, finite</em> value. Because observables
+          may be sampled every 50 or 100 steps, <code>t⁻</code> does not necessarily
+          mean <code>t−1</code>.
+        </p>
+      </div>
+
+      <details class="ref-symbol-details">
+        <summary>Symbols used in some formulas</summary>
+        <dl class="ref-notation-symbols">
+          <div><dt>t</dt><dd>the current recorded training step</dd></div>
+          <div><dt>t⁻</dt><dd>the previous step where this observable produced a finite value</dd></div>
+          <div><dt>N</dt><dd>the number of scalar entries included in a reduction</dd></div>
+          <div><dt>b, h</dt><dd>one batch item and one attention head</dd></div>
+          <div><dt>q, k</dt><dd>one attention query position and key position</dd></div>
+          <div><dt>τ</dt><dd>a token position in the input sequence</dd></div>
+          <div><dt>B, T, F</dt><dd>batch size, sequence length, and feature width</dd></div>
+          <div><dt>r, c</dt><dd>row and column counts of a matrix</dd></div>
+          <div>
+            <dt>mat(X)</dt>
+            <dd>reshape X into a 2-D table: features are columns and all other axes become rows</dd>
+          </div>
+        </dl>
+      </details>
     </section>
 
     <section class="panel ref-toolbar" aria-label="Catalog filters">
