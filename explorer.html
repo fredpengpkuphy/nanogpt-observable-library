@@ -55,6 +55,7 @@
             </div>
             <div class="loss-view-toggle" id="lossScaleToggle" title="Axis scale">
               <button type="button" class="chart-btn loss-scale-btn active" data-scale="linear">Linear</button>
+              <button type="button" class="chart-btn loss-scale-btn" data-scale="loglinear">Log–linear</button>
               <button type="button" class="chart-btn loss-scale-btn" data-scale="loglog">Log–log</button>
             </div>
             <div class="loss-view-toggle x-axis-toggle" id="lossXAxisToggle" title="Horizontal axis">
@@ -118,6 +119,7 @@
               <div class="chart-actions">
                 <div class="loss-view-toggle" id="curveScaleToggle" title="Axis scale" hidden>
                   <button type="button" class="chart-btn curve-scale-btn active" data-scale="linear">Linear</button>
+                  <button type="button" class="chart-btn curve-scale-btn" data-scale="loglinear">Log–linear</button>
                   <button type="button" class="chart-btn curve-scale-btn" data-scale="loglog">Log–log</button>
                 </div>
                 <div class="loss-view-toggle x-axis-toggle" id="curveXAxisToggle" title="Horizontal axis" hidden>
@@ -189,10 +191,12 @@
           </div>
           <div class="loss-view-toggle" id="lossScaleToggleFull" hidden>
             <button type="button" class="chart-btn loss-scale-btn" data-scale="linear">Linear</button>
+            <button type="button" class="chart-btn loss-scale-btn" data-scale="loglinear">Log–linear</button>
             <button type="button" class="chart-btn loss-scale-btn" data-scale="loglog">Log–log</button>
           </div>
           <div class="loss-view-toggle" id="curveScaleToggleFull" hidden>
             <button type="button" class="chart-btn curve-scale-btn" data-scale="linear">Linear</button>
+            <button type="button" class="chart-btn curve-scale-btn" data-scale="loglinear">Log–linear</button>
             <button type="button" class="chart-btn curve-scale-btn" data-scale="loglog">Log–log</button>
           </div>
           <div class="loss-view-toggle x-axis-toggle" id="xAxisToggleFull" hidden title="Horizontal axis">
@@ -308,6 +312,6 @@
   <script src="js/maintenance-gate.js?v=1"></script>
   <script src="js/notes-ui.js?v=17"></script>
   <script src="js/observable_defs.js?v=10"></script>
-  <script src="js/app.js?v=45"></script>
+  <script src="js/app.js?v=46"></script>
 </body>
 </html>

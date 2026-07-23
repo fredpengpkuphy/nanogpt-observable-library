@@ -84,9 +84,9 @@ let chart = null;
 let lossChart = null;
 let lossLog = null;
 let lossViewMode = "both";
-/** @type {"linear" | "loglog"} */
+/** @type {"linear" | "loglinear" | "loglog"} */
 let lossScaleMode = "linear";
-/** @type {"linear" | "loglog"} */
+/** @type {"linear" | "loglinear" | "loglog"} */
 let curveScaleMode = "linear";
 const CURVE_LOGLOG_ENABLED = true;
 /** @type {"step" | "tau"} */
@@ -1209,8 +1209,8 @@ function chartScaleOptions({
 } = {}) {
   const axis = "rgba(255, 255, 255, 0.78)";
   const grid = "rgba(255, 255, 255, 0.12)";
-  // Residuals cross zero — y must stay linear. X may still be log for loss.
-  const logX = !residual && scaleMode === "loglog";
+  // Residuals cross zero, so y stays linear; x may still be logarithmic.
+  const logX = scaleMode === "loglinear" || scaleMode === "loglog";
   const logY = !residual && scaleMode === "loglog";
   return {
     x: {
@@ -1273,8 +1273,8 @@ function chartCommonOptions({
   yTitle = "Value",
   residual = false,
 } = {}) {
-  // Residuals can be negative — never use log-y for residual plots.
-  const effectiveScale = residual ? "linear" : scaleMode;
+  // Residuals can be negative: preserve log-x but never use log-y.
+  const effectiveScale = residual && scaleMode === "loglog" ? "loglinear" : scaleMode;
   const opts = {
     responsive: true,
     maintainAspectRatio: false,
@@ -1344,7 +1344,9 @@ function finiteMinMax(values) {
 function referenceLineMode(chartInstance) {
   const logX = chartInstance?.scales?.x?.type === "logarithmic";
   const logY = chartInstance?.scales?.y?.type === "logarithmic";
-  return logX && logY ? "loglog" : "linear";
+  if (logX && logY) return "loglog";
+  if (logX) return "loglinear";
+  return "linear";
 }
 
 function referenceLinePoints(chartInstance, line) {
@@ -1371,6 +1373,18 @@ function referenceLinePoints(chartInstance, line) {
       const logY = line.intercept + line.slope * Math.log(x);
       return { x, y: Math.exp(Math.max(-700, Math.min(700, logY))) };
     };
+    return [pointAt(xMin), pointAt(xMax)];
+  }
+
+  if (mode === "loglinear") {
+    if (!(xMin > 0)) return null;
+    if (line.mode !== mode || !Number.isFinite(line.intercept)) {
+      const xCenter = Math.sqrt(xMin * xMax);
+      const yCenter = (yMin + yMax) / 2;
+      line.mode = mode;
+      line.intercept = yCenter - line.slope * Math.log10(xCenter);
+    }
+    const pointAt = (x) => ({ x, y: line.slope * Math.log10(x) + line.intercept });
     return [pointAt(xMin), pointAt(xMax)];
   }
 
@@ -1485,8 +1499,11 @@ function addReferenceLine() {
   referenceLines.push({ slope, intercept: null, mode: null });
   input.value = "";
   applyReferenceLinesToFullChart();
+  const mode = referenceLineMode(fullChart);
+  const modeLabel =
+    mode === "loglog" ? "log–log" : mode === "loglinear" ? "log–linear" : "linear";
   updateReferenceLineControls(
-    `Added m=${slope} (${referenceLineMode(fullChart) === "loglog" ? "log–log" : "linear"})`,
+    `Added m=${slope} (${modeLabel})`,
   );
 }
 
@@ -1595,6 +1612,9 @@ function onReferenceLinePointerMove(event) {
   if (mode === "loglog") {
     if (!(x > 0) || !(y > 0)) return;
     line.intercept = Math.log(y) - line.slope * Math.log(x);
+  } else if (mode === "loglinear") {
+    if (!(x > 0)) return;
+    line.intercept = y - line.slope * Math.log10(x);
   } else {
     line.intercept = y - line.slope * x;
   }
@@ -1809,18 +1829,18 @@ function tauZeroPlotX() {
   return candidates.length ? Math.min(...candidates) : Number.EPSILON;
 }
 
-function mapPointsToXAxis(rawPoints, logarithmic) {
+function mapPointsToXAxis(rawPoints, logX, logY = logX) {
   const valid = rawPoints.filter(
-    (p) => Number.isFinite(p._axisX) && Number.isFinite(p.y) && (!logarithmic || p.y > 0),
+    (p) => Number.isFinite(p._axisX) && Number.isFinite(p.y) && (!logY || p.y > 0),
   );
   const zeroPlotX =
     xAxisMode === "step"
       ? LOG_ZERO_PLOT_X
       : tauZeroPlotX();
   return valid
-    .filter((p) => !logarithmic || p._axisX >= 0)
+    .filter((p) => !logX || p._axisX >= 0)
     .map((p) => ({
-      x: logarithmic && p._axisX === 0 ? zeroPlotX : p._axisX,
+      x: logX && p._axisX === 0 ? zeroPlotX : p._axisX,
       y: p.y,
       _step: p._step,
       _axisX: p._axisX,
@@ -1829,7 +1849,9 @@ function mapPointsToXAxis(rawPoints, logarithmic) {
 }
 
 function pointsFromSeries(series, rid = runId) {
-  const log = CURVE_LOGLOG_ENABLED && curveScaleMode === "loglog";
+  const logX = CURVE_LOGLOG_ENABLED && curveScaleMode !== "linear";
+  const residual = setupResidualMode && compareRuns;
+  const logY = CURVE_LOGLOG_ENABLED && curveScaleMode === "loglog" && !residual;
   const raw = [];
   for (let i = 0; i < series.steps.length; i += 1) {
     const step = series.steps[i];
@@ -1837,7 +1859,7 @@ function pointsFromSeries(series, rid = runId) {
     if (!Number.isFinite(step) || !Number.isFinite(y)) continue;
     raw.push({ _axisX: xAxisValueForStep(step, rid), y, _step: step });
   }
-  return mapPointsToXAxis(raw, log);
+  return mapPointsToXAxis(raw, logX, logY);
 }
 
 function lineDataHasPoints(lineData) {
@@ -1883,7 +1905,7 @@ function setCurveScaleMode(mode) {
     curveScaleMode = "linear";
     return;
   }
-  if (!["linear", "loglog"].includes(mode)) return;
+  if (!["linear", "loglinear", "loglog"].includes(mode)) return;
   curveScaleMode = mode;
   updateCurveScaleButtons();
   const spec = activeSpec();
@@ -2396,7 +2418,9 @@ function resetLossStepRange() {
 }
 
 function filterLossPoints(points, rid = runId) {
-  const log = lossScaleMode === "loglog";
+  const logX = lossScaleMode !== "linear";
+  const residual = setupResidualMode && compareLossRuns;
+  const logY = lossScaleMode === "loglog" && !residual;
   const raw = points
     .filter((p) => {
       if (lossStepMin != null && p.x < lossStepMin) return false;
@@ -2404,14 +2428,14 @@ function filterLossPoints(points, rid = runId) {
       return Number.isFinite(p.x) && Number.isFinite(p.y);
     })
     .map((p) => ({ _axisX: xAxisValueForStep(p.x, rid), y: p.y, _step: p.x }));
-  return mapPointsToXAxis(raw, log);
+  return mapPointsToXAxis(raw, logX, logY);
 }
 
 function lossChartScaleOptions() {
   const axis = "rgba(255, 255, 255, 0.78)";
   const grid = "rgba(255, 255, 255, 0.12)";
   const residual = setupResidualMode && compareLossRuns;
-  const logX = lossScaleMode === "loglog";
+  const logX = lossScaleMode !== "linear";
   const logY = !residual && lossScaleMode === "loglog";
   return {
     x: {
@@ -2444,7 +2468,7 @@ function lossChartOptions({ enablePan = true, onClick = null } = {}) {
     legend: true,
     enablePan,
     onClick,
-    scaleMode: residual ? "linear" : lossScaleMode,
+    scaleMode: lossScaleMode,
     yTitle: residual ? "Δ Loss vs baseline" : "Loss",
     residual,
   });
@@ -2647,7 +2671,7 @@ function setLossViewMode(mode) {
 }
 
 function setLossScaleMode(mode) {
-  if (!["linear", "loglog"].includes(mode)) return;
+  if (!["linear", "loglinear", "loglog"].includes(mode)) return;
   lossScaleMode = mode;
   updateLossViewButtons();
   renderLossChart();
