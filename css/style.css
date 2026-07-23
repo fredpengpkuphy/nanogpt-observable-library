@@ -1061,6 +1061,15 @@ body.curator-mode .app-header {
   color: #ffffff;
 }
 
+.chart-def-eq .katex-display {
+  margin: 0.25rem 0;
+  text-align: left;
+}
+
+.chart-def-eq .katex-display > .katex {
+  text-align: left;
+}
+
 .chart-def-sep {
   color: var(--muted);
   opacity: 0.7;
@@ -1519,6 +1528,35 @@ body.curator-mode .app-header {
 
 .ref-page .app-header p {
   max-width: 36rem;
+}
+
+.ref-notation {
+  padding: 0.9rem 1rem;
+}
+
+.ref-notation h2 {
+  margin: 0 0 0.3rem;
+  font-size: 1rem;
+  color: #ffffff;
+}
+
+.ref-notation p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.ref-notation-symbols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+  margin-top: 0.55rem;
+  color: #ffffff;
+  font-size: 0.82rem;
+}
+
+.ref-notation-symbols span {
+  white-space: nowrap;
 }
 
 .ref-toolbar {

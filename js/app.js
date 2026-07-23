@@ -1585,7 +1585,7 @@ function renderSpecDefinition(spec) {
     try {
       mathHtml = katex.renderToString(direct.tex, {
         throwOnError: false,
-        displayMode: false,
+        displayMode: true,
         output: "html",
       });
     } catch (_) {

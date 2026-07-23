@@ -140,16 +140,16 @@ function applyTransformTex(op, x, spec) {
   const name = parseOpName(op);
   if (name === "center") {
     if (SAMPLE_AXIS_SOURCES.has(spec?.source_kind)) {
-      return `\\big(${x}-\\mathbb{E}_{b}[${x}]\\big)`;
+      return `\\operatorname{center}_{b}(${x})=${x}-\\mathbb{E}_{b}[${x}]`;
     }
-    return `\\big(${x}-\\overline{${x}}\\big)`;
+    return `\\operatorname{center}(${x})=${x}-\\overline{${x}}`;
   }
   if (name === "abs") return `\\lvert ${x}\\rvert`;
   if (name === "normalize") {
     const norm = FEATURE_AXIS_SOURCES.has(spec?.source_kind)
       ? `\\|${x}\\|_{2,f}`
       : `\\|${x}\\|_2`;
-    return `\\dfrac{${x}}{\\max(${norm},10^{-12})}`;
+    return `\\operatorname{normalize}(${x})=\\dfrac{${x}}{\\max(${norm},10^{-12})}`;
   }
   if (name === "square") return `(${x})^{2}`;
   return x;
@@ -162,101 +162,154 @@ function applyTransformTex(op, x, spec) {
 function applyReductionTex(reduction, x) {
   switch (reduction) {
     case "mean":
-      return `\\dfrac{1}{N}\\sum_{i=1}^{N}(${x})_i`;
+      return `\\operatorname{mean}(${x})=\\dfrac{1}{N}\\sum_{i=1}^{N}(${x})_i`;
     case "std":
-      return (
-        `\\sqrt{\\dfrac{1}{N-1}\\sum_{i=1}^{N}` +
-        `\\big((${x})_i-\\mu\\big)^2},\\quad` +
-        `\\mu=\\dfrac{1}{N}\\sum_{i=1}^{N}(${x})_i`
-      );
+      return {
+        main:
+          `\\operatorname{std}(${x})=` +
+          `\\sqrt{\\dfrac{1}{N-1}\\sum_{i=1}^{N}\\big((${x})_i-\\mu\\big)^2}`,
+        details: [`\\mu=\\dfrac{1}{N}\\sum_{i=1}^{N}(${x})_i`],
+      };
     case "min":
-      return `\\min_i(${x})_i`;
+      return `\\operatorname{min}(${x})=\\min_i(${x})_i`;
     case "max":
-      return `\\max_i(${x})_i`;
+      return `\\operatorname{max}(${x})=\\max_i(${x})_i`;
     case "l1_norm":
-      return `\\sum_{i=1}^{N}\\lvert(${x})_i\\rvert`;
+      return `\\|${x}\\|_1=\\sum_{i=1}^{N}\\lvert(${x})_i\\rvert`;
     case "l2_norm":
-      return `\\sqrt{\\sum_{i=1}^{N}(${x})_i^2}`;
+      return `\\|${x}\\|_2=\\sqrt{\\sum_{i=1}^{N}(${x})_i^2}`;
     case "rms":
-      return `\\sqrt{\\dfrac{1}{N}\\sum_{i=1}^{N}(${x})_i^2}`;
+      return `\\operatorname{RMS}(${x})=\\sqrt{\\dfrac{1}{N}\\sum_{i=1}^{N}(${x})_i^2}`;
     case "max_abs":
-      return `\\max_i\\lvert(${x})_i\\rvert`;
+      return `\\operatorname{maxabs}(${x})=\\max_i\\lvert(${x})_i\\rvert`;
     case "sparsity":
       return (
-        `\\dfrac{1}{N}\\sum_{i=1}^{N}` +
+        `\\operatorname{nearzero}(${x})=\\dfrac{1}{N}\\sum_{i=1}^{N}` +
         `\\mathbf{1}\\!\\left[\\lvert(${x})_i\\rvert<10^{-6}\\right]`
       );
     case "positive_fraction":
-      return `\\dfrac{1}{N}\\sum_{i=1}^{N}\\mathbf{1}[(${x})_i>0]`;
-    case "entropy":
       return (
-        `-\\sum_i\\widetilde p_i\\log\\widetilde p_i,\\quad` +
-        `\\widetilde p_i=\\max\\!\\left(` +
-        `\\dfrac{\\lvert(${x})_i\\rvert}{\\sum_j\\lvert(${x})_j\\rvert},10^{-12}\\right),\\quad` +
-        `\\sum_j\\lvert(${x})_j\\rvert>10^{-12}`
+        `\\operatorname{positive\\,frac}(${x})=` +
+        `\\dfrac{1}{N}\\sum_{i=1}^{N}\\mathbf{1}[(${x})_i>0]`
       );
+    case "entropy":
+      return {
+        main: `\\operatorname{entropy}(${x})=-\\sum_i\\widetilde p_i\\log\\widetilde p_i`,
+        details: [
+          `\\widetilde p_i=\\max\\!\\left(` +
+            `\\dfrac{\\lvert(${x})_i\\rvert}{\\sum_j\\lvert(${x})_j\\rvert},10^{-12}\\right)`,
+          `\\text{defined when }\\sum_j\\lvert(${x})_j\\rvert>10^{-12}`,
+        ],
+      };
     case "spectral_norm":
     case "top_singular_value":
-      return `\\sigma_{\\max}(${x})`;
+      return `\\|${x}\\|_{2}=\\sigma_{\\max}(${x})`;
     case "trace":
-      return `\\sum_i(${x})_{ii}`;
+      return `\\operatorname{tr}(${x})=\\sum_i(${x})_{ii}`;
     case "row_std_mean":
-      return (
-        `\\dfrac{1}{r}\\sum_{i=1}^{r}` +
-        `\\sqrt{\\dfrac{1}{c-1}\\sum_{j=1}^{c}` +
-        `\\big((${x})_{ij}-\\overline{x}_{i,:}\\big)^2}`
-      );
+      return {
+        main:
+          `\\operatorname{row\\,std}(${x})=\\dfrac{1}{r}\\sum_{i=1}^{r}` +
+          `\\sqrt{\\dfrac{1}{c-1}\\sum_{j=1}^{c}` +
+          `\\big((${x})_{ij}-\\overline{x}_{i,:}\\big)^2}`,
+        details: [
+          `\\overline{x}_{i,:}=\\dfrac{1}{c}\\sum_{j=1}^{c}(${x})_{ij}`,
+        ],
+      };
     case "col_std_mean":
-      return (
-        `\\dfrac{1}{c}\\sum_{j=1}^{c}` +
-        `\\sqrt{\\dfrac{1}{r-1}\\sum_{i=1}^{r}` +
-        `\\big((${x})_{ij}-\\overline{x}_{:,j}\\big)^2}`
-      );
+      return {
+        main:
+          `\\operatorname{col\\,std}(${x})=\\dfrac{1}{c}\\sum_{j=1}^{c}` +
+          `\\sqrt{\\dfrac{1}{r-1}\\sum_{i=1}^{r}` +
+          `\\big((${x})_{ij}-\\overline{x}_{:,j}\\big)^2}`,
+        details: [
+          `\\overline{x}_{:,j}=\\dfrac{1}{r}\\sum_{i=1}^{r}(${x})_{ij}`,
+        ],
+      };
     case "effective_rank":
-      return (
-        `\\exp\\!\\left(-\\sum_{k\\in K}p_k\\log p_k\\right),\\quad` +
-        `M=\\operatorname{mat}(${x})-\\mathbf{1}\\,\\overline m^{\\!\\top},\\quad` +
-        `K=\\{k:\\sigma_k(M)^2>10^{-12}\\},\\quad` +
-        `p_k=\\dfrac{\\sigma_k(M)^2}{\\sum_{j\\in K}\\sigma_j(M)^2}`
-      );
+      return {
+        main:
+          `\\operatorname{erank}(${x})=` +
+          `\\exp\\!\\left(-\\sum_{k\\in K}p_k\\log p_k\\right)`,
+        details: [
+          `M=\\operatorname{mat}(${x})-\\mathbf{1}\\,\\overline m^{\\!\\top}`,
+          `K=\\{k:\\sigma_k(M)^2>10^{-12}\\}`,
+          `p_k=\\dfrac{\\sigma_k(M)^2}{\\sum_{j\\in K}\\sigma_j(M)^2}`,
+          `\\text{defined when }K\\ne\\varnothing`,
+        ],
+      };
     case "attention_entropy_mean":
-      return (
-        `\\mathbb{E}_{b,h,q}\\!\\left[-\\sum_{k=0}^{T-1}` +
-        `\\widetilde{${x}}_{b,h,q,k}\\log\\widetilde{${x}}_{b,h,q,k}\\right],\\quad` +
-        `\\widetilde{${x}}=\\max(${x},10^{-12})`
-      );
+      return {
+        main:
+          `\\operatorname{mean\\,attn\\,entropy}(${x})=` +
+          `\\mathbb{E}_{b,h,q}\\!\\left[-\\sum_{k=0}^{T-1}` +
+          `\\widetilde{${x}}_{b,h,q,k}\\log\\widetilde{${x}}_{b,h,q,k}\\right]`,
+        details: [`\\widetilde{${x}}=\\max(${x},10^{-12})`],
+      };
     case "attention_entropy_min":
-      return (
-        `\\min_{b,h,q}\\!\\left[-\\sum_{k=0}^{T-1}` +
-        `\\widetilde{${x}}_{b,h,q,k}\\log\\widetilde{${x}}_{b,h,q,k}\\right]` +
-        `=-(T-1)\\varepsilon\\log\\varepsilon,\\quad` +
-        `\\widetilde{${x}}=\\max(${x},\\varepsilon),\\quad` +
-        `\\varepsilon=10^{-12}\\quad(q=0\\text{ guarantees the minimum})`
-      );
+      return {
+        main:
+          `\\operatorname{min\\,attn\\,entropy}(${x})=` +
+          `\\min_{b,h,q}\\!\\left[-\\sum_{k=0}^{T-1}` +
+          `\\widetilde{${x}}_{b,h,q,k}\\log\\widetilde{${x}}_{b,h,q,k}\\right]`,
+        details: [
+          `\\widetilde{${x}}=\\max(${x},\\varepsilon),\\quad\\varepsilon=10^{-12}`,
+          `\\operatorname{min\\,attn\\,entropy}(${x})=` +
+            `-(T-1)\\varepsilon\\log\\varepsilon\\quad(q=0)`,
+        ],
+      };
     case "attention_sink_first_token":
-      return `\\mathbb{E}_{b,h,\\,q=1,\\ldots,T-1}[(${x})_{b,h,q,0}]`;
+      return (
+        `\\operatorname{first\\,token\\,mass}(${x})=` +
+        `\\mathbb{E}_{b,h,\\,q=1,\\ldots,T-1}[(${x})_{b,h,q,0}]`
+      );
     case "attention_sink_domination":
-      return `\\max_{0\\le k<T}\\mathbb{E}_{b,h,\\,q=0,\\ldots,T-1}[(${x})_{b,h,q,k}]`;
+      return (
+        `\\operatorname{sink\\,domination}(${x})=` +
+        `\\max_{0\\le k<T}\\mathbb{E}_{b,h,\\,q=0,\\ldots,T-1}[(${x})_{b,h,q,k}]`
+      );
     case "attention_sink_ratio":
-      return `T\\,\\mathbb{E}_{b,h,\\,q=1,\\ldots,T-1}[(${x})_{b,h,q,0}]`;
+      return (
+        `\\operatorname{first\\,token\\,ratio}(${x})=` +
+        `T\\,\\mathbb{E}_{b,h,\\,q=1,\\ldots,T-1}[(${x})_{b,h,q,0}]`
+      );
     case "activation_rate":
-      return `\\dfrac{1}{N}\\sum_{i=1}^{N}\\mathbf{1}[(${x})_i>0]`;
+      return (
+        `\\operatorname{activation\\,rate}(${x})=` +
+        `\\dfrac{1}{N}\\sum_{i=1}^{N}\\mathbf{1}[(${x})_i>0]`
+      );
     case "massive_activation_peak_ratio":
-      return (
-        `\\dfrac{\\max_i\\lvert(${x})_i\\rvert}` +
-        `{\\sqrt{N^{-1}\\sum_i(${x})_i^2}}`
-      );
+      return {
+        main:
+          `\\operatorname{peak\\,ratio}(${x})=` +
+          `\\dfrac{\\max_i\\lvert(${x})_i\\rvert}{r}`,
+        details: [
+          `r=\\operatorname{RMS}(${x})=\\sqrt{N^{-1}\\sum_i(${x})_i^2}`,
+          `\\text{defined when }r>10^{-12}`,
+        ],
+      };
     case "massive_activation_outlier_fraction":
-      return (
-        `\\dfrac{1}{N}\\sum_i\\mathbf{1}\\!\\left[` +
-        `\\lvert(${x})_i\\rvert>3\\sqrt{N^{-1}\\sum_j(${x})_j^2}\\right]`
-      );
+      return {
+        main:
+          `\\operatorname{outlier\\,frac}(${x})=` +
+          `\\dfrac{1}{N}\\sum_i\\mathbf{1}\\!\\left[\\lvert(${x})_i\\rvert>3r\\right]`,
+        details: [
+          `r=\\operatorname{RMS}(${x})=\\sqrt{N^{-1}\\sum_i(${x})_i^2}`,
+          `\\text{defined when }r>10^{-12}`,
+        ],
+      };
     case "massive_neuron_fraction":
-      return (
-        `\\dfrac{1}{F}\\sum_{f=1}^{F}\\mathbf{1}\\!\\left[` +
-        `\\max_{b,q}\\lvert(${x})_{b,q,f}\\rvert>` +
-        `3\\sqrt{(BTF)^{-1}\\sum_{b,q,j}(${x})_{b,q,j}^{2}}\\right]`
-      );
+      return {
+        main:
+          `\\operatorname{massive\\,neuron\\,frac}(${x})=` +
+          `\\dfrac{1}{F}\\sum_{f=1}^{F}\\mathbf{1}\\!\\left[` +
+          `\\max_{b,q}\\lvert(${x})_{b,q,f}\\rvert>3r\\right]`,
+        details: [
+          `r=\\operatorname{RMS}(${x})=` +
+            `\\sqrt{(BTF)^{-1}\\sum_{b,q,j}(${x})_{b,q,j}^{2}}`,
+          `\\text{defined when }r>10^{-12}`,
+        ],
+      };
     default: {
       const safe = String(reduction || "R").replace(/[^a-zA-Z0-9_]/g, "");
       return `\\mathcal{R}_{\\mathrm{${safe}}}(${x})`;
@@ -269,16 +322,20 @@ function temporalStageTex(raw, inputName, outputName) {
   const args = parseOpArgs(raw);
   if (name === "identity") return `${outputName}_t=${inputName}_t`;
   if (name === "delta") {
-    return `${outputName}_t=${inputName}_t-${inputName}_{t-1}`;
+    return `${outputName}_t=\\Delta ${inputName}_t=${inputName}_t-${inputName}_{t-1}`;
   }
   if (name === "ema") {
     const a = parseNamedArg(args, "alpha") || "0.9";
-    return `${outputName}_t=${a}\\,${outputName}_{t-1}+(1-${a})${inputName}_t`;
+    return (
+      `${outputName}_t=\\operatorname{EMA}_{${a}}(${inputName})_t=` +
+      `${a}\\,${outputName}_{t-1}+(1-${a})${inputName}_t`
+    );
   }
   if (name === "slope") {
     const w = parseNamedArg(args, "window") || parseNamedArg(args, "w") || "5";
     return (
       `${outputName}_t=` +
+      `\\operatorname{slope}(${inputName}_{t-n+1:t})=` +
       `\\dfrac{\\sum_{j=0}^{n-1}(j-\\overline j)` +
       `(${inputName}_{t-n+1+j}-\\overline{${inputName}})}` +
       `{\\sum_{j=0}^{n-1}(j-\\overline j)^2},\\quad 2\\le n\\le${w}`
@@ -288,26 +345,38 @@ function temporalStageTex(raw, inputName, outputName) {
     const w = parseNamedArg(args, "window") || parseNamedArg(args, "w") || "5";
     return (
       `${outputName}_t=` +
+      `\\operatorname{rolling\\,std}(${inputName}_{t-n+1:t})=` +
       `\\sqrt{\\dfrac{1}{n}\\sum_{j=0}^{n-1}` +
       `(${inputName}_{t-j}-\\overline{${inputName}})^2},\\quad 2\\le n\\le${w}`
     );
   }
   if (name === "curvature") {
-    return `${outputName}_t=${inputName}_t-2${inputName}_{t-1}+${inputName}_{t-2}`;
+    return (
+      `${outputName}_t=\\Delta^2${inputName}_t=` +
+      `${inputName}_t-2${inputName}_{t-1}+${inputName}_{t-2}`
+    );
   }
   return `${outputName}_t=${inputName}_t`;
 }
 
-function buildTemporalFormula(scalarTex, temporalOps) {
-  if (!temporalOps.length) return `y_t=${scalarTex}`;
-  const lines = [`z_t=${scalarTex}`];
-  let inputName = "z";
+function alignFormulaLine(line) {
+  if (line.includes("&")) return line;
+  const eq = line.indexOf("=");
+  return eq >= 0 ? `${line.slice(0, eq)}&=${line.slice(eq + 1)}` : `&${line}`;
+}
+
+function buildFormulaLines(prefixLines, scalarTex, scalarDetails, temporalOps) {
+  const lines = [...prefixLines];
+  const scalarName = temporalOps.length ? "s" : "y";
+  lines.push(`${scalarName}_t=${scalarTex}`);
+  lines.push(...scalarDetails);
+  let inputName = scalarName;
   temporalOps.forEach((raw, index) => {
     const outputName = index === temporalOps.length - 1 ? "y" : `z^{(${index + 1})}`;
     lines.push(temporalStageTex(raw, inputName, outputName));
     inputName = outputName;
   });
-  return `\\begin{aligned}${lines.join("\\\\[2pt]")}\\end{aligned}`;
+  return `\\begin{aligned}${lines.map(alignFormulaLine).join("\\\\[2pt]")}\\end{aligned}`;
 }
 
 function modulePlaceEn(spec) {
@@ -557,11 +626,20 @@ function buildSpecPlainDescription(spec) {
  */
 function buildSpecDirectFormula(spec) {
   if (!spec) return null;
-  let x = sourceCallTex(spec);
+  const lines = [`X_t=${sourceCallTex(spec)}`];
+  let x = "X_t";
   const { tensorOps, temporalOps } = pipelineOpsForSpec(spec);
-  for (const op of tensorOps) x = applyTransformTex(op, x, spec);
-  const scalar = applyReductionTex(spec.reduction, x);
-  const tex = buildTemporalFormula(scalar, temporalOps);
+  tensorOps.forEach((op, index) => {
+    const next = `X_t^{(${index + 1})}`;
+    lines.push(`${next}=${applyTransformTex(op, x, spec)}`);
+    x = next;
+  });
+  const renderedReduction = applyReductionTex(spec.reduction, x);
+  const scalar =
+    typeof renderedReduction === "string" ? renderedReduction : renderedReduction.main;
+  const scalarDetails =
+    typeof renderedReduction === "string" ? [] : renderedReduction.details || [];
+  const tex = buildFormulaLines(lines, scalar, scalarDetails, temporalOps);
   const title = spec.label || `${spec.source_kind} · ${spec.reduction}`;
   return { tex, title, description: buildSpecPlainDescription(spec) };
 }
