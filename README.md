@@ -1,77 +1,59 @@
 # nanoGPT Observable Explorer
 
-Interactive architecture viewer for nanoGPT training observables.
+nanoGPT Observable Explorer is a public, interactive view of what happens inside
+a GPT-style language model during training. It connects training curves to the
+model architecture, making it easier to inspect how individual layers, modules,
+weights, gradients, activations, and attention patterns evolve over time.
 
-## 1. Organize curves (optional standalone)
+## What You Can Explore
 
-Flat PNGs under `out_baseline/observables/curve/` can be organized into a module tree:
+- Compare training and validation loss across recorded runs.
+- Navigate the model from embeddings through transformer blocks to the output head.
+- Inspect observables for individual modules and training steps.
+- Compare the same observable across layers or experimental setups.
+- View residuals against a baseline run.
+- Zoom into curves, select step ranges, and open charts in fullscreen mode.
+- Read the mathematical definition and plain-language description of each observable.
 
-```bash
-python3 scripts/organize_curves.py --obs-dir ../out_baseline/observables
-```
+## Observable Families
 
-Output: `../out_baseline/observables/curve_tree/<run_id>/curves/...`
+The explorer includes measurements derived from:
 
-Tree layout:
+- Model weights
+- Gradients
+- Parameter updates
+- Layer activations and pre-activations
+- Attention entropy and attention-sink behavior
+- GELU activation patterns and activation outliers
+- Output logits
+- Training and validation loss
 
-```text
-curves/{weight|grad|update|activation|attention|gelu_activation|...}/
-  embeddings/{wte|wpe}/
-  blocks/layer_{00..11}/{ln_1|attn|attn/c_attn|attn/c_proj|ln_2|mlp/c_fc|mlp/gelu|mlp/c_proj}/
-  head/ln_f/
-```
+Available measurements depend on the data recorded for each training run.
 
-## 2. Build viewer data
+## Using the Explorer
 
-Copies tree-organized curves + manifest into `data/`:
+1. Select **Start Exploration** on the home page.
+2. Choose a recorded training run.
+3. Select a transformer layer and module.
+4. Choose an observable to display its curve.
+5. Enable layer or setup comparison when compatible data is available.
+6. Open a chart in fullscreen mode to inspect individual steps and public notes.
 
-```bash
-python3 scripts/build_viewer_data.py --clean
-python3 scripts/build_viewer_data.py --obs-dir ../out_baseline/observables --run run_20260709_031351
-```
+The **Formulas** page provides a searchable catalog of observable definitions.
+The **Announcements** and **Suggestions** pages provide project updates and a
+public channel for feedback.
 
-Produces:
+## Public Notes and Suggestions
 
-- `data/index.json` — list of all runs (dataset picker)
-- `data/<run_id>/manifest.json` — specs, series, module index
-- `data/<run_id>/curves/...` — tree-organized PNG curves
-- `data/<run_id>/eval_loss_log.csv` — train/val loss (if available)
+Visitors can post notes on charts and submit suggestions without displaying a
+public username. Notes and replies are visible to everyone, so please do not
+include private, sensitive, or identifying information.
 
-## 3. Local preview
+## About the Data
 
-```bash
-python3 -m http.server 8080
-```
+The site displays previously recorded training runs; it does not run or modify a
+model in the browser. Curves may differ between runs because of changes in
+training configuration, initialization, optimization, or instrumentation.
 
-- **http://localhost:8080/** — landing intro (`index.html`)
-- **http://localhost:8080/select.html** — choose a training run
-- **http://localhost:8080/explorer.html?run=…** — architecture explorer
-
-## 4. GitHub Pages
-
-Push this folder as the repo root. Entry point is the landing page `index.html`.  
-After each training run, re-run `build_viewer_data.py` and commit `data/`.
-
-## Usage
-
-1. Open the site → **Start Exploration** → pick a run
-2. Loss chart (if present): Both / Train / Val, step range filter, fullscreen
-3. Use **L0–L11** tabs to switch transformer blocks
-4. Click a module (incl. Attention entropy / GELU massive) → observables by source kind
-5. Click a chip → interactive chart (CSV series) or PNG from the tree
-6. Fullscreen a curve → **click any step** to leave a public note (stored in Firestore)
-
-## Public notes (Firebase)
-
-Notes, comments, suggestions, announcements, and maintenance state are stored in
-Firebase Firestore. Visitors authenticate anonymously in the background; only the
-configured curator account can edit or delete content.
-
-See [`NOTES_SETUP.md`](NOTES_SETUP.md) for Firebase setup and publish the included
-`firestore.rules` before enabling public posting.
-
-## Tests
-
-```bash
-python -m unittest discover -s tests -v
-```
+This project is intended as a research and educational tool for studying neural
+network training dynamics.

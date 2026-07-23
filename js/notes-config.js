@@ -5,7 +5,7 @@
  * Only the curator (email/password) can delete notes or comments.
  * Sign in via ?admin=1 on the homepage or explorer.
  *
- * Setup: see NOTES_SETUP.md and firestore.rules (must Publish rules after changes).
+ * Access is enforced by the deployed Firestore security rules.
  */
 window.NOTES_CONFIG = {
   firebase: {
