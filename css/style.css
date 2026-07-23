@@ -1398,6 +1398,7 @@ body.curator-mode .app-header {
 
 .reference-line-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
   padding: 0.25rem 0.35rem;
@@ -1437,6 +1438,46 @@ body.curator-mode .app-header {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.reference-line-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  max-width: 100%;
+}
+
+.reference-line-list:empty {
+  display: none;
+}
+
+.reference-line-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.24rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-panel);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.reference-line-chip:hover {
+  border-color: rgba(126, 184, 201, 0.55);
+  background: var(--bg-hover);
+}
+
+.reference-line-swatch {
+  width: 1rem;
+  height: 0;
+  border-top: 2px dashed currentColor;
+}
+
+.reference-line-remove {
+  color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .full-run-pick {

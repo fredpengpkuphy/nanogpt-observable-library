@@ -51,6 +51,8 @@ const RUN_COLORS = [
   "#9fd4e4", "#e8c888", "#8fd9a4", "#f0a8b6", "#b8d4f0", "#7ecfc4",
 ];
 
+const REFERENCE_LINE_COLORS = ["#f0d080", "#f0a8b6", "#8fd9a4", "#b8d4f0", "#7ecfc4"];
+
 // Logarithmic axes cannot represent zero. Keep step 0 separate from the
 // genuine step 1 instead of mapping both to x=1.
 const LOG_ZERO_PLOT_X = 0.1;
@@ -1340,11 +1342,10 @@ function referenceLinePoints(chartInstance, slope) {
 function referenceLineDataset(chartInstance, slope, index) {
   const points = referenceLinePoints(chartInstance, slope);
   if (!points || !points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))) return null;
-  const colors = ["#f0d080", "#f0a8b6", "#8fd9a4", "#b8d4f0", "#7ecfc4"];
   return {
     label: `Reference slope ${slope}`,
     data: points,
-    borderColor: colors[index % colors.length],
+    borderColor: REFERENCE_LINE_COLORS[index % REFERENCE_LINE_COLORS.length],
     borderWidth: 2,
     borderDash: [8, 5],
     pointRadius: 0,
@@ -1358,6 +1359,30 @@ function referenceLineDataset(chartInstance, slope, index) {
 function updateReferenceLineControls(message = "") {
   const clearBtn = document.getElementById("clearReferenceLinesBtn");
   if (clearBtn) clearBtn.hidden = referenceLineSlopes.length === 0;
+  const list = document.getElementById("referenceLineList");
+  if (list) {
+    list.replaceChildren();
+    referenceLineSlopes.forEach((slope, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "reference-line-chip";
+      button.title = `Remove reference line with slope ${slope}`;
+      button.setAttribute("aria-label", button.title);
+      button.addEventListener("click", () => removeReferenceLine(index));
+
+      const swatch = document.createElement("span");
+      swatch.className = "reference-line-swatch";
+      swatch.style.color = REFERENCE_LINE_COLORS[index % REFERENCE_LINE_COLORS.length];
+      const label = document.createElement("span");
+      label.textContent = `m = ${slope}`;
+      const remove = document.createElement("span");
+      remove.className = "reference-line-remove";
+      remove.textContent = "×";
+      remove.setAttribute("aria-hidden", "true");
+      button.append(swatch, label, remove);
+      list.append(button);
+    });
+  }
   const status = document.getElementById("referenceLineStatus");
   if (status) {
     status.textContent = message ||
@@ -1419,6 +1444,12 @@ function addReferenceLine() {
 
 function clearReferenceLines() {
   referenceLineSlopes = [];
+  applyReferenceLinesToFullChart();
+}
+
+function removeReferenceLine(index) {
+  if (!Number.isInteger(index) || index < 0 || index >= referenceLineSlopes.length) return;
+  referenceLineSlopes.splice(index, 1);
   applyReferenceLinesToFullChart();
 }
 
