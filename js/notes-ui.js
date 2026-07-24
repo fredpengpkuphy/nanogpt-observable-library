@@ -48,6 +48,11 @@ function chartIsAlive(chart) {
   }
 }
 
+function isUsableNoteStep(step) {
+  if (typeof isValidStep === "function") return isValidStep(step);
+  return Number.isInteger(step) && step >= 0 && step <= 1_000_000_000_000;
+}
+
 function isNoteModalOpen() {
   const modal = document.getElementById("noteModal");
   return !!(modal && !modal.hidden && modal.classList.contains("visible"));
@@ -122,8 +127,8 @@ function collectChartSteps(chart) {
     if (ds._referenceLine) continue;
     for (const p of ds.data || []) {
       if (!p) continue;
-      if (Number.isFinite(p._step)) steps.add(p._step);
-      else if (Number.isFinite(p.x)) steps.add(p.x);
+      if (isUsableNoteStep(p._step)) steps.add(p._step);
+      else if (isUsableNoteStep(p.x)) steps.add(p.x);
     }
   }
   return [...steps].sort((a, b) => a - b);
@@ -138,7 +143,8 @@ function nearestStep(chart, pixelX) {
     if (ds._referenceLine) continue;
     for (const point of ds.data || []) {
       if (!point || !Number.isFinite(point.x)) continue;
-      const step = Number.isFinite(point._step) ? point._step : point.x;
+      const step = isUsableNoteStep(point._step) ? point._step : point.x;
+      if (!isUsableNoteStep(step)) continue;
       const pointPixel = xScale.getPixelForValue(point.x);
       if (!Number.isFinite(pointPixel)) continue;
       const distance = Math.abs(pointPixel - pixelX);
@@ -152,7 +158,7 @@ function nearestStep(chart, pixelX) {
 }
 
 function plotXForNoteStep(chart, step) {
-  if (!Number.isFinite(step)) return step;
+  if (!isUsableNoteStep(step)) return NaN;
   for (const ds of chart?.data?.datasets || []) {
     if (ds._referenceLine) continue;
     const match = (ds.data || []).find((point) => point?._step === step);
@@ -179,8 +185,8 @@ function noteAnnotationConfig(notes, chart) {
   const byStep = new Map();
   const ranges = [];
   for (const n of notes) {
-    if (!Number.isFinite(n.step)) continue;
-    if (Number.isFinite(n.stepEnd) && n.stepEnd > n.step) {
+    if (!isUsableNoteStep(n.step)) continue;
+    if (isUsableNoteStep(n.stepEnd) && n.stepEnd > n.step) {
       ranges.push(n);
       continue;
     }
@@ -213,6 +219,7 @@ function noteAnnotationConfig(notes, chart) {
   }
   for (const [step, list] of byStep) {
     const x = plotXForNoteStep(chart, step);
+    if (!Number.isFinite(x) || x < 0) continue;
     annotations[`note_${i++}`] = {
       type: "line",
       xMin: x,
@@ -261,8 +268,8 @@ function formatNoteTime(iso) {
 }
 
 function stepLabel(step, stepEnd = null) {
-  if (!Number.isFinite(step)) return "General";
-  return Number.isFinite(stepEnd) && stepEnd > step
+  if (!isUsableNoteStep(step)) return "General";
+  return isUsableNoteStep(stepEnd) && stepEnd > step
     ? `steps ${step}–${stepEnd}`
     : `step ${step}`;
 }
@@ -326,11 +333,11 @@ function renderNotesRail(notes) {
     return;
   }
   const sorted = [...notes].sort((a, b) => {
-    const as = Number.isFinite(a.step) ? a.step : Number.POSITIVE_INFINITY;
-    const bs = Number.isFinite(b.step) ? b.step : Number.POSITIVE_INFINITY;
+    const as = isUsableNoteStep(a.step) ? a.step : Number.POSITIVE_INFINITY;
+    const bs = isUsableNoteStep(b.step) ? b.step : Number.POSITIVE_INFINITY;
     if (as !== bs) return as - bs;
-    const ae = Number.isFinite(a.stepEnd) ? a.stepEnd : as;
-    const be = Number.isFinite(b.stepEnd) ? b.stepEnd : bs;
+    const ae = isUsableNoteStep(a.stepEnd) ? a.stepEnd : as;
+    const be = isUsableNoteStep(b.stepEnd) ? b.stepEnd : bs;
     if (ae !== be) return ae - be;
     return String(a.createdAt).localeCompare(String(b.createdAt));
   });
@@ -341,8 +348,8 @@ function renderNotesRail(notes) {
       );
       return `
     <article class="note-card" data-id="${escapeHtml(n.id)}"
-      data-step="${Number.isFinite(n.step) ? n.step : ""}"
-      data-step-end="${Number.isFinite(n.stepEnd) ? n.stepEnd : ""}">
+      data-step="${isUsableNoteStep(n.step) ? n.step : ""}"
+      data-step-end="${isUsableNoteStep(n.stepEnd) ? n.stepEnd : ""}">
       <header>
         <span class="note-step">${escapeHtml(stepLabel(n.step, n.stepEnd))}</span>
         <time class="note-time">${escapeHtml(formatNoteTime(n.createdAt))}</time>
@@ -601,7 +608,7 @@ function canvasCssPixelX(chart, clientX) {
 }
 
 function scheduleOpenNoteAtStep(step) {
-  if (step == null || !Number.isFinite(step)) return;
+  if (!isUsableNoteStep(step)) return;
   cancelPendingNoteClick();
   noteClickTimer = setTimeout(() => {
     noteClickTimer = null;
@@ -715,9 +722,9 @@ function openNoteModal(step) {
   const modeEl = document.getElementById("railNoteMode");
   const stepEl = document.getElementById("railNoteStep");
   const textEl = document.getElementById("railNoteText");
-  if (modeEl && Number.isFinite(step)) modeEl.value = "single";
+  if (modeEl && isUsableNoteStep(step)) modeEl.value = "single";
   updateRailNoteMode();
-  if (stepEl && Number.isFinite(step)) stepEl.value = String(Math.round(step));
+  if (stepEl && isUsableNoteStep(step)) stepEl.value = String(step);
   textEl?.focus();
 }
 

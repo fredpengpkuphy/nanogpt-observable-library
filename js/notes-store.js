@@ -192,6 +192,10 @@ const NotesStore = (() => {
     return "";
   }
 
+  function validStoredStep(step) {
+    return Number.isInteger(step) && step >= 0 && step <= 1_000_000_000_000;
+  }
+
   function parseNote(doc) {
     const d = doc.data() || {};
     const stepRaw = d.step;
@@ -204,13 +208,18 @@ const NotesStore = (() => {
       stepEndRaw === null || stepEndRaw === undefined || stepEndRaw === ""
         ? null
         : Number(stepEndRaw);
+    const validStep = validStoredStep(step) ? step : null;
+    const validStepEnd =
+      validStep != null && validStoredStep(stepEnd) && stepEnd > validStep
+        ? stepEnd
+        : null;
     return {
       id: doc.id,
       runId: d.runId || "",
       specId: d.specId || "",
       context: d.context || "spec",
-      step: Number.isFinite(step) ? step : null,
-      stepEnd: Number.isFinite(stepEnd) ? stepEnd : null,
+      step: validStep,
+      stepEnd: validStepEnd,
       uid: d.uid || "",
       text: d.text || "",
       createdAt: tsToIso(d.createdAt),
@@ -321,7 +330,7 @@ const NotesStore = (() => {
   function normalizeStep(step) {
     if (step === null || step === undefined || step === "") return null;
     const n = Number(step);
-    return Number.isFinite(n) ? Math.round(n) : null;
+    return validStoredStep(n) ? n : null;
   }
 
   async function createNote({
@@ -338,8 +347,19 @@ const NotesStore = (() => {
     if (!myUid) throw new Error("Not signed in.");
     const clean = String(text || "").trim().slice(0, 2000);
     if (!clean) throw new Error("Note is empty.");
+    const hasStep = step !== null && step !== undefined && step !== "";
+    const hasStepEnd = stepEnd !== null && stepEnd !== undefined && stepEnd !== "";
     const stepVal = normalizeStep(step);
     let stepEndVal = normalizeStep(stepEnd);
+    if (hasStep && stepVal == null) {
+      throw new Error("The step must be a non-negative whole number.");
+    }
+    if (hasStepEnd && stepEndVal == null) {
+      throw new Error("The end step must be a non-negative whole number.");
+    }
+    if (stepVal == null && stepEndVal != null) {
+      throw new Error("A step range requires a start step.");
+    }
     if (stepVal == null) stepEndVal = null;
     if (stepEndVal != null && stepEndVal < stepVal) {
       throw new Error("The end step must be greater than or equal to the start step.");

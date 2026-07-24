@@ -56,10 +56,16 @@ const REFERENCE_LINE_COLORS = ["#f0d080", "#f0a8b6", "#8fd9a4", "#b8d4f0", "#7ec
 // Logarithmic axes cannot represent zero. Keep step 0 separate from the
 // genuine step 1 instead of mapping both to x=1.
 const LOG_ZERO_PLOT_X = 0.1;
+const MAX_PLOT_STEP = 1_000_000_000_000;
 const LOG_SCALE_NON_POSITIVE_MESSAGE =
   "The selected step range contains zero or negative values, so a logarithmic y-axis cannot be plotted.";
 
+function isValidStep(step) {
+  return Number.isInteger(step) && step >= 0 && step <= MAX_PLOT_STEP;
+}
+
 function plotXForStep(step, logarithmic) {
+  if (!isValidStep(step)) return NaN;
   return logarithmic && step === 0 ? LOG_ZERO_PLOT_X : step;
 }
 
@@ -344,13 +350,7 @@ function wireEvents() {
   document.getElementById("lossApplyRangeBtn")?.addEventListener("click", applyLossStepRange);
   document.getElementById("lossResetRangeBtn")?.addEventListener("click", resetLossStepRange);
   document.getElementById("lossApplyRangeFullBtn")?.addEventListener("click", () => {
-    const minEl = document.getElementById("lossStepMinFull");
-    const maxEl = document.getElementById("lossStepMaxFull");
-    const mainMin = document.getElementById("lossStepMin");
-    const mainMax = document.getElementById("lossStepMax");
-    if (mainMin && minEl) mainMin.value = minEl.value;
-    if (mainMax && maxEl) mainMax.value = maxEl.value;
-    applyLossStepRange();
+    applyLossStepRange("full");
   });
   for (const id of ["lossStepMin", "lossStepMax", "lossStepMinFull", "lossStepMaxFull"]) {
     document.getElementById(id)?.addEventListener("keydown", (e) => {
@@ -525,8 +525,8 @@ async function ensureBaselineManifest(context = "curve") {
 }
 
 function pointStepKey(p) {
-  if (p && Number.isFinite(p._step)) return p._step;
-  if (p && Number.isFinite(p.x)) return p.x;
+  if (p && isValidStep(p._step)) return p._step;
+  if (p && isValidStep(p.x)) return p.x;
   return null;
 }
 
@@ -545,7 +545,7 @@ function residualAgainstBaseline(points, baselinePoints) {
     out.push({
       x: p.x,
       y: p.y - baseMap.get(key),
-      _step: Number.isFinite(p._step) ? p._step : key,
+      _step: isValidStep(p._step) ? p._step : key,
       _axisX: p._axisX,
       ...(Number.isFinite(p._tau) ? { _tau: p._tau } : {}),
     });
@@ -557,7 +557,7 @@ function zeroBaselinePoints(baselinePoints) {
   return (baselinePoints || []).map((p) => ({
     x: p.x,
     y: 0,
-    _step: Number.isFinite(p._step) ? p._step : pointStepKey(p),
+    _step: isValidStep(p._step) ? p._step : pointStepKey(p),
     _axisX: p._axisX,
     ...(Number.isFinite(p._tau) ? { _tau: p._tau } : {}),
   }));
@@ -658,11 +658,7 @@ async function fetchText(url) {
 
 function specHasCurveData(spec) {
   const series = spec?.series;
-  const hasSeries =
-    Array.isArray(series?.steps) &&
-    Array.isArray(series?.values) &&
-    series.steps.length > 0 &&
-    series.values.length > 0;
+  const hasSeries = pointsFromSeries(series).length > 0;
   return hasSeries || Boolean(spec?.curve_png);
 }
 
@@ -1125,12 +1121,12 @@ function renderLayerPicker(spec) {
 }
 
 /** Collect unique plot-x values from chart datasets (log-x tick positions). */
-function collectPlotXsFromChart(chart) {
+function collectPlotXsFromChart(chart, { min = 0, max = Number.MAX_VALUE } = {}) {
   const xs = new Set();
   for (const ds of chart?.data?.datasets || []) {
     if (ds._referenceLine) continue;
     for (const p of ds.data || []) {
-      if (p && Number.isFinite(p.x) && p.x > 0) xs.add(p.x);
+      if (p && Number.isFinite(p.x) && p.x > 0 && p.x >= min && p.x <= max) xs.add(p.x);
     }
   }
   return [...xs].sort((a, b) => a - b);
@@ -1233,12 +1229,18 @@ function afterBuildLogXTicks(axis, axisMode = curveXAxisMode) {
     axisMode === "tau"
       ? (width < 520 ? 4 : 6)
       : (width < 520 ? 5 : 8);
-  const values = thinLogAxisTicks(collectPlotXsFromChart(axis.chart), maxTicks, axisMode);
+  const values = thinLogAxisTicks(
+    collectPlotXsFromChart(axis.chart, { min: axis.min, max: axis.max }),
+    maxTicks,
+    axisMode,
+  );
   axis.ticks = values.map((value) => ({ value }));
 }
 
 function formatXAxisValue(value, axisMode = curveXAxisMode) {
   if (!Number.isFinite(value)) return "";
+  if (value < -1e-12) return "";
+  if (Math.abs(value) <= 1e-12) value = 0;
   if (axisMode === "step" && Math.abs(value - Math.round(value)) < 1e-9) {
     return String(Math.round(value));
   }
@@ -1264,9 +1266,28 @@ function linearXAxisTickConfig(axisColor, axisMode = curveXAxisMode) {
     maxRotation: 0,
     minRotation: 0,
     callback(value) {
-      return formatXAxisValue(Number(value), axisMode);
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric < -1e-12) return "";
+      return formatXAxisValue(Math.max(0, numeric), axisMode);
     },
   };
+}
+
+function guardNonNegativeXAxis(scale) {
+  if (!scale) return;
+  if (scale.type === "logarithmic") {
+    if (!(scale.min > 0)) {
+      const xs = collectPlotXsFromChart(scale.chart);
+      scale.min = xs[0] || Number.EPSILON;
+    }
+    if (!(scale.max > scale.min)) scale.max = scale.min * 10;
+    return;
+  }
+  if (!Number.isFinite(scale.min) || scale.min < 0) scale.min = 0;
+  if (!Number.isFinite(scale.max)) scale.max = Math.max(1, scale.min);
+  if (!(scale.max > scale.min)) {
+    scale.max = scale.min + Math.max(1, Math.abs(scale.min) * 0.01);
+  }
 }
 
 function chartScaleOptions({
@@ -1286,6 +1307,7 @@ function chartScaleOptions({
       title: { display: true, text: logX ? `${xTitle} (log)` : xTitle, color: axis },
       ticks: logX ? logXAxisTickConfig(axis, axisMode) : linearXAxisTickConfig(axis, axisMode),
       ...(logX ? { afterBuildTicks: (scale) => afterBuildLogXTicks(scale, axisMode) } : {}),
+      afterDataLimits: guardNonNegativeXAxis,
       grid: { color: grid },
     },
     y: {
@@ -1371,13 +1393,15 @@ function chartCommonOptions({
           title: (items) => {
             if (!items.length) return "";
             const raw = items[0].raw;
-            if (raw && Number.isFinite(raw._step)) {
+            if (raw && isValidStep(raw._step)) {
               if (axisMode === "tau" && Number.isFinite(raw._tau)) {
                 return `τ ${formatXAxisValue(raw._tau, axisMode)} · step ${raw._step}`;
               }
               return `step ${raw._step}`;
             }
-            return `step ${items[0].parsed.x}`;
+            const x = Number(items[0].parsed?.x);
+            if (!Number.isFinite(x) || x < 0) return "";
+            return `${axisMode === "tau" ? "τ" : "step"} ${formatXAxisValue(x, axisMode)}`;
           },
         },
       },
@@ -1412,6 +1436,20 @@ function chartCommonOptions({
   };
   if (typeof onClick === "function") opts.onClick = onClick;
   return opts;
+}
+
+function createLineChartSafely(canvas, datasets, options) {
+  if (!canvas || !Array.isArray(datasets) || !datasets.length) return null;
+  try {
+    return new Chart(canvas, {
+      type: "line",
+      data: { datasets },
+      options,
+    });
+  } catch (err) {
+    console.warn("Chart rendering failed", err);
+    return null;
+  }
 }
 
 function finiteMinMax(values) {
@@ -1768,6 +1806,38 @@ function attachReferenceLineDragHandlers(canvas) {
   canvas.addEventListener("click", onReferenceLineClick, true);
 }
 
+function finiteOffset(value, delta) {
+  const result = value + delta;
+  if (Number.isFinite(result)) return result;
+  return result < 0 ? -Number.MAX_VALUE : Number.MAX_VALUE;
+}
+
+function paddedLinearBounds(
+  min,
+  max,
+  { nonNegative = false, ratio = 0.01, minimumSpan = 0 } = {},
+) {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+  if (max < min) [min, max] = [max, min];
+  const rawSpan = max - min;
+  const scale = Math.max(Math.abs(min), Math.abs(max), 1);
+  const span = Math.max(
+    Number.isFinite(rawSpan) && rawSpan > 0 ? rawSpan : scale,
+    Number.isFinite(minimumSpan) && minimumSpan > 0 ? minimumSpan : 0,
+  );
+  const pad = Math.max(Number.EPSILON, span * ratio);
+  let lower = finiteOffset(min, -pad);
+  let upper = finiteOffset(max, pad);
+  if (nonNegative) lower = Math.max(0, lower);
+  if (Number.isFinite(minimumSpan) && minimumSpan > 0 && upper - lower < minimumSpan) {
+    upper = finiteOffset(lower, minimumSpan);
+  }
+  if (!(upper > lower)) {
+    return { min: lower, max: finiteOffset(lower, Math.max(1, scale * ratio)) };
+  }
+  return { min: lower, max: upper };
+}
+
 /** Restore axis range from data without destroying the Chart instance. */
 function fitChartScalesToData(chart) {
   if (!chart?.data?.datasets?.length) return false;
@@ -1776,7 +1846,7 @@ function fitChartScalesToData(chart) {
   for (const ds of chart.data.datasets) {
     if (ds._referenceLine) continue;
     for (const p of ds.data || []) {
-      if (p && Number.isFinite(p.x)) xs.push(p.x);
+      if (p && Number.isFinite(p.x) && p.x >= 0) xs.push(p.x);
       if (p && Number.isFinite(p.y)) ys.push(p.y);
     }
   }
@@ -1790,19 +1860,26 @@ function fitChartScalesToData(chart) {
   const yLog = chart.options.scales?.y?.type === "logarithmic";
   if (xLog) {
     chart.options.scales.x.min = Math.max(xMin / 1.05, Number.EPSILON);
-    chart.options.scales.x.max = xMax * 1.05;
+    chart.options.scales.x.max = finiteOffset(xMax, xMax * 0.05);
   } else {
-    const xPad = (xMax - xMin) * 0.01 || 1;
-    chart.options.scales.x.min = xMin - xPad;
-    chart.options.scales.x.max = xMax + xPad;
+    const configuredMinRange = Number(chart.options.plugins?.zoom?.limits?.x?.minRange);
+    const xBounds = paddedLinearBounds(xMin, xMax, {
+      nonNegative: true,
+      ratio: 0.01,
+      minimumSpan: Number.isFinite(configuredMinRange) ? configuredMinRange : 0,
+    });
+    if (!xBounds) return false;
+    chart.options.scales.x.min = xBounds.min;
+    chart.options.scales.x.max = xBounds.max;
   }
   if (yLog) {
     chart.options.scales.y.min = Math.max(yMin / 1.08, Number.EPSILON);
-    chart.options.scales.y.max = yMax * 1.08;
+    chart.options.scales.y.max = finiteOffset(yMax, yMax * 0.08);
   } else {
-    const yPad = (yMax - yMin) * 0.06 || Math.max(Math.abs(yMax) * 0.05, 1e-6);
-    chart.options.scales.y.min = yMin - yPad;
-    chart.options.scales.y.max = yMax + yPad;
+    const yBounds = paddedLinearBounds(yMin, yMax, { ratio: 0.06 });
+    if (!yBounds) return false;
+    chart.options.scales.y.min = yBounds.min;
+    chart.options.scales.y.max = yBounds.max;
   }
   try {
     chart.update("none");
@@ -1878,9 +1955,23 @@ function setChartChrome(hasSeriesChart) {
   updateCurveXAxisButtons();
 }
 
+function validLearningRatePoints(log) {
+  if (!log || typeof log !== "object") return [];
+  if (Array.isArray(log._validLrPoints)) return log._validLrPoints;
+  const byStep = new Map();
+  for (const point of Array.isArray(log.lr) ? log.lr : []) {
+    if (!isValidStep(point?.x) || !Number.isFinite(point?.y) || point.y < 0) continue;
+    byStep.set(point.x, { x: point.x, y: point.y });
+  }
+  log._validLrPoints = [...byStep.values()].sort((a, b) => a.x - b.x);
+  return log._validLrPoints;
+}
+
 function learningRateAtStep(log, step) {
-  const points = log?.lr;
-  if (!Array.isArray(points) || !points.length || !Number.isFinite(step)) return NaN;
+  const points = validLearningRatePoints(log);
+  if (!points.length || !Number.isFinite(step) || step < 0 || step > MAX_PLOT_STEP) {
+    return NaN;
+  }
   if (step <= points[0].x) return points[0].y;
   const last = points[points.length - 1];
   if (step >= last.x) return last.y;
@@ -1901,35 +1992,63 @@ function learningRateAtStep(log, step) {
 }
 
 function ensureLearningRatePrefix(log) {
-  if (Array.isArray(log?.lrPrefix)) return log.lrPrefix;
-  const points = log?.lr;
-  if (!Array.isArray(points) || !points.length) return null;
-  const maxStep = Math.max(0, Math.floor(points[points.length - 1].x));
-  const prefix = new Array(maxStep + 1).fill(0);
-  for (let step = 0; step < maxStep; step += 1) {
-    const lr = learningRateAtStep(log, step);
-    prefix[step + 1] = prefix[step] + (Number.isFinite(lr) ? lr : 0);
+  if (log?._lrIntegral) return log._lrIntegral;
+  const points = validLearningRatePoints(log);
+  if (!points.length) return null;
+  const prefixAtPoint = new Array(points.length).fill(0);
+  prefixAtPoint[0] = points[0].x * points[0].y;
+  for (let i = 0; i + 1 < points.length; i += 1) {
+    const left = points[i];
+    const right = points[i + 1];
+    const count = right.x - left.x;
+    const slope = count > 0 ? (right.y - left.y) / count : 0;
+    const area = count * left.y + slope * count * (count - 1) / 2;
+    prefixAtPoint[i + 1] = prefixAtPoint[i] + area;
+    if (!Number.isFinite(prefixAtPoint[i + 1])) return null;
   }
-  log.lrPrefix = prefix;
-  return prefix;
+  log._lrIntegral = { points, prefixAtPoint };
+  return log._lrIntegral;
 }
 
 function cumulativeLearningRateAt(log, step) {
-  if (!Number.isFinite(step) || step <= 0) return 0;
-  const prefix = ensureLearningRatePrefix(log);
-  if (!prefix) return NaN;
+  if (!Number.isFinite(step) || step < 0 || step > MAX_PLOT_STEP) return NaN;
+  if (step === 0) return 0;
+  const integral = ensureLearningRatePrefix(log);
+  if (!integral) return NaN;
+  const { points, prefixAtPoint } = integral;
   const whole = Math.floor(step);
-  const covered = Math.min(whole, prefix.length - 1);
-  let tau = prefix[covered];
-  if (whole > covered) {
-    tau += (whole - covered) * learningRateAtStep(log, covered);
+  let tau;
+  if (whole <= points[0].x) {
+    tau = whole * points[0].y;
+  } else {
+    let lo = 0;
+    let hi = points.length - 1;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (points[mid].x <= whole) lo = mid;
+      else hi = mid - 1;
+    }
+    const left = points[lo];
+    const count = whole - left.x;
+    tau = prefixAtPoint[lo];
+    if (count > 0) {
+      if (lo + 1 < points.length) {
+        const right = points[lo + 1];
+        const span = right.x - left.x;
+        const slope = span > 0 ? (right.y - left.y) / span : 0;
+        tau += count * left.y + slope * count * (count - 1) / 2;
+      } else {
+        tau += count * left.y;
+      }
+    }
   }
   const fraction = step - whole;
   if (fraction > 0) tau += fraction * learningRateAtStep(log, whole);
-  return tau;
+  return Number.isFinite(tau) && tau >= 0 ? tau : NaN;
 }
 
 function xAxisValueForStep(step, rid = runId, axisMode = curveXAxisMode) {
+  if (!isValidStep(step)) return NaN;
   if (axisMode === "step") return step;
   return cumulativeLearningRateAt(lossLogByRun.get(rid), step);
 }
@@ -1944,9 +2063,17 @@ function tauZeroPlotX() {
 }
 
 function mapPointsToXAxis(rawPoints, logX, axisMode = curveXAxisMode) {
-  const valid = rawPoints.filter(
-    (p) => Number.isFinite(p._axisX) && Number.isFinite(p.y),
-  );
+  const byStep = new Map();
+  for (const p of rawPoints || []) {
+    if (
+      !isValidStep(p?._step) ||
+      !Number.isFinite(p?._axisX) ||
+      p._axisX < 0 ||
+      !Number.isFinite(p?.y)
+    ) continue;
+    byStep.set(p._step, p);
+  }
+  const valid = [...byStep.values()].sort((a, b) => a._step - b._step);
   const zeroPlotX =
     axisMode === "step"
       ? LOG_ZERO_PLOT_X
@@ -1966,10 +2093,13 @@ function mapPointsToXAxis(rawPoints, logX, axisMode = curveXAxisMode) {
 function pointsFromSeries(series, rid = runId) {
   const logX = CURVE_LOGLOG_ENABLED && curveScaleMode === "loglog";
   const raw = [];
-  for (let i = 0; i < series.steps.length; i += 1) {
-    const step = series.steps[i];
-    const y = series.values[i];
-    if (!Number.isFinite(step) || !Number.isFinite(y)) continue;
+  const steps = Array.isArray(series?.steps) ? series.steps : [];
+  const values = Array.isArray(series?.values) ? series.values : [];
+  const count = Math.min(steps.length, values.length);
+  for (let i = 0; i < count; i += 1) {
+    const step = steps[i];
+    const y = values[i];
+    if (!isValidStep(step) || !Number.isFinite(y)) continue;
     raw.push({ _axisX: xAxisValueForStep(step, rid, curveXAxisMode), y, _step: step });
   }
   return mapPointsToXAxis(raw, logX);
@@ -2374,15 +2504,20 @@ function renderChart(spec) {
       if (fullOverlayOpen && fullOverlayMode === "spec") renderFullChart(spec);
       return;
     }
-    chart = new Chart(canvas, {
-      type: "line",
-      data: { datasets: lineData.datasets },
-      options: chartCommonOptions({
+    chart = createLineChartSafely(
+      canvas,
+      lineData.datasets,
+      chartCommonOptions({
         legend: lineData.legend,
         scaleMode: curveScaleMode,
         residual: !!lineData.residual,
       }),
-    });
+    );
+    if (!chart) {
+      setChartChrome(false);
+      infoEl.textContent = "The curve could not be rendered because its data is invalid.";
+      return;
+    }
     attachDoubleClickReset(canvas);
     setChartChrome(true);
     if (fullOverlayOpen && fullOverlayMode === "spec") renderFullChart(spec);
@@ -2458,9 +2593,9 @@ function parseLossCsv(text) {
     const yt = parseNumber(cols[trainIdx]);
     const yv = parseNumber(cols[valIdx]);
     const lr = lrIdx >= 0 ? parseNumber(cols[lrIdx]) : NaN;
-    if (Number.isFinite(x) && Number.isFinite(yt)) trainByStep.set(x, yt);
-    if (Number.isFinite(x) && Number.isFinite(yv)) valByStep.set(x, yv);
-    if (Number.isFinite(x) && Number.isFinite(lr) && lr >= 0) lrByStep.set(x, lr);
+    if (isValidStep(x) && Number.isFinite(yt)) trainByStep.set(x, yt);
+    if (isValidStep(x) && Number.isFinite(yv)) valByStep.set(x, yv);
+    if (isValidStep(x) && Number.isFinite(lr) && lr >= 0) lrByStep.set(x, lr);
   }
   const toPoints = (values) =>
     [...values.entries()]
@@ -2493,11 +2628,22 @@ function lossLogsForChart() {
   return [{ run_id: runId, label: runLabel(runId), log: lossLog }];
 }
 
+function lossPointArrays(log) {
+  return [
+    Array.isArray(log?.train) ? log.train : [],
+    Array.isArray(log?.val) ? log.val : [],
+  ];
+}
+
 function lossDataBounds() {
   const logs = lossLogsForChart();
   const xs = [];
   for (const item of logs) {
-    for (const p of [...item.log.train, ...item.log.val]) xs.push(p.x);
+    for (const points of lossPointArrays(item.log)) {
+      for (const p of points) {
+        if (p && isValidStep(p.x)) xs.push(p.x);
+      }
+    }
   }
   const bounds = finiteMinMax(xs);
   return bounds || { min: 0, max: 0 };
@@ -2508,8 +2654,10 @@ function lossAvailableSteps() {
   const logs = lossLogsForChart();
   const xs = new Set();
   for (const item of logs) {
-    for (const p of [...item.log.train, ...item.log.val]) {
-      if (Number.isFinite(p.x)) xs.add(p.x);
+    for (const points of lossPointArrays(item.log)) {
+      for (const p of points) {
+        if (p && isValidStep(p.x)) xs.add(p.x);
+      }
     }
   }
   return [...xs].sort((a, b) => a - b);
@@ -2550,9 +2698,15 @@ function syncLossRangeInputs() {
   }
 }
 
-function applyLossStepRange() {
-  const minEl = document.getElementById("lossStepMin");
-  const maxEl = document.getElementById("lossStepMax");
+function applyLossStepRange(source = "main") {
+  const suffix = source === "full" ? "Full" : "";
+  const minEl =
+    document.getElementById(`lossStepMin${suffix}`) ||
+    document.getElementById("lossStepMinFull");
+  const maxEl =
+    document.getElementById(`lossStepMax${suffix}`) ||
+    document.getElementById("lossStepMaxFull");
+  if (!minEl || !maxEl) return;
   const steps = lossAvailableSteps();
   let min = minEl.value === "" ? null : Number(minEl.value);
   let max = maxEl.value === "" ? null : Number(maxEl.value);
@@ -2579,11 +2733,11 @@ function resetLossStepRange() {
 
 function filterLossPoints(points, rid = runId) {
   const logX = lossScaleMode === "loglog";
-  const raw = points
+  const raw = (Array.isArray(points) ? points : [])
     .filter((p) => {
       if (lossStepMin != null && p.x < lossStepMin) return false;
       if (lossStepMax != null && p.x > lossStepMax) return false;
-      return Number.isFinite(p.x) && Number.isFinite(p.y);
+      return isValidStep(p.x) && Number.isFinite(p.y);
     })
     .map((p) => ({ _axisX: xAxisValueForStep(p.x, rid, lossXAxisMode), y: p.y, _step: p.x }));
   return mapPointsToXAxis(raw, logX, lossXAxisMode);
@@ -2609,6 +2763,7 @@ function lossChartScaleOptions() {
       ...(logX
         ? { afterBuildTicks: (scale) => afterBuildLogXTicks(scale, lossXAxisMode) }
         : {}),
+      afterDataLimits: guardNonNegativeXAxis,
       grid: { color: grid },
     },
     y: {
@@ -2800,11 +2955,11 @@ function createLossChart(
 ) {
   const chartDatasets = datasets || buildLossDatasets();
   if (!chartDatasets || datasetsHaveBlockedLogY(chartDatasets, lossScaleMode)) return null;
-  return new Chart(canvas, {
-    type: "line",
-    data: { datasets: chartDatasets },
-    options: lossChartOptions({ enablePan, onClick }),
-  });
+  return createLineChartSafely(
+    canvas,
+    chartDatasets,
+    lossChartOptions({ enablePan, onClick }),
+  );
 }
 
 function updateLossViewButtons() {
@@ -2976,10 +3131,10 @@ function renderFullChart(spec) {
   canvas.removeAttribute("height");
   canvas.style.width = "";
   canvas.style.height = "";
-  fullChart = new Chart(canvas, {
-    type: "line",
-    data: { datasets: lineData.datasets },
-    options: chartCommonOptions({
+  fullChart = createLineChartSafely(
+    canvas,
+    lineData.datasets,
+    chartCommonOptions({
       legend: lineData.legend,
       onClick: fullscreenNoteClickHandler,
       enablePan: false,
@@ -2987,7 +3142,11 @@ function renderFullChart(spec) {
       scaleMode: curveScaleMode,
       residual: !!lineData.residual,
     }),
-  });
+  );
+  if (!fullChart) {
+    infoEl.textContent = "The curve could not be rendered because its data is invalid.";
+    return;
+  }
   bindFullscreenCanvasInteractions(canvas);
   applyReferenceLinesToFullChart();
 }

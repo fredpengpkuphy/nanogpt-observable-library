@@ -155,6 +155,9 @@ def find_run_ids(obs_dir: Path, explicit: str | None) -> list[str]:
     return [p.name.replace("_specs.json", "") for p in specs_files]
 
 
+MAX_VIEWER_STEP = 1_000_000_000_000
+
+
 def load_series(obs_dir: Path, run_id: str) -> dict[str, dict]:
     obs_path = obs_dir / f"{run_id}_observations.csv"
     values_by_step: dict[str, dict[int, float]] = defaultdict(dict)
@@ -171,7 +174,7 @@ def load_series(obs_dir: Path, run_id: str) -> dict[str, dict]:
                 val = float(row["value"])
             except (TypeError, ValueError):
                 continue
-            if not math.isfinite(val):
+            if step < 0 or step > MAX_VIEWER_STEP or not math.isfinite(val):
                 continue
             if row.get("valid") not in (None, "", "ok"):
                 continue

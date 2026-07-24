@@ -66,6 +66,13 @@ class ViewerDataTests(unittest.TestCase):
                         {"step": 30, "spec_id": "a", "value": 9, "valid": "nan"},
                         {"step": 40, "spec_id": "a", "value": "nan", "valid": "ok"},
                         {"step": 50, "spec_id": "a", "value": "inf", "valid": "ok"},
+                        {"step": -1000, "spec_id": "a", "value": 7, "valid": "ok"},
+                        {
+                            "step": 1_000_000_000_001,
+                            "spec_id": "a",
+                            "value": 8,
+                            "valid": "ok",
+                        },
                     ]
                 )
             self.assertEqual(
