@@ -662,6 +662,152 @@ function isDegenerateCenteredMean(spec, tensorOps) {
   );
 }
 
+/**
+ * Plain-language glossary for every index or shorthand that appears in the
+ * displayed formula. Keep this separate from the equation so notation remains
+ * readable on narrow screens and accessible without parsing TeX.
+ */
+function buildSpecNotation(spec) {
+  if (!spec) return [];
+  const entries = [];
+  const seen = new Set();
+  const add = (symbol, meaning) => {
+    if (!symbol || seen.has(symbol)) return;
+    seen.add(symbol);
+    entries.push({ symbol, meaning });
+  };
+  const { tensorOps, temporalOps } = pipelineOpsForSpec(spec);
+  const reduction = spec.reduction || "";
+  const genericElementReductions = new Set([
+    "mean", "std", "min", "max", "l1_norm", "l2_norm", "rms", "max_abs",
+    "sparsity", "positive_fraction", "entropy", "activation_rate",
+    "massive_activation_peak_ratio", "massive_activation_outlier_fraction",
+  ]);
+
+  add("t", "observation index: the checkpoint or training step at which this tensor was recorded");
+  add("X_t", "the source tensor recorded at observation t");
+  const sourceSymbols = {
+    weight: ["Θ_t", "model-parameter tensor at observation t"],
+    grad: ["∇_Θ L_t", "gradient of the training loss L with respect to the selected parameters Θ"],
+    update: ["Θ_t−Θ_t⁻", "change in the selected parameter tensor since its previous observation"],
+    activation: ["A_t", "recorded activation tensor"],
+    preactivation: ["P_t", "recorded tensor before the module’s nonlinearity"],
+    logits: ["Z_t", "recorded vocabulary-logit tensor"],
+    attention: ["𝒜_t", "recorded attention-probability tensor"],
+    gelu_activation: ["H_t", "recorded post-GELU activation tensor"],
+  };
+  if (sourceSymbols[spec.source_kind]) add(...sourceSymbols[spec.source_kind]);
+  if (tensorOps.length) {
+    add("X_t^(m)", "intermediate tensor after the m-th transform in the displayed pipeline");
+  }
+  add("y_t", "final scalar observable plotted at observation t");
+  if (temporalOps.length) {
+    add("s_t", "scalar reduction of the tensor before temporal processing");
+  }
+
+  if (genericElementReductions.has(reduction)) {
+    add("i", "index of one element after the tensor is flattened");
+    add("N", "total number of elements in the flattened tensor");
+  }
+  if (reduction === "std") {
+    add("μ", "mean of the N flattened tensor elements");
+  }
+  if (reduction === "entropy") {
+    add("j", "flattened-element index used in the normalization sum");
+    add("p̃_i", "normalized absolute magnitude of flattened element i, floored at 10⁻¹²");
+  }
+  if (reduction === "trace") {
+    add("i", "matrix diagonal index; X_ii is the i-th diagonal entry");
+  }
+  if (["sparsity", "positive_fraction", "activation_rate",
+       "massive_activation_outlier_fraction", "massive_neuron_fraction"].includes(reduction)) {
+    add("1[·]", "indicator: 1 when the condition in brackets is true, otherwise 0");
+  }
+  if (["row_std_mean", "col_std_mean"].includes(reduction)) {
+    add("i", "matrix row index");
+    add("j", "matrix column index");
+    add("r", "number of matrix rows");
+    add("c", "number of matrix columns");
+  }
+  if (reduction === "effective_rank") {
+    add("n", "number of samples after reshaping the tensor into a matrix");
+    add("F", "feature dimension of the reshaped matrix");
+    add("k", "singular-value index");
+    add("K", "indices of singular values whose squared magnitude exceeds 10⁻¹²");
+    add("σ_k(M)", "k-th singular value of the centered matrix M");
+    add("p_k", "fraction of total retained squared singular-value mass carried by component k");
+    add("A", "matrix obtained by reshaping the source tensor into n samples by F features");
+    add("M", "A after subtracting its mean feature vector from every sample");
+  }
+  if (["spectral_norm", "top_singular_value"].includes(reduction)) {
+    add("σ_max", "largest singular value of the source matrix");
+  }
+
+  const attentionReductions = new Set([
+    "attention_entropy_mean",
+    "attention_entropy_min",
+    "attention_sink_first_token",
+    "attention_sink_domination",
+    "attention_sink_ratio",
+  ]);
+  if (spec.source_kind === "attention" || attentionReductions.has(reduction)) {
+    add("b", "batch-example index");
+    add("h", "attention-head index");
+    add("q", "query-token position: the token that is attending");
+    add("k", "key-token position: the token being attended to");
+    add("T", "sequence length (number of token positions)");
+    if (reduction.includes("entropy")) {
+      add("H_{b,h,q}", "entropy of the attention distribution for batch item b, head h, and query q");
+      add("X̃", "attention probabilities after flooring each value at 10⁻¹² for a stable logarithm");
+    }
+    if (reduction.includes("mean") || reduction.includes("sink")) {
+      add("E_{indices}", "expectation: the arithmetic average over every index listed in the subscript");
+    }
+  }
+
+  if (reduction === "massive_neuron_fraction") {
+    add("b", "batch-example index");
+    add("τ", "token-position index within the sequence (not the chart’s cumulative-learning-rate τ)");
+    add("f", "feature or neuron index");
+    add("j", "feature index used in the RMS sum");
+    add("B", "batch size");
+    add("T", "sequence length");
+    add("F", "number of features or neurons");
+    add("a_f", "largest absolute activation produced by feature f over all batch items and token positions");
+  }
+  if (["massive_activation_peak_ratio", "massive_activation_outlier_fraction",
+       "massive_neuron_fraction"].includes(reduction)) {
+    add("r", "root-mean-square (RMS) magnitude used as the typical activation scale");
+  }
+
+  if (tensorOps.some((op) => parseOpName(op) === "center") &&
+      SAMPLE_AXIS_SOURCES.has(spec.source_kind)) {
+    add("b", "batch-example index; E_b averages across the batch dimension");
+  }
+  if (tensorOps.some((op) => parseOpName(op) === "normalize") &&
+      FEATURE_AXIS_SOURCES.has(spec.source_kind)) {
+    add("f", "feature index; ‖·‖₂,f is the L2 norm along the feature dimension");
+  }
+
+  if (temporalOps.length) {
+    add("t⁻", "previous observation for which the required input value is finite");
+  }
+  if (temporalOps.some((op) => ["slope", "rolling_std"].includes(parseOpName(op)))) {
+    add("u_j", "j-th scalar value in the current temporal window, ordered from oldest to newest");
+    add("n", "number of finite scalar observations currently available in that window");
+    add("j", "position within the temporal window");
+  }
+  if (temporalOps.some((op) => parseOpName(op) === "slope")) {
+    add("D", "sum of squared temporal-index deviations used as the slope denominator");
+    add("j̄, ū", "means of the temporal indices and scalar values in the current window");
+  }
+  if (temporalOps.some((op) => parseOpName(op) === "curvature")) {
+    add("u_0,u_1,u_2", "the latest three finite scalar observations, from oldest to newest");
+  }
+
+  return entries;
+}
+
 function buildSpecPlainDescription(spec) {
   if (!spec) return "";
   const place = modulePlaceEn(spec);
@@ -718,7 +864,12 @@ function buildSpecDirectFormula(spec) {
     typeof renderedReduction === "string" ? [] : renderedReduction.details || [];
   const tex = buildFormulaLines(lines, scalar, scalarDetails, temporalOps);
   const title = observableDisplayLabel(spec, temporalOps);
-  return { tex, title, description: buildSpecPlainDescription(spec) };
+  return {
+    tex,
+    title,
+    description: buildSpecPlainDescription(spec),
+    notation: buildSpecNotation(spec),
+  };
 }
 
 function referenceAnchorForSpec(spec) {

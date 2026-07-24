@@ -1,5 +1,5 @@
 /**
- * Fullscreen chart notes: panel compose, optional step tags, comments/replies.
+ * Fullscreen chart notes: general, single-step, or step-range tags plus comments/replies.
  * Anonymous posts (no public usernames). Curator can delete anything.
  */
 
@@ -112,7 +112,7 @@ function updateNotesHint() {
   if (!hint || !fullOverlayOpen) return;
   const n = notesForCurrentChart().length;
   const base =
-    "Write in the Notes panel · click the curve to tag a step · scroll to zoom · double-click to reset · Esc to close";
+    "Drag a rectangle to zoom · click the curve to tag a step · notes can cover one step or a range · double-click to reset · Esc to close";
   hint.textContent = n ? `${base} · ${n} note${n === 1 ? "" : "s"}` : base;
 }
 
@@ -177,13 +177,40 @@ function plotXForNoteStep(chart, step) {
 
 function noteAnnotationConfig(notes, chart) {
   const byStep = new Map();
+  const ranges = [];
   for (const n of notes) {
     if (!Number.isFinite(n.step)) continue;
+    if (Number.isFinite(n.stepEnd) && n.stepEnd > n.step) {
+      ranges.push(n);
+      continue;
+    }
     if (!byStep.has(n.step)) byStep.set(n.step, []);
     byStep.get(n.step).push(n);
   }
   const annotations = {};
   let i = 0;
+  for (const note of ranges) {
+    const xMin = plotXForNoteStep(chart, note.step);
+    const xMax = plotXForNoteStep(chart, note.stepEnd);
+    if (!Number.isFinite(xMin) || !Number.isFinite(xMax)) continue;
+    annotations[`note_range_${i++}`] = {
+      type: "box",
+      xMin: Math.min(xMin, xMax),
+      xMax: Math.max(xMin, xMax),
+      backgroundColor: "rgba(232, 200, 136, 0.10)",
+      borderColor: "rgba(232, 200, 136, 0.7)",
+      borderWidth: 1,
+      label: {
+        display: true,
+        content: `note · ${note.step}–${note.stepEnd}`,
+        position: "start",
+        backgroundColor: "rgba(14, 20, 25, 0.82)",
+        color: "#ffe6b8",
+        font: { size: 10, weight: "600" },
+        padding: 3,
+      },
+    };
+  }
   for (const [step, list] of byStep) {
     const x = plotXForNoteStep(chart, step);
     annotations[`note_${i++}`] = {
@@ -233,8 +260,11 @@ function formatNoteTime(iso) {
   }
 }
 
-function stepLabel(step) {
-  return Number.isFinite(step) ? `step ${step}` : "General";
+function stepLabel(step, stepEnd = null) {
+  if (!Number.isFinite(step)) return "General";
+  return Number.isFinite(stepEnd) && stepEnd > step
+    ? `steps ${step}–${stepEnd}`
+    : `step ${step}`;
 }
 
 function buildCommentTree(comments) {
@@ -299,6 +329,9 @@ function renderNotesRail(notes) {
     const as = Number.isFinite(a.step) ? a.step : Number.POSITIVE_INFINITY;
     const bs = Number.isFinite(b.step) ? b.step : Number.POSITIVE_INFINITY;
     if (as !== bs) return as - bs;
+    const ae = Number.isFinite(a.stepEnd) ? a.stepEnd : as;
+    const be = Number.isFinite(b.stepEnd) ? b.stepEnd : bs;
+    if (ae !== be) return ae - be;
     return String(a.createdAt).localeCompare(String(b.createdAt));
   });
   rail.innerHTML = sorted
@@ -307,9 +340,11 @@ function renderNotesRail(notes) {
         (n.comments || []).map((c) => ({ ...c, noteId: n.id }))
       );
       return `
-    <article class="note-card" data-id="${escapeHtml(n.id)}" data-step="${Number.isFinite(n.step) ? n.step : ""}">
+    <article class="note-card" data-id="${escapeHtml(n.id)}"
+      data-step="${Number.isFinite(n.step) ? n.step : ""}"
+      data-step-end="${Number.isFinite(n.stepEnd) ? n.stepEnd : ""}">
       <header>
-        <span class="note-step">${escapeHtml(stepLabel(n.step))}</span>
+        <span class="note-step">${escapeHtml(stepLabel(n.step, n.stepEnd))}</span>
         <time class="note-time">${escapeHtml(formatNoteTime(n.createdAt))}</time>
         ${
           noteIsAdmin
@@ -410,12 +445,46 @@ function ceilNoteStepToData(value) {
   return steps[steps.length - 1];
 }
 
-function snapRailNoteStepInput() {
+function floorNoteStepToData(value) {
+  if (!Number.isFinite(value)) return null;
+  const steps = chartIsAlive(fullChart) ? collectChartSteps(fullChart) : [];
+  if (!steps.length) return Math.round(value);
+  for (let i = steps.length - 1; i >= 0; i -= 1) {
+    if (steps[i] <= value) return steps[i];
+  }
+  return steps[0];
+}
+
+function railNoteMode() {
+  const mode = document.getElementById("railNoteMode")?.value;
+  return ["general", "single", "range"].includes(mode) ? mode : "general";
+}
+
+function updateRailNoteMode() {
+  const mode = railNoteMode();
+  const fields = document.getElementById("railNoteStepFields");
+  const generalHint = document.getElementById("railNoteGeneralHint");
+  const endWrap = document.getElementById("railNoteStepEndWrap");
+  const startLabel = document.getElementById("railNoteStepLabel");
   const stepEl = document.getElementById("railNoteStep");
+  const endEl = document.getElementById("railNoteStepEnd");
+  if (fields) fields.hidden = mode === "general";
+  if (generalHint) generalHint.hidden = mode !== "general";
+  if (endWrap) endWrap.hidden = mode !== "range";
+  if (startLabel) startLabel.textContent = mode === "range" ? "From" : "Step";
+  if (stepEl) stepEl.required = mode !== "general";
+  if (endEl) endEl.required = mode === "range";
+}
+
+function snapRailNoteStepInput(which = "start") {
+  const stepEl = document.getElementById(
+    which === "end" ? "railNoteStepEnd" : "railNoteStep"
+  );
   if (!stepEl || stepEl.value.trim() === "") return null;
   const n = Number(stepEl.value);
   if (!Number.isFinite(n)) return null;
-  const snapped = ceilNoteStepToData(n);
+  const snapped =
+    which === "end" ? floorNoteStepToData(n) : ceilNoteStepToData(n);
   if (snapped != null) stepEl.value = String(snapped);
   return snapped;
 }
@@ -424,6 +493,7 @@ async function submitRailNote(evt) {
   evt.preventDefault();
   const textEl = document.getElementById("railNoteText");
   const stepEl = document.getElementById("railNoteStep");
+  const stepEndEl = document.getElementById("railNoteStepEnd");
   const status = document.getElementById("railNoteStatus");
   const submitBtn = document.getElementById("railNoteSubmit");
   const text = textEl?.value.trim() || "";
@@ -442,16 +512,45 @@ async function submitRailNote(evt) {
     }
     return;
   }
+  const mode = railNoteMode();
   let step = null;
-  if (stepEl && stepEl.value.trim() !== "") {
+  let stepEnd = null;
+  if (mode !== "general") {
+    if (!stepEl || stepEl.value.trim() === "") {
+      status.hidden = false;
+      status.textContent = mode === "range"
+        ? "Choose the start step."
+        : "Choose a step.";
+      return;
+    }
     const n = Number(stepEl.value);
     if (!Number.isFinite(n)) {
       status.hidden = false;
-      status.textContent = "Step must be a number (or leave blank).";
+      status.textContent = "Step must be a number.";
       return;
     }
     step = ceilNoteStepToData(n);
     if (stepEl && step != null) stepEl.value = String(step);
+  }
+  if (mode === "range") {
+    if (!stepEndEl || stepEndEl.value.trim() === "") {
+      status.hidden = false;
+      status.textContent = "Choose the end step.";
+      return;
+    }
+    const n = Number(stepEndEl.value);
+    if (!Number.isFinite(n)) {
+      status.hidden = false;
+      status.textContent = "End step must be a number.";
+      return;
+    }
+    stepEnd = floorNoteStepToData(n);
+    if (stepEndEl && stepEnd != null) stepEndEl.value = String(stepEnd);
+    if (stepEnd <= step) {
+      status.hidden = false;
+      status.textContent = "The end step must be after the start step.";
+      return;
+    }
   }
   submitBtn.disabled = true;
   status.hidden = false;
@@ -462,11 +561,16 @@ async function submitRailNote(evt) {
       specId: key.specId,
       context: key.context,
       step,
+      stepEnd,
       text,
     });
     allNotes.unshift(result.note);
     textEl.value = "";
     if (stepEl) stepEl.value = "";
+    if (stepEndEl) stepEndEl.value = "";
+    const modeEl = document.getElementById("railNoteMode");
+    if (modeEl) modeEl.value = "general";
+    updateRailNoteMode();
     status.textContent = "Published.";
     if (chartIsAlive(fullChart)) applyNoteAnnotations(fullChart);
     else renderNotesRail(notesForCurrentChart());
@@ -504,8 +608,11 @@ function scheduleOpenNoteAtStep(step) {
     if (!fullOverlayOpen || !chartIsAlive(fullChart)) return;
     if (isNoteModalOpen()) return;
     // Prefer filling the rail form with this step.
+    const modeEl = document.getElementById("railNoteMode");
     const stepEl = document.getElementById("railNoteStep");
     const textEl = document.getElementById("railNoteText");
+    if (modeEl) modeEl.value = "single";
+    updateRailNoteMode();
     if (stepEl) stepEl.value = String(Math.round(step));
     textEl?.focus();
   }, 280);
@@ -526,7 +633,8 @@ function onFullscreenCanvasClick(evt) {
   if (notePointerDown) {
     const dx = evt.clientX - notePointerDown.x;
     const dy = evt.clientY - notePointerDown.y;
-    if (Math.hypot(dx, dy) > 10) {
+    if (Math.hypot(dx, dy) >= 8) {
+      cancelPendingNoteClick();
       notePointerDown = null;
       return;
     }
@@ -565,6 +673,14 @@ function handleFullscreenChartClick(evt, chart) {
     cancelPendingNoteClick();
     return;
   }
+  if (notePointerDown && native?.clientX != null && native?.clientY != null) {
+    const dx = native.clientX - notePointerDown.x;
+    const dy = native.clientY - notePointerDown.y;
+    if (Math.hypot(dx, dy) >= 8) {
+      cancelPendingNoteClick();
+      return;
+    }
+  }
   let pixelX = null;
   if (typeof evt?.x === "number" && Number.isFinite(evt.x)) {
     pixelX = evt.x;
@@ -596,8 +712,11 @@ function attachFullscreenNoteHandlers(chart) {
 function openNoteModal(step) {
   // Legacy path: route into the rail composer.
   pendingNoteStep = step;
+  const modeEl = document.getElementById("railNoteMode");
   const stepEl = document.getElementById("railNoteStep");
   const textEl = document.getElementById("railNoteText");
+  if (modeEl && Number.isFinite(step)) modeEl.value = "single";
+  updateRailNoteMode();
   if (stepEl && Number.isFinite(step)) stepEl.value = String(Math.round(step));
   textEl?.focus();
 }
@@ -671,8 +790,20 @@ function wireNotesUi() {
   }
   renderAdminBar();
   document.getElementById("railNoteForm")?.addEventListener("submit", submitRailNote);
-  document.getElementById("railNoteStep")?.addEventListener("change", snapRailNoteStepInput);
-  document.getElementById("railNoteStep")?.addEventListener("blur", snapRailNoteStepInput);
+  document.getElementById("railNoteMode")?.addEventListener("change", updateRailNoteMode);
+  document.getElementById("railNoteStep")?.addEventListener(
+    "change", () => snapRailNoteStepInput("start")
+  );
+  document.getElementById("railNoteStep")?.addEventListener(
+    "blur", () => snapRailNoteStepInput("start")
+  );
+  document.getElementById("railNoteStepEnd")?.addEventListener(
+    "change", () => snapRailNoteStepInput("end")
+  );
+  document.getElementById("railNoteStepEnd")?.addEventListener(
+    "blur", () => snapRailNoteStepInput("end")
+  );
+  updateRailNoteMode();
   document.getElementById("noteModalClose")?.addEventListener("click", closeNoteModal);
   document.getElementById("noteModalCancel")?.addEventListener("click", closeNoteModal);
   document.getElementById("noteModal")?.addEventListener("click", (e) => {

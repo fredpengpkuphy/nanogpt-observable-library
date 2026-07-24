@@ -316,7 +316,7 @@ function wireEvents() {
     renderLossChart();
     if (fullOverlayOpen && fullOverlayMode === "loss") renderFullLossChart();
   });
-  document.getElementById("lossExpandBtn")?.addEventListener("click", openLossFullscreen);
+  document.getElementById("lossOpenBtn")?.addEventListener("click", openLossFullscreen);
   document.getElementById("compareLossRuns")?.addEventListener("change", async (e) => {
     await setCompareLossRuns(e.target.checked);
   });
@@ -1301,13 +1301,23 @@ function chartScaleOptions({
   };
 }
 
-function zoomPluginOptions({ enablePan = true } = {}) {
+function zoomPluginOptions({
+  enablePan = true,
+  enableDragZoom = false,
+  xMinRange = 1,
+} = {}) {
   return {
     zoom: {
       wheel: { enabled: true, speed: 0.1 },
       pinch: { enabled: true },
       mode: "xy",
-      drag: { enabled: false },
+      drag: {
+        enabled: enableDragZoom,
+        threshold: 8,
+        backgroundColor: "rgba(159, 212, 228, 0.14)",
+        borderColor: "rgba(159, 212, 228, 0.85)",
+        borderWidth: 1,
+      },
       onZoomComplete: ({ chart: zoomedChart }) => {
         if (zoomedChart === fullChart && referenceLines.length) {
           applyReferenceLinesToFullChart();
@@ -1327,7 +1337,7 @@ function zoomPluginOptions({ enablePan = true } = {}) {
       },
     },
     limits: {
-      x: { min: "original", max: "original", minRange: 1 },
+      x: { min: "original", max: "original", minRange: xMinRange },
       y: { min: "original", max: "original", minRange: 1e-12 },
     },
   };
@@ -1341,6 +1351,7 @@ function chartCommonOptions({
   yTitle = "Value",
   residual = false,
   axisMode = curveXAxisMode,
+  enableDragZoom = false,
 } = {}) {
   const effectiveScale = scaleMode;
   const opts = {
@@ -1370,7 +1381,11 @@ function chartCommonOptions({
           },
         },
       },
-      zoom: zoomPluginOptions({ enablePan }),
+      zoom: zoomPluginOptions({
+        enablePan,
+        enableDragZoom,
+        xMinRange: axisMode === "tau" ? 1e-12 : 1,
+      }),
       ...(residual
         ? {
             annotation: {
@@ -2267,6 +2282,16 @@ function renderSpecDefinition(spec) {
   const desc =
     direct.description ||
     (typeof buildSpecPlainDescription === "function" ? buildSpecPlainDescription(spec) : "");
+  const notation = Array.isArray(direct.notation)
+    ? direct.notation
+    : (typeof buildSpecNotation === "function" ? buildSpecNotation(spec) : []);
+  const notationHtml = notation.length
+    ? `<div class="formula-notation">` +
+      `<div class="formula-notation-title">Notation</div>` +
+      `<dl>${notation.map((item) =>
+        `<div><dt>${escapeHtml(item.symbol)}</dt><dd>${escapeHtml(item.meaning)}</dd></div>`
+      ).join("")}</dl></div>`
+    : "";
   const formulaLineCount = direct.tex.split("\\\\[2pt]").length;
   el.classList.toggle("chart-def-dense", formulaLineCount >= 5);
   el.innerHTML = [
@@ -2279,6 +2304,7 @@ function renderSpecDefinition(spec) {
         `${mathHtml}</div>` +
       `<p class="chart-def-scroll-hint" hidden>Scroll horizontally to view the complete formula</p>` +
     `</div>`,
+    notationHtml,
   ].filter(Boolean).join("");
   el.hidden = false;
 
@@ -2608,6 +2634,7 @@ function lossChartOptions({ enablePan = true, onClick = null } = {}) {
     yTitle: residual ? "Δ Loss vs baseline" : "Loss",
     residual,
     axisMode: lossXAxisMode,
+    enableDragZoom: !enablePan,
   });
   opts.scales = lossChartScaleOptions();
   return opts;
@@ -2821,8 +2848,8 @@ function setLossScaleMode(mode) {
 function renderLossChart() {
   const section = document.getElementById("lossSection");
   const infoEl = document.getElementById("lossInfo");
-  const canvas = document.getElementById("lossChart");
-  if (!section || !infoEl || !canvas) return;
+  const openBtn = document.getElementById("lossOpenBtn");
+  if (!section || !infoEl || !openBtn) return;
 
   destroyLossChart();
   updateLossViewButtons();
@@ -2831,6 +2858,7 @@ function renderLossChart() {
   if (lossLog?.error) {
     section.hidden = false;
     infoEl.textContent = "eval_loss_log.csv not found";
+    openBtn.disabled = true;
     return;
   }
 
@@ -2840,24 +2868,10 @@ function renderLossChart() {
   }
 
   section.hidden = false;
-  infoEl.textContent = lossInfoText();
-  const datasets = buildLossDatasets();
-  if (datasetsHaveBlockedLogY(datasets, lossScaleMode)) {
-    infoEl.textContent = LOG_SCALE_NON_POSITIVE_MESSAGE;
-    return;
-  }
-  lossChart = createLossChart(canvas, { datasets });
-  if (!lossChart) {
-    infoEl.textContent =
-      lossScaleMode === "loglog"
-        ? "No positive step/loss points for log–log view."
-        : lossInfoText() || "No loss data to display.";
-    return;
-  }
-  canvas.ondblclick = (evt) => {
-    evt.preventDefault();
-    renderLossChart();
-  };
+  openBtn.disabled = false;
+  infoEl.textContent = compareLossRuns
+    ? lossInfoText() || "Compare training and validation loss across setups"
+    : "Inspect training and validation curves in a dedicated view";
 }
 
 function destroyFullChart() {
@@ -2969,6 +2983,7 @@ function renderFullChart(spec) {
       legend: lineData.legend,
       onClick: fullscreenNoteClickHandler,
       enablePan: false,
+      enableDragZoom: true,
       scaleMode: curveScaleMode,
       residual: !!lineData.residual,
     }),

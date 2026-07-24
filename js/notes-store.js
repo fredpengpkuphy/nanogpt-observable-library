@@ -3,7 +3,7 @@
  *
  * Collections
  *   notes/{id}
- *     { runId, specId, context, step|null, uid, text, createdAt }
+ *     { runId, specId, context, step|null, stepEnd|null, uid, text, createdAt }
  *   notes/{id}/comments/{id}
  *     { uid, text, parentId|null, createdAt }
  *   announcements/{id}
@@ -195,16 +195,22 @@ const NotesStore = (() => {
   function parseNote(doc) {
     const d = doc.data() || {};
     const stepRaw = d.step;
+    const stepEndRaw = d.stepEnd;
     const step =
       stepRaw === null || stepRaw === undefined || stepRaw === ""
         ? null
         : Number(stepRaw);
+    const stepEnd =
+      stepEndRaw === null || stepEndRaw === undefined || stepEndRaw === ""
+        ? null
+        : Number(stepEndRaw);
     return {
       id: doc.id,
       runId: d.runId || "",
       specId: d.specId || "",
       context: d.context || "spec",
       step: Number.isFinite(step) ? step : null,
+      stepEnd: Number.isFinite(stepEnd) ? stepEnd : null,
       uid: d.uid || "",
       text: d.text || "",
       createdAt: tsToIso(d.createdAt),
@@ -318,7 +324,14 @@ const NotesStore = (() => {
     return Number.isFinite(n) ? Math.round(n) : null;
   }
 
-  async function createNote({ runId, specId, context, step = null, text }) {
+  async function createNote({
+    runId,
+    specId,
+    context,
+    step = null,
+    stepEnd = null,
+    text,
+  }) {
     await init();
     if (!backendReady) throw new Error("Notes backend is not configured yet.");
     await waitForUid();
@@ -326,11 +339,18 @@ const NotesStore = (() => {
     const clean = String(text || "").trim().slice(0, 2000);
     if (!clean) throw new Error("Note is empty.");
     const stepVal = normalizeStep(step);
+    let stepEndVal = normalizeStep(stepEnd);
+    if (stepVal == null) stepEndVal = null;
+    if (stepEndVal != null && stepEndVal < stepVal) {
+      throw new Error("The end step must be greater than or equal to the start step.");
+    }
+    if (stepEndVal === stepVal) stepEndVal = null;
     const payload = {
       runId,
       specId,
       context: context || "spec",
       step: stepVal,
+      stepEnd: stepEndVal,
       uid: myUid,
       text: clean,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -344,6 +364,7 @@ const NotesStore = (() => {
         specId,
         context: context || "spec",
         step: stepVal,
+        stepEnd: stepEndVal,
         uid: myUid,
         text: clean,
         createdAt: new Date().toISOString(),

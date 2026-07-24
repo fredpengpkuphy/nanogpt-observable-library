@@ -26,7 +26,7 @@ service cloud.firestore {
 
       allow create: if request.auth != null
         && request.resource.data.keys().hasOnly([
-          "runId", "specId", "context", "step", "uid", "text", "createdAt"
+          "runId", "specId", "context", "step", "stepEnd", "uid", "text", "createdAt"
         ])
         && request.resource.data.uid == request.auth.uid
         && validText()
@@ -40,6 +40,12 @@ service cloud.firestore {
           || (request.resource.data.step is int
             && request.resource.data.step >= 0
             && request.resource.data.step <= 1000000000000))
+        && (!request.resource.data.keys().hasAny(["stepEnd"])
+          || request.resource.data.stepEnd == null
+          || (request.resource.data.step is int
+            && request.resource.data.stepEnd is int
+            && request.resource.data.stepEnd >= request.resource.data.step
+            && request.resource.data.stepEnd <= 1000000000000))
         && isServerCreate();
 
       allow update, delete: if isAdmin();

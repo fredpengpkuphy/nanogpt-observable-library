@@ -237,6 +237,16 @@ function renderCard(obs) {
     (typeof buildSpecPlainDescription === "function" && buildSpecPlainDescription(obs)) ||
     direct?.description ||
     "";
+  const notation = Array.isArray(direct?.notation)
+    ? direct.notation
+    : (typeof buildSpecNotation === "function" ? buildSpecNotation(obs) : []);
+  const notationHtml = notation.length
+    ? `<div class="formula-notation ref-formula-notation">` +
+      `<div class="formula-notation-title">Notation</div>` +
+      `<dl>${notation.map((item) =>
+        `<div><dt>${escapeHtml(item.symbol)}</dt><dd>${escapeHtml(item.meaning)}</dd></div>`
+      ).join("")}</dl></div>`
+    : "";
 
   article.innerHTML = `
     <div class="ref-obs-head">
@@ -249,6 +259,7 @@ function renderCard(obs) {
     </div>
     <p class="ref-obs-desc">${escapeHtml(description)}</p>
     <div class="ref-obs-formula">${mathHtml}</div>
+    ${notationHtml}
     <div class="ref-obs-meta">
       <span>${escapeHtml(obs.label || "")}</span>
       <span>transforms: ${escapeHtml(transforms)}</span>

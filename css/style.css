@@ -605,7 +605,63 @@ body.curator-mode .app-header {
 
 .loss-section {
   border-bottom: 1px solid var(--border);
-  padding: 0.85rem 1rem 0.75rem;
+  padding: 0.65rem 1rem;
+}
+
+.loss-launch {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgba(126, 184, 201, 0.24);
+  border-radius: 11px;
+  background:
+    linear-gradient(100deg, rgba(126, 184, 201, 0.1), transparent 55%),
+    rgba(255, 255, 255, 0.025);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.loss-launch:hover,
+.loss-launch:focus-visible {
+  border-color: rgba(126, 184, 201, 0.52);
+  background:
+    linear-gradient(100deg, rgba(126, 184, 201, 0.16), transparent 62%),
+    rgba(255, 255, 255, 0.04);
+  outline: none;
+}
+
+.loss-launch:active {
+  transform: translateY(1px);
+}
+
+.loss-launch:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.loss-launch-icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9px;
+  background: rgba(126, 184, 201, 0.14);
+  color: var(--accent);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.loss-launch-action {
+  white-space: nowrap;
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
 .loss-section-head {
@@ -632,6 +688,16 @@ body.curator-mode .app-header {
 .loss-section-info {
   font-size: 0.74rem;
   color: var(--muted);
+}
+
+@media (max-width: 560px) {
+  .loss-launch-action {
+    font-size: 0;
+  }
+
+  .loss-launch-action span {
+    font-size: 1rem;
+  }
 }
 
 .loss-range {
@@ -1090,6 +1156,59 @@ body.curator-mode .app-header {
 .chart-def-eq:focus-visible {
   outline: 2px solid rgba(159, 212, 228, 0.72);
   outline-offset: -2px;
+}
+
+.formula-notation {
+  padding-top: 0.1rem;
+}
+
+.formula-notation-title {
+  margin-bottom: 0.38rem;
+  color: rgba(159, 212, 228, 0.78);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.formula-notation dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.34rem 0.75rem;
+  margin: 0;
+}
+
+.formula-notation dl > div {
+  display: grid;
+  grid-template-columns: minmax(2.5rem, auto) 1fr;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.34rem 0.48rem;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.formula-notation dt {
+  color: var(--accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.formula-notation dd {
+  min-width: 0;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  line-height: 1.42;
+}
+
+.ref-formula-notation {
+  margin-top: 0.45rem;
 }
 
 .chart-def-eq .katex,
@@ -2161,6 +2280,39 @@ body.curator-mode .app-header {
   gap: 0.45rem;
 }
 
+.rail-note-mode-label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.rail-note-mode-label select {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.3rem 0.4rem;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--text);
+  background: var(--bg-panel);
+}
+
+.rail-note-step-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.rail-note-general-hint {
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: var(--muted-soft);
+}
+
 .rail-note-step-label {
   display: flex;
   align-items: center;
@@ -2170,7 +2322,7 @@ body.curator-mode .app-header {
 }
 
 .rail-note-step-label input {
-  width: 5.5rem;
+  width: 4.7rem;
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.28rem 0.4rem;
