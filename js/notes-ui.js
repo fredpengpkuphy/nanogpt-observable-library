@@ -159,9 +159,13 @@ function plotXForNoteStep(chart, step) {
     if (match && Number.isFinite(match.x)) return match.x;
   }
   const logarithmic = chart?.scales?.x?.type === "logarithmic";
-  if (typeof xAxisValueForStep === "function" && typeof xAxisMode !== "undefined" && xAxisMode === "tau") {
+  const axisMode =
+    typeof fullOverlayMode !== "undefined" && fullOverlayMode === "loss"
+      ? lossXAxisMode
+      : curveXAxisMode;
+  if (typeof xAxisValueForStep === "function" && axisMode === "tau") {
     const rid = typeof noteContextKey === "function" ? noteContextKey().runId : runId;
-    const tau = xAxisValueForStep(step, rid);
+    const tau = xAxisValueForStep(step, rid, axisMode);
     if (Number.isFinite(tau)) return logarithmic && tau === 0 ? Number.EPSILON : tau;
   }
   return typeof plotXForStep === "function"
