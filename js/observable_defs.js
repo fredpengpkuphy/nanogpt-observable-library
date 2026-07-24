@@ -662,6 +662,28 @@ function isDegenerateCenteredMean(spec, tensorOps) {
   );
 }
 
+const NOTATION_SYMBOL_TEX = {
+  "Θ_t": "\\Theta_t",
+  "∇_Θ L_t": "\\nabla_{\\Theta}\\mathcal{L}_t",
+  "Θ_t−Θ_t⁻": "\\Theta_t-\\Theta_{t^-}",
+  "𝒜_t": "\\mathcal{A}_t",
+  "X_t^(m)": "X_t^{(m)}",
+  "μ": "\\mu",
+  "p̃_i": "\\widetilde{p}_i",
+  "1[·]": "\\mathbf{1}[\\cdot]",
+  "σ_k(M)": "\\sigma_k(M)",
+  "σ_max": "\\sigma_{\\max}",
+  "X̃": "\\widetilde{X}",
+  "τ": "\\tau",
+  "‖·‖₂,f": "\\lVert\\cdot\\rVert_{2,f}",
+  "t⁻": "t^-",
+  "j̄, ū": "\\bar{j},\\,\\bar{u}",
+};
+
+function notationSymbolTex(symbol) {
+  return NOTATION_SYMBOL_TEX[symbol] || String(symbol || "");
+}
+
 /**
  * Plain-language glossary for every index or shorthand that appears in the
  * displayed formula. Keep this separate from the equation so notation remains
@@ -671,10 +693,10 @@ function buildSpecNotation(spec) {
   if (!spec) return [];
   const entries = [];
   const seen = new Set();
-  const add = (symbol, meaning) => {
+  const add = (symbol, meaning, tex = notationSymbolTex(symbol)) => {
     if (!symbol || seen.has(symbol)) return;
     seen.add(symbol);
-    entries.push({ symbol, meaning });
+    entries.push({ symbol, tex, meaning });
   };
   const { tensorOps, temporalOps } = pipelineOpsForSpec(spec);
   const reduction = spec.reduction || "";
@@ -760,8 +782,38 @@ function buildSpecNotation(spec) {
       add("H_{b,h,q}", "entropy of the attention distribution for batch item b, head h, and query q");
       add("X̃", "attention probabilities after flooring each value at 10⁻¹² for a stable logarithm");
     }
-    if (reduction.includes("mean") || reduction.includes("sink")) {
-      add("E_{indices}", "expectation: the arithmetic average over every index listed in the subscript");
+    if (reduction === "attention_entropy_mean") {
+      add(
+        "E_{b,h,q}",
+        "arithmetic average over batch examples b, attention heads h, and query positions q",
+        "\\mathbb{E}_{b,h,q}",
+      );
+    }
+    if (reduction === "attention_sink_first_token") {
+      add(
+        "E_{b,h,q=1,…,T−1}",
+        "arithmetic average over batch examples b, heads h, and non-initial query positions q = 1 through T − 1",
+        "\\mathbb{E}_{b,h,\\,q=1,\\ldots,T-1}",
+      );
+    }
+    if (reduction === "attention_sink_domination") {
+      add(
+        "E_{b,h,q=0,…,T−1}",
+        "arithmetic average over batch examples b, heads h, and all query positions q = 0 through T − 1",
+        "\\mathbb{E}_{b,h,\\,q=0,\\ldots,T-1}",
+      );
+    }
+    if (reduction === "attention_sink_ratio") {
+      add(
+        "E_{b,h,q=1,…,T−1}",
+        "for T ≥ 2, the arithmetic average over batch examples b, heads h, and non-initial query positions q = 1 through T − 1",
+        "\\mathbb{E}_{b,h,\\,q=1,\\ldots,T-1}",
+      );
+      add(
+        "E_{b,h,q}",
+        "for T = 1, the arithmetic average over batch examples b, heads h, and the only query position q",
+        "\\mathbb{E}_{b,h,q}",
+      );
     }
   }
 

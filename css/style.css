@@ -1198,6 +1198,11 @@ body.curator-mode .app-header {
   white-space: nowrap;
 }
 
+.formula-notation dt .katex {
+  color: var(--accent);
+  font-size: 1.05em;
+}
+
 .formula-notation dd {
   min-width: 0;
   margin: 0;

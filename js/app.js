@@ -69,6 +69,10 @@ function plotXForStep(step, logarithmic) {
   return logarithmic && step === 0 ? LOG_ZERO_PLOT_X : step;
 }
 
+function arrayOrEmpty(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 let manifest = null;
 let runId = null;
 let availableRuns = [];
@@ -533,13 +537,13 @@ function pointStepKey(p) {
 /** y_other − y_baseline at matching steps (keeps plot-x / _step from other). */
 function residualAgainstBaseline(points, baselinePoints) {
   const baseMap = new Map();
-  for (const p of baselinePoints || []) {
+  for (const p of arrayOrEmpty(baselinePoints)) {
     const key = pointStepKey(p);
     if (key == null || !Number.isFinite(p.y)) continue;
     baseMap.set(key, p.y);
   }
   const out = [];
-  for (const p of points || []) {
+  for (const p of arrayOrEmpty(points)) {
     const key = pointStepKey(p);
     if (key == null || !Number.isFinite(p.y) || !baseMap.has(key)) continue;
     out.push({
@@ -554,13 +558,15 @@ function residualAgainstBaseline(points, baselinePoints) {
 }
 
 function zeroBaselinePoints(baselinePoints) {
-  return (baselinePoints || []).map((p) => ({
-    x: p.x,
-    y: 0,
-    _step: isValidStep(p._step) ? p._step : pointStepKey(p),
-    _axisX: p._axisX,
-    ...(Number.isFinite(p._tau) ? { _tau: p._tau } : {}),
-  }));
+  return (Array.isArray(baselinePoints) ? baselinePoints : [])
+    .filter((p) => pointStepKey(p) != null && Number.isFinite(p?.x))
+    .map((p) => ({
+      x: p.x,
+      y: 0,
+      _step: isValidStep(p._step) ? p._step : pointStepKey(p),
+      _axisX: p._axisX,
+      ...(Number.isFinite(p._tau) ? { _tau: p._tau } : {}),
+    }));
 }
 
 function setCurveResidualMode(on) {
@@ -658,7 +664,16 @@ async function fetchText(url) {
 
 function specHasCurveData(spec) {
   const series = spec?.series;
-  const hasSeries = pointsFromSeries(series).length > 0;
+  const steps = Array.isArray(series?.steps) ? series.steps : [];
+  const values = Array.isArray(series?.values) ? series.values : [];
+  const count = Math.min(steps.length, values.length);
+  let hasSeries = false;
+  for (let i = 0; i < count; i += 1) {
+    if (isValidStep(steps[i]) && Number.isFinite(values[i])) {
+      hasSeries = true;
+      break;
+    }
+  }
   return hasSeries || Boolean(spec?.curve_png);
 }
 
@@ -1123,9 +1138,9 @@ function renderLayerPicker(spec) {
 /** Collect unique plot-x values from chart datasets (log-x tick positions). */
 function collectPlotXsFromChart(chart, { min = 0, max = Number.MAX_VALUE } = {}) {
   const xs = new Set();
-  for (const ds of chart?.data?.datasets || []) {
+  for (const ds of arrayOrEmpty(chart?.data?.datasets)) {
     if (ds._referenceLine) continue;
-    for (const p of ds.data || []) {
+    for (const p of arrayOrEmpty(ds.data)) {
       if (p && Number.isFinite(p.x) && p.x > 0 && p.x >= min && p.x <= max) xs.add(p.x);
     }
   }
@@ -1843,9 +1858,9 @@ function fitChartScalesToData(chart) {
   if (!chart?.data?.datasets?.length) return false;
   const xs = [];
   const ys = [];
-  for (const ds of chart.data.datasets) {
+  for (const ds of arrayOrEmpty(chart.data.datasets)) {
     if (ds._referenceLine) continue;
-    for (const p of ds.data || []) {
+    for (const p of arrayOrEmpty(ds.data)) {
       if (p && Number.isFinite(p.x) && p.x >= 0) xs.push(p.x);
       if (p && Number.isFinite(p.y)) ys.push(p.y);
     }
@@ -2064,7 +2079,7 @@ function tauZeroPlotX() {
 
 function mapPointsToXAxis(rawPoints, logX, axisMode = curveXAxisMode) {
   const byStep = new Map();
-  for (const p of rawPoints || []) {
+  for (const p of arrayOrEmpty(rawPoints)) {
     if (
       !isValidStep(p?._step) ||
       !Number.isFinite(p?._axisX) ||
@@ -2371,6 +2386,25 @@ function chartInfoFor(spec, lineData = null) {
   return "";
 }
 
+function renderNotationSymbolHtml(item) {
+  const fallback = String(item?.symbol || "");
+  const tex =
+    item?.tex ||
+    (typeof notationSymbolTex === "function" ? notationSymbolTex(fallback) : fallback);
+  if (window.katex && tex) {
+    try {
+      return katex.renderToString(tex, {
+        throwOnError: true,
+        displayMode: false,
+        output: "htmlAndMathml",
+      });
+    } catch (_) {
+      /* use the readable source symbol below */
+    }
+  }
+  return escapeHtml(fallback);
+}
+
 function renderSpecDefinition(spec) {
   const el = document.getElementById("chartDef");
   if (!el) return;
@@ -2419,7 +2453,8 @@ function renderSpecDefinition(spec) {
     ? `<div class="formula-notation">` +
       `<div class="formula-notation-title">Notation</div>` +
       `<dl>${notation.map((item) =>
-        `<div><dt>${escapeHtml(item.symbol)}</dt><dd>${escapeHtml(item.meaning)}</dd></div>`
+        `<div><dt aria-label="${escapeHtml(item.symbol)}">${renderNotationSymbolHtml(item)}</dt>` +
+        `<dd>${escapeHtml(item.meaning)}</dd></div>`
       ).join("")}</dl></div>`
     : "";
   const formulaLineCount = direct.tex.split("\\\\[2pt]").length;
@@ -2735,9 +2770,10 @@ function filterLossPoints(points, rid = runId) {
   const logX = lossScaleMode === "loglog";
   const raw = (Array.isArray(points) ? points : [])
     .filter((p) => {
+      if (!p || !isValidStep(p.x) || !Number.isFinite(p.y)) return false;
       if (lossStepMin != null && p.x < lossStepMin) return false;
       if (lossStepMax != null && p.x > lossStepMax) return false;
-      return isValidStep(p.x) && Number.isFinite(p.y);
+      return true;
     })
     .map((p) => ({ _axisX: xAxisValueForStep(p.x, rid, lossXAxisMode), y: p.y, _step: p.x }));
   return mapPointsToXAxis(raw, logX, lossXAxisMode);

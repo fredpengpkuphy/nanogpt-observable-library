@@ -53,6 +53,10 @@ function isUsableNoteStep(step) {
   return Number.isInteger(step) && step >= 0 && step <= 1_000_000_000_000;
 }
 
+function noteArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 function isNoteModalOpen() {
   const modal = document.getElementById("noteModal");
   return !!(modal && !modal.hidden && modal.classList.contains("visible"));
@@ -123,9 +127,9 @@ function updateNotesHint() {
 
 function collectChartSteps(chart) {
   const steps = new Set();
-  for (const ds of chart.data?.datasets || []) {
+  for (const ds of noteArray(chart?.data?.datasets)) {
     if (ds._referenceLine) continue;
-    for (const p of ds.data || []) {
+    for (const p of noteArray(ds.data)) {
       if (!p) continue;
       if (isUsableNoteStep(p._step)) steps.add(p._step);
       else if (isUsableNoteStep(p.x)) steps.add(p.x);
@@ -139,9 +143,9 @@ function nearestStep(chart, pixelX) {
   if (!xScale) return null;
   let best = null;
   let bestDist = Infinity;
-  for (const ds of chart.data?.datasets || []) {
+  for (const ds of noteArray(chart?.data?.datasets)) {
     if (ds._referenceLine) continue;
-    for (const point of ds.data || []) {
+    for (const point of noteArray(ds.data)) {
       if (!point || !Number.isFinite(point.x)) continue;
       const step = isUsableNoteStep(point._step) ? point._step : point.x;
       if (!isUsableNoteStep(step)) continue;
@@ -159,9 +163,9 @@ function nearestStep(chart, pixelX) {
 
 function plotXForNoteStep(chart, step) {
   if (!isUsableNoteStep(step)) return NaN;
-  for (const ds of chart?.data?.datasets || []) {
+  for (const ds of noteArray(chart?.data?.datasets)) {
     if (ds._referenceLine) continue;
-    const match = (ds.data || []).find((point) => point?._step === step);
+    const match = noteArray(ds.data).find((point) => point?._step === step);
     if (match && Number.isFinite(match.x)) return match.x;
   }
   const logarithmic = chart?.scales?.x?.type === "logarithmic";
@@ -184,7 +188,7 @@ function plotXForNoteStep(chart, step) {
 function noteAnnotationConfig(notes, chart) {
   const byStep = new Map();
   const ranges = [];
-  for (const n of notes) {
+  for (const n of noteArray(notes)) {
     if (!isUsableNoteStep(n.step)) continue;
     if (isUsableNoteStep(n.stepEnd) && n.stepEnd > n.step) {
       ranges.push(n);

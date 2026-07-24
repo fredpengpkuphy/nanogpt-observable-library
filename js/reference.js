@@ -244,7 +244,8 @@ function renderCard(obs) {
     ? `<div class="formula-notation ref-formula-notation">` +
       `<div class="formula-notation-title">Notation</div>` +
       `<dl>${notation.map((item) =>
-        `<div><dt>${escapeHtml(item.symbol)}</dt><dd>${escapeHtml(item.meaning)}</dd></div>`
+        `<div><dt aria-label="${escapeHtml(item.symbol)}">${renderNotationSymbolHtml(item)}</dt>` +
+        `<dd>${escapeHtml(item.meaning)}</dd></div>`
       ).join("")}</dl></div>`
     : "";
 
@@ -267,6 +268,25 @@ function renderCard(obs) {
     </div>
   `;
   return article;
+}
+
+function renderNotationSymbolHtml(item) {
+  const fallback = String(item?.symbol || "");
+  const tex =
+    item?.tex ||
+    (typeof notationSymbolTex === "function" ? notationSymbolTex(fallback) : fallback);
+  if (window.katex && tex) {
+    try {
+      return katex.renderToString(tex, {
+        throwOnError: true,
+        displayMode: false,
+        output: "htmlAndMathml",
+      });
+    } catch (_) {
+      /* use the readable source symbol below */
+    }
+  }
+  return escapeHtml(fallback);
 }
 
 function escapeHtml(text) {
