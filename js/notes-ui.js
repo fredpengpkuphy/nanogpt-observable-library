@@ -73,7 +73,7 @@ async function refreshNotes() {
   }
   updateNotesHint();
   if (fullOverlayOpen && chartIsAlive(fullChart)) {
-    applyNoteAnnotations(fullChart);
+    refreshNotesUi();
   } else if (fullOverlayOpen) {
     renderNotesRail(notesForCurrentChart());
   }
@@ -84,7 +84,7 @@ async function deleteNoteById(id) {
   try {
     await NotesStore.deleteNote(id);
     allNotes = allNotes.filter((n) => n.id !== id);
-    if (chartIsAlive(fullChart)) applyNoteAnnotations(fullChart);
+    if (chartIsAlive(fullChart)) refreshNotesUi();
     else renderNotesRail(notesForCurrentChart());
   } catch (err) {
     alert(err.message || String(err));
@@ -274,78 +274,8 @@ function navigateToNote(noteId) {
   }
 }
 
-function noteAnnotationConfig(notes, chart) {
-  const byStep = new Map();
-  const ranges = [];
-  for (const n of noteArray(notes)) {
-    if (!isUsableNoteStep(n.step)) continue;
-    if (isUsableNoteStep(n.stepEnd) && n.stepEnd > n.step) {
-      ranges.push(n);
-      continue;
-    }
-    if (!byStep.has(n.step)) byStep.set(n.step, []);
-    byStep.get(n.step).push(n);
-  }
-  const annotations = {};
-  let i = 0;
-  for (const note of ranges) {
-    const xMin = plotXForNoteStep(chart, note.step);
-    const xMax = plotXForNoteStep(chart, note.stepEnd);
-    if (!Number.isFinite(xMin) || !Number.isFinite(xMax)) continue;
-    annotations[`note_range_${i++}`] = {
-      type: "box",
-      xMin: Math.min(xMin, xMax),
-      xMax: Math.max(xMin, xMax),
-      backgroundColor: "rgba(232, 200, 136, 0.10)",
-      borderColor: "rgba(232, 200, 136, 0.7)",
-      borderWidth: 1,
-      label: {
-        display: true,
-        content: `note · ${note.step}–${note.stepEnd}`,
-        position: "start",
-        backgroundColor: "rgba(14, 20, 25, 0.82)",
-        color: "#ffe6b8",
-        font: { size: 10, weight: "600" },
-        padding: 3,
-      },
-    };
-  }
-  for (const [step, list] of byStep) {
-    const x = plotXForNoteStep(chart, step);
-    if (!Number.isFinite(x) || x < 0) continue;
-    annotations[`note_${i++}`] = {
-      type: "line",
-      xMin: x,
-      xMax: x,
-      borderColor: "rgba(232, 200, 136, 0.9)",
-      borderWidth: 1.5,
-      borderDash: [4, 3],
-      label: {
-        display: true,
-        content: list.length > 1 ? `${list.length} notes` : "note",
-        position: "start",
-        backgroundColor: "rgba(14, 20, 25, 0.8)",
-        color: "#ffe6b8",
-        font: { size: 10, weight: "600" },
-        padding: 3,
-      },
-    };
-  }
-  return annotations;
-}
-
-function applyNoteAnnotations(chart) {
-  if (!chartIsAlive(chart)) return;
+function refreshNotesUi() {
   const notes = notesForCurrentChart();
-  try {
-    if (!chart.options.plugins) chart.options.plugins = {};
-    chart.options.plugins.annotation = {
-      annotations: noteAnnotationConfig(notes, chart),
-    };
-    chart.update("none");
-  } catch (err) {
-    console.warn("applyNoteAnnotations failed", err);
-  }
   updateNotesHint();
   renderNotesRail(notes);
 }
@@ -696,7 +626,7 @@ async function submitRailNote(evt) {
     if (modeEl) modeEl.value = "general";
     updateRailNoteMode();
     status.textContent = "Published.";
-    if (chartIsAlive(fullChart)) applyNoteAnnotations(fullChart);
+    if (chartIsAlive(fullChart)) refreshNotesUi();
     else renderNotesRail(notesForCurrentChart());
     setTimeout(() => {
       status.hidden = true;
@@ -818,7 +748,7 @@ function handleFullscreenChartClick(evt, chart) {
 
 function attachFullscreenNoteHandlers(chart) {
   if (!chartIsAlive(chart)) return;
-  applyNoteAnnotations(chart);
+  refreshNotesUi();
   const canvas = chart.canvas;
   if (noteCanvasClickBound && noteCanvasClickBound !== canvas) {
     noteCanvasClickBound.removeEventListener("pointerdown", onFullscreenCanvasPointerDown);
