@@ -395,7 +395,6 @@ function buildCommentTree(comments) {
               <time>${escapeHtml(formatNoteTime(c.createdAt))}</time>
             </div>
             <div class="note-comment-actions">
-              <button type="button" class="note-navigate-btn" data-navigate-note-id="${escapeHtml(c.noteId || "")}" title="${isUsableNoteStep(c.step) ? `Zoom to ${escapeHtml(stepLabel(c.step, c.stepEnd))}` : "This comment is not attached to a step"}"${isUsableNoteStep(c.step) ? "" : " disabled"}>Navigate</button>
               <button type="button" class="note-reply-btn" data-note-id="${escapeHtml(c.noteId || "")}" data-parent-id="${escapeHtml(c.id)}">Reply</button>
               ${
                 noteIsAdmin
@@ -444,8 +443,6 @@ function renderNotesRail(notes) {
         (n.comments || []).map((c) => ({
           ...c,
           noteId: n.id,
-          step: n.step,
-          stepEnd: n.stepEnd,
         }))
       );
       return `
