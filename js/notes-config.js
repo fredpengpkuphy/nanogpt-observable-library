@@ -1,7 +1,7 @@
 /**
- * Anonymous chart notes backed by Firebase (Firestore + Auth).
+ * Chart notes backed by Firebase (Firestore + Auth).
  *
- * Anyone can post notes / comments anonymously (no public usernames).
+ * Anyone can post notes / comments with an optional public display name.
  * Only the curator (email/password) can delete notes or comments.
  * Sign in via ?admin=1 on the homepage or explorer.
  *

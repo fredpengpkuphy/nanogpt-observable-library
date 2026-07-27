@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=41">
+  <link rel="stylesheet" href="css/style.css?v=44">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
@@ -86,6 +86,10 @@
                 <div class="loss-view-toggle x-axis-toggle" id="curveXAxisToggle" title="Horizontal axis" hidden>
                   <button type="button" class="chart-btn x-axis-btn active" data-x-axis="step">Step</button>
                   <button type="button" class="chart-btn x-axis-btn" data-x-axis="tau">τ</button>
+                </div>
+                <div class="chart-zoom-controls" id="curveZoomControls" hidden aria-label="Observable curve zoom">
+                  <button type="button" class="chart-btn chart-zoom-btn" id="curveZoomInBtn" title="Zoom in" aria-label="Zoom in">＋</button>
+                  <button type="button" class="chart-btn chart-zoom-btn" id="curveZoomOutBtn" title="Zoom out" aria-label="Zoom out">−</button>
                 </div>
                 <button type="button" class="chart-btn" id="resetZoomBtn" hidden title="Reset zoom">Reset</button>
                 <button type="button" class="chart-btn" id="expandBtn" hidden title="Expand">⤢ Expand</button>
@@ -203,6 +207,10 @@
             <span class="reference-line-help">Drag a dashed line to move it</span>
           </div>
           <button type="button" class="chart-btn" id="fullAddNoteBtn" title="Leave a note">Note</button>
+          <div class="chart-zoom-controls" aria-label="Curve zoom">
+            <button type="button" class="chart-btn chart-zoom-btn" id="fullZoomInBtn" title="Zoom in" aria-label="Zoom in">＋</button>
+            <button type="button" class="chart-btn chart-zoom-btn" id="fullZoomOutBtn" title="Zoom out" aria-label="Zoom out">−</button>
+          </div>
           <button type="button" class="chart-btn" id="fullResetZoomBtn" title="Reset zoom">Reset</button>
           <button type="button" class="chart-btn" id="fullCloseBtn" title="Close">✕ Close</button>
         </div>
@@ -232,6 +240,10 @@
           </div>
           <form id="railNoteForm" class="rail-note-form">
             <textarea id="railNoteText" rows="3" maxlength="2000" required placeholder="Leave a note on this curve…"></textarea>
+            <label class="rail-note-name-label">
+              <span>Leave your name <span class="field-optional">(optional)</span></span>
+              <input type="text" id="railNoteName" maxlength="80" autocomplete="name" placeholder="Your name" />
+            </label>
             <label class="rail-note-mode-label">
               Attach to
               <select id="railNoteMode">
@@ -261,7 +273,7 @@
           </div>
         </aside>
       </div>
-      <p class="chart-hint" id="fullChartHint">Drag a rectangle to zoom · click the curve to tag a step · scroll to zoom · double-click to reset · Esc to close</p>
+      <p class="chart-hint" id="fullChartHint">Use ＋/−, scroll, or drag a rectangle to zoom · click the curve to tag a step · double-click to reset · Esc to close</p>
     </div>
   </div>
 
@@ -282,12 +294,12 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
   <script src="js/notes-config.js?v=3"></script>
-  <script src="js/notes-store.js?v=15"></script>
+  <script src="js/notes-store.js?v=16"></script>
   <script src="js/announcement-banner.js?v=2"></script>
   <script src="js/curator-ui.js?v=6"></script>
   <script src="js/maintenance-gate.js?v=1"></script>
-  <script src="js/notes-ui.js?v=20"></script>
+  <script src="js/notes-ui.js?v=23"></script>
   <script src="js/observable_defs.js?v=12"></script>
-  <script src="js/app.js?v=55"></script>
+  <script src="js/app.js?v=56"></script>
 </body>
 </html>

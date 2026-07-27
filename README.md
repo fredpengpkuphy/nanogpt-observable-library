@@ -45,9 +45,11 @@ public channel for feedback.
 
 ## Public Notes and Suggestions
 
-Visitors can post notes on charts and submit suggestions without displaying a
-public username. Notes and replies are visible to everyone, so please do not
-include private, sensitive, or identifying information.
+Visitors can post notes on charts and add replies with an optional public display
+name. Leaving the name blank keeps the post anonymous. Notes, names, and replies
+are visible to everyone, so please do not include private or sensitive information.
+The public **Navigate** control on a note or reply focuses the chart on its
+attached step or step range.
 
 ## About the Data
 

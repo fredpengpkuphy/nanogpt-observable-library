@@ -1331,6 +1331,30 @@ body.curator-mode .app-header {
   display: none;
 }
 
+.chart-zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.12rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-card);
+}
+
+.chart-zoom-controls[hidden] {
+  display: none;
+}
+
+.chart-zoom-controls .chart-zoom-btn {
+  min-width: 1.8rem;
+  padding-inline: 0.42rem;
+  border-color: transparent;
+  background: transparent;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .compare-toggle {
   display: inline-flex;
   align-items: center;
@@ -2217,6 +2241,7 @@ body.curator-mode .app-header {
 .note-card header {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 0.4rem;
   margin-bottom: 0.25rem;
   font-size: 0.7rem;
@@ -2235,6 +2260,33 @@ body.curator-mode .app-header {
 .note-step {
   font-weight: 600;
   color: var(--accent);
+}
+
+.note-card-byline,
+.note-card-actions,
+.note-comment-byline {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.note-card-byline {
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+}
+
+.note-card-actions {
+  flex: 0 0 auto;
+}
+
+.note-author {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--sand);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .notes-rail-head-actions {
@@ -2276,6 +2328,31 @@ body.curator-mode .app-header {
   background: var(--bg-panel);
   resize: vertical;
   min-height: 4.2rem;
+}
+
+.rail-note-name-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.field-optional {
+  color: var(--muted-soft);
+  font-weight: 400;
+}
+
+.rail-note-name-label input,
+.note-reply-box input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.45rem;
+  font: inherit;
+  font-size: 0.76rem;
+  color: var(--text);
+  background: var(--bg-panel);
 }
 
 .rail-note-form-row {
@@ -2371,10 +2448,38 @@ body.curator-mode .app-header {
   color: var(--muted);
 }
 
+.note-comment-byline {
+  flex-wrap: wrap;
+}
+
 .note-comment-actions {
   display: flex;
   align-items: center;
   gap: 0.25rem;
+}
+
+.note-navigate-btn {
+  border: 1px solid rgba(126, 184, 201, 0.32);
+  border-radius: 999px;
+  padding: 0.12rem 0.42rem;
+  background: rgba(126, 184, 201, 0.1);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.note-navigate-btn:hover:not(:disabled),
+.note-navigate-btn:focus-visible {
+  border-color: rgba(126, 184, 201, 0.65);
+  background: rgba(126, 184, 201, 0.2);
+}
+
+.note-navigate-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
 }
 
 .note-comment p {

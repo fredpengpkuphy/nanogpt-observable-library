@@ -16,6 +16,12 @@ service cloud.firestore {
         && request.resource.data.text.size() <= 2000;
     }
 
+    function validOptionalName() {
+      return !request.resource.data.keys().hasAny(["name"])
+        || (request.resource.data.name is string
+          && request.resource.data.name.size() <= 80);
+    }
+
     function isServerCreate() {
       return request.resource.data.createdAt is timestamp
         && request.resource.data.createdAt == request.time;
@@ -26,9 +32,10 @@ service cloud.firestore {
 
       allow create: if request.auth != null
         && request.resource.data.keys().hasOnly([
-          "runId", "specId", "context", "step", "stepEnd", "uid", "text", "createdAt"
+          "runId", "specId", "context", "step", "stepEnd", "uid", "name", "text", "createdAt"
         ])
         && request.resource.data.uid == request.auth.uid
+        && validOptionalName()
         && validText()
         && request.resource.data.runId is string
         && request.resource.data.runId.size() > 0
@@ -55,9 +62,10 @@ service cloud.firestore {
 
         allow create: if request.auth != null
           && request.resource.data.keys().hasOnly([
-            "noteId", "uid", "text", "parentId", "createdAt"
+            "noteId", "uid", "name", "text", "parentId", "createdAt"
           ])
           && request.resource.data.uid == request.auth.uid
+          && validOptionalName()
           && validText()
           && request.resource.data.noteId == noteId
           && (request.resource.data.parentId == null

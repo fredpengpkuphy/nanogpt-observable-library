@@ -1,6 +1,6 @@
 /**
  * Fullscreen chart notes: general, single-step, or step-range tags plus comments/replies.
- * Anonymous posts (no public usernames). Curator can delete anything.
+ * Posts may include an optional public display name. Curator can delete anything.
  */
 
 let allNotes = [];
@@ -121,7 +121,7 @@ function updateNotesHint() {
   if (!hint || !fullOverlayOpen) return;
   const n = notesForCurrentChart().length;
   const base =
-    "Drag a rectangle to zoom · click the curve to tag a step · notes can cover one step or a range · double-click to reset · Esc to close";
+    "Use ＋/−, scroll, or drag a rectangle to zoom · click the curve to tag a step · notes can cover one step or a range · double-click to reset · Esc to close";
   hint.textContent = n ? `${base} · ${n} note${n === 1 ? "" : "s"}` : base;
 }
 
@@ -183,6 +183,95 @@ function plotXForNoteStep(chart, step) {
     : logarithmic && step === 0
       ? 0.1
       : step;
+}
+
+function closestNoteStepIndex(steps, target) {
+  if (!steps.length || !isUsableNoteStep(target)) return -1;
+  let lo = 0;
+  let hi = steps.length - 1;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (steps[mid] < target) lo = mid + 1;
+    else hi = mid;
+  }
+  if (lo > 0 && Math.abs(steps[lo - 1] - target) <= Math.abs(steps[lo] - target)) {
+    return lo - 1;
+  }
+  return lo;
+}
+
+function noteNavigationBounds(chart, note) {
+  if (!chartIsAlive(chart) || !isUsableNoteStep(note?.step)) return null;
+  const steps = collectChartSteps(chart);
+  if (!steps.length) return null;
+  let startIndex = closestNoteStepIndex(steps, note.step);
+  let endIndex =
+    isUsableNoteStep(note.stepEnd) && note.stepEnd > note.step
+      ? closestNoteStepIndex(steps, note.stepEnd)
+      : startIndex;
+  if (startIndex < 0 || endIndex < 0) return null;
+  if (startIndex > endIndex) [startIndex, endIndex] = [endIndex, startIndex];
+
+  if (startIndex === endIndex) {
+    const contextPoints = Math.max(2, Math.min(8, Math.ceil(steps.length * 0.025)));
+    startIndex = Math.max(0, startIndex - contextPoints);
+    endIndex = Math.min(steps.length - 1, endIndex + contextPoints);
+  } else {
+    const rangePoints = endIndex - startIndex + 1;
+    const paddingPoints = Math.max(1, Math.ceil(rangePoints * 0.12));
+    startIndex = Math.max(0, startIndex - paddingPoints);
+    endIndex = Math.min(steps.length - 1, endIndex + paddingPoints);
+  }
+
+  let min = plotXForNoteStep(chart, steps[startIndex]);
+  let max = plotXForNoteStep(chart, steps[endIndex]);
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+  if (min > max) [min, max] = [max, min];
+  if (max > min) return { min, max };
+
+  const scale = chart.scales?.x;
+  const scaleMin = Number(scale?.min);
+  const scaleMax = Number(scale?.max);
+  if (!(Number.isFinite(scaleMin) && Number.isFinite(scaleMax) && scaleMax > scaleMin)) {
+    return null;
+  }
+  if (scale.type === "logarithmic" && min > 0 && scaleMin > 0) {
+    const factor = Math.max(1.05, Math.pow(scaleMax / scaleMin, 0.04));
+    return { min: Math.max(Number.EPSILON, min / factor), max: min * factor };
+  }
+  const halfSpan = Math.max(0.5, (scaleMax - scaleMin) * 0.04);
+  return { min: Math.max(0, min - halfSpan), max: min + halfSpan };
+}
+
+function navigateToNote(noteId) {
+  const note = allNotes.find((item) => item.id === noteId);
+  if (!note || !isUsableNoteStep(note.step) || !chartIsAlive(fullChart)) return;
+  const navigate = () => {
+    if (!chartIsAlive(fullChart)) return;
+    const bounds = noteNavigationBounds(fullChart, note);
+    if (!bounds) return;
+    try {
+      if (typeof fullChart.zoomScale === "function") {
+        fullChart.zoomScale("x", bounds, "none");
+      } else {
+        fullChart.options.scales.x.min = bounds.min;
+        fullChart.options.scales.x.max = bounds.max;
+        fullChart.update("none");
+      }
+      if (typeof applyReferenceLinesToFullChart === "function") {
+        applyReferenceLinesToFullChart();
+      }
+      fullChart.canvas?.focus?.({ preventScroll: true });
+    } catch (err) {
+      console.warn("Navigate to note failed", err);
+    }
+  };
+  if (isNotesRailExpanded()) {
+    setNotesRailExpanded(false);
+    requestAnimationFrame(navigate);
+  } else {
+    navigate();
+  }
 }
 
 function noteAnnotationConfig(notes, chart) {
@@ -301,8 +390,12 @@ function buildCommentTree(comments) {
         return `
         <div class="note-comment ${depth ? "note-comment-reply" : ""}" data-comment-id="${escapeHtml(c.id)}">
           <div class="note-comment-head">
-            <time>${escapeHtml(formatNoteTime(c.createdAt))}</time>
+            <div class="note-comment-byline">
+              ${c.name ? `<span class="note-author">${escapeHtml(c.name)}</span>` : ""}
+              <time>${escapeHtml(formatNoteTime(c.createdAt))}</time>
+            </div>
             <div class="note-comment-actions">
+              <button type="button" class="note-navigate-btn" data-navigate-note-id="${escapeHtml(c.noteId || "")}" title="${isUsableNoteStep(c.step) ? `Zoom to ${escapeHtml(stepLabel(c.step, c.stepEnd))}` : "This comment is not attached to a step"}"${isUsableNoteStep(c.step) ? "" : " disabled"}>Navigate</button>
               <button type="button" class="note-reply-btn" data-note-id="${escapeHtml(c.noteId || "")}" data-parent-id="${escapeHtml(c.id)}">Reply</button>
               ${
                 noteIsAdmin
@@ -348,20 +441,31 @@ function renderNotesRail(notes) {
   rail.innerHTML = sorted
     .map((n) => {
       const commentsHtml = buildCommentTree(
-        (n.comments || []).map((c) => ({ ...c, noteId: n.id }))
+        (n.comments || []).map((c) => ({
+          ...c,
+          noteId: n.id,
+          step: n.step,
+          stepEnd: n.stepEnd,
+        }))
       );
       return `
     <article class="note-card" data-id="${escapeHtml(n.id)}"
       data-step="${isUsableNoteStep(n.step) ? n.step : ""}"
       data-step-end="${isUsableNoteStep(n.stepEnd) ? n.stepEnd : ""}">
       <header>
-        <span class="note-step">${escapeHtml(stepLabel(n.step, n.stepEnd))}</span>
-        <time class="note-time">${escapeHtml(formatNoteTime(n.createdAt))}</time>
-        ${
-          noteIsAdmin
-            ? `<button type="button" class="note-delete" data-id="${escapeHtml(n.id)}" title="Delete note">✕</button>`
-            : ""
-        }
+        <div class="note-card-byline">
+          <span class="note-step">${escapeHtml(stepLabel(n.step, n.stepEnd))}</span>
+          ${n.name ? `<span class="note-author">${escapeHtml(n.name)}</span>` : ""}
+        </div>
+        <div class="note-card-actions">
+          <button type="button" class="note-navigate-btn" data-navigate-note-id="${escapeHtml(n.id)}" title="${isUsableNoteStep(n.step) ? `Zoom to ${escapeHtml(stepLabel(n.step, n.stepEnd))}` : "This note is not attached to a step"}"${isUsableNoteStep(n.step) ? "" : " disabled"}>Navigate</button>
+          <time class="note-time">${escapeHtml(formatNoteTime(n.createdAt))}</time>
+          ${
+            noteIsAdmin
+              ? `<button type="button" class="note-delete" data-id="${escapeHtml(n.id)}" title="Delete note">✕</button>`
+              : ""
+          }
+        </div>
       </header>
       <p>${escapeHtml(n.text)}</p>
       <div class="note-comments">${commentsHtml || ""}</div>
@@ -391,6 +495,12 @@ function renderNotesRail(notes) {
       openReplyBox(btn.dataset.noteId, btn.dataset.parentId || null, btn);
     });
   });
+  rail.querySelectorAll(".note-navigate-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      navigateToNote(btn.dataset.navigateNoteId);
+    });
+  });
 }
 
 function openReplyBox(noteId, parentId, anchorBtn) {
@@ -399,6 +509,7 @@ function openReplyBox(noteId, parentId, anchorBtn) {
   const box = document.createElement("form");
   box.className = "note-reply-box";
   box.innerHTML = `
+    <input type="text" maxlength="80" autocomplete="name" placeholder="Leave your name (optional)" aria-label="Leave your name (optional)" />
     <textarea rows="2" maxlength="2000" placeholder="Write a reply…" required></textarea>
     <div class="note-reply-box-actions">
       <button type="button" class="chart-btn note-reply-cancel">Cancel</button>
@@ -408,6 +519,7 @@ function openReplyBox(noteId, parentId, anchorBtn) {
   const host =
     anchorBtn.closest(".note-comment") || anchorBtn.closest(".note-card");
   if (host) host.appendChild(box);
+  const nameInput = box.querySelector("input");
   const ta = box.querySelector("textarea");
   ta?.focus();
   box.querySelector(".note-reply-cancel")?.addEventListener("click", () => {
@@ -428,6 +540,7 @@ function openReplyBox(noteId, parentId, anchorBtn) {
         noteId,
         text,
         parentId: parentId || null,
+        name: nameInput?.value || "",
       });
       const note = allNotes.find((n) => n.id === noteId);
       if (note) {
@@ -503,6 +616,7 @@ function snapRailNoteStepInput(which = "start") {
 async function submitRailNote(evt) {
   evt.preventDefault();
   const textEl = document.getElementById("railNoteText");
+  const nameEl = document.getElementById("railNoteName");
   const stepEl = document.getElementById("railNoteStep");
   const stepEndEl = document.getElementById("railNoteStepEnd");
   const status = document.getElementById("railNoteStatus");
@@ -573,10 +687,12 @@ async function submitRailNote(evt) {
       context: key.context,
       step,
       stepEnd,
+      name: nameEl?.value || "",
       text,
     });
     allNotes.unshift(result.note);
     textEl.value = "";
+    if (nameEl) nameEl.value = "";
     if (stepEl) stepEl.value = "";
     if (stepEndEl) stepEndEl.value = "";
     const modeEl = document.getElementById("railNoteMode");

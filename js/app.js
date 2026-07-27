@@ -279,10 +279,22 @@ function wireEvents() {
     updateFullscreenCompareChrome();
   });
   document.getElementById("resetZoomBtn").addEventListener("click", resetChartZoom);
+  document.getElementById("curveZoomInBtn")?.addEventListener("click", () => {
+    zoomChartBy(chart, 1.25);
+  });
+  document.getElementById("curveZoomOutBtn")?.addEventListener("click", () => {
+    zoomChartBy(chart, 0.8);
+  });
   document.getElementById("expandBtn").addEventListener("click", openFullscreen);
   document.getElementById("fullCloseBtn").addEventListener("click", closeFullscreen);
   document.getElementById("fullResetZoomBtn").addEventListener("click", () => {
     safeResetFullChartZoom();
+  });
+  document.getElementById("fullZoomInBtn")?.addEventListener("click", () => {
+    zoomChartBy(fullChart, 1.25);
+  });
+  document.getElementById("fullZoomOutBtn")?.addEventListener("click", () => {
+    zoomChartBy(fullChart, 0.8);
   });
   document.getElementById("addReferenceLineBtn")?.addEventListener("click", addReferenceLine);
   document.getElementById("clearReferenceLinesBtn")?.addEventListener("click", clearReferenceLines);
@@ -1911,6 +1923,67 @@ function attachDoubleClickReset(canvas) {
   };
 }
 
+function fallbackZoomScale(scale, magnification) {
+  const min = Number(scale?.min);
+  const max = Number(scale?.max);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || !(max > min)) return null;
+  if (scale.type === "logarithmic") {
+    if (!(min > 0)) return null;
+    const logMin = Math.log(min);
+    const logMax = Math.log(max);
+    const center = (logMin + logMax) / 2;
+    const halfSpan = (logMax - logMin) / (2 * magnification);
+    const nextMin = Math.exp(center - halfSpan);
+    const nextMax = Math.exp(center + halfSpan);
+    return Number.isFinite(nextMin) && Number.isFinite(nextMax) && nextMax > nextMin
+      ? { min: nextMin, max: nextMax }
+      : null;
+  }
+  const center = min + (max - min) / 2;
+  const span = (max - min) / magnification;
+  let nextMin = center - span / 2;
+  let nextMax = center + span / 2;
+  if (scale.axis === "x" && nextMin < 0) {
+    nextMax -= nextMin;
+    nextMin = 0;
+  }
+  return Number.isFinite(nextMin) && Number.isFinite(nextMax) && nextMax > nextMin
+    ? { min: nextMin, max: nextMax }
+    : null;
+}
+
+function zoomChartBy(chartInstance, magnification) {
+  if (
+    !chartInstance ||
+    !Number.isFinite(magnification) ||
+    magnification <= 0 ||
+    magnification === 1
+  ) return false;
+  try {
+    if (typeof chartInstance.zoom === "function") {
+      chartInstance.zoom({ x: magnification, y: magnification }, "none");
+    } else {
+      let changed = false;
+      for (const axis of ["x", "y"]) {
+        const bounds = fallbackZoomScale(chartInstance.scales?.[axis], magnification);
+        if (!bounds) continue;
+        chartInstance.options.scales[axis].min = bounds.min;
+        chartInstance.options.scales[axis].max = bounds.max;
+        changed = true;
+      }
+      if (!changed) return false;
+      chartInstance.update("none");
+    }
+    if (chartInstance === fullChart && referenceLines.length) {
+      applyReferenceLinesToFullChart();
+    }
+    return true;
+  } catch (err) {
+    console.warn("Chart button zoom failed", err);
+    return false;
+  }
+}
+
 /** Prefer rebuilding from data — resetZoom can leave linear scales in a dead state. */
 function resetChartZoom() {
   const spec = activeSpec();
@@ -1960,6 +2033,8 @@ function safeResetFullChartZoom() {
 
 function setChartChrome(hasSeriesChart) {
   document.getElementById("resetZoomBtn").hidden = !hasSeriesChart;
+  const zoomControls = document.getElementById("curveZoomControls");
+  if (zoomControls) zoomControls.hidden = !hasSeriesChart;
   document.getElementById("chartHint").hidden = !hasSeriesChart;
   document.getElementById("expandBtn").hidden = !hasSeriesChart;
   const scale = document.getElementById("curveScaleToggle");

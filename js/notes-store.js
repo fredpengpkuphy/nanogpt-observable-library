@@ -3,9 +3,9 @@
  *
  * Collections
  *   notes/{id}
- *     { runId, specId, context, step|null, stepEnd|null, uid, text, createdAt }
+ *     { runId, specId, context, step|null, stepEnd|null, uid, name, text, createdAt }
  *   notes/{id}/comments/{id}
- *     { uid, text, parentId|null, createdAt }
+ *     { uid, name, text, parentId|null, createdAt }
  *   announcements/{id}
  *     { text, uid, createdAt, updatedAt }
  *   suggestions/{id}
@@ -13,7 +13,7 @@
  *   suggestions/{id}/replies/{id}
  *     { text, uid, createdAt }  // curator-only
  *
- * Visitors sign in anonymously under the hood (no public username).
+ * Visitors sign in anonymously under the hood and may leave a public display name.
  * Only the curator (email/password) may delete notes/comments, manage announcements,
  * or reply to site suggestions.
  */
@@ -196,6 +196,10 @@ const NotesStore = (() => {
     return Number.isInteger(step) && step >= 0 && step <= 1_000_000_000_000;
   }
 
+  function normalizeDisplayName(name) {
+    return String(name || "").trim().replace(/\s+/g, " ").slice(0, 80);
+  }
+
   function parseNote(doc) {
     const d = doc.data() || {};
     const stepRaw = d.step;
@@ -221,6 +225,7 @@ const NotesStore = (() => {
       step: validStep,
       stepEnd: validStepEnd,
       uid: d.uid || "",
+      name: normalizeDisplayName(d.name),
       text: d.text || "",
       createdAt: tsToIso(d.createdAt),
       comments: [],
@@ -233,6 +238,7 @@ const NotesStore = (() => {
       id: doc.id,
       noteId: d.noteId || "",
       uid: d.uid || "",
+      name: normalizeDisplayName(d.name),
       text: d.text || "",
       parentId: d.parentId || null,
       createdAt: tsToIso(d.createdAt),
@@ -339,6 +345,7 @@ const NotesStore = (() => {
     context,
     step = null,
     stepEnd = null,
+    name = "",
     text,
   }) {
     await init();
@@ -346,6 +353,7 @@ const NotesStore = (() => {
     await waitForUid();
     if (!myUid) throw new Error("Not signed in.");
     const clean = String(text || "").trim().slice(0, 2000);
+    const cleanName = normalizeDisplayName(name);
     if (!clean) throw new Error("Note is empty.");
     const hasStep = step !== null && step !== undefined && step !== "";
     const hasStepEnd = stepEnd !== null && stepEnd !== undefined && stepEnd !== "";
@@ -372,6 +380,7 @@ const NotesStore = (() => {
       step: stepVal,
       stepEnd: stepEndVal,
       uid: myUid,
+      name: cleanName,
       text: clean,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     };
@@ -386,6 +395,7 @@ const NotesStore = (() => {
         step: stepVal,
         stepEnd: stepEndVal,
         uid: myUid,
+        name: cleanName,
         text: clean,
         createdAt: new Date().toISOString(),
         comments: [],
@@ -393,17 +403,19 @@ const NotesStore = (() => {
     };
   }
 
-  async function createComment({ noteId, text, parentId = null }) {
+  async function createComment({ noteId, text, parentId = null, name = "" }) {
     await init();
     if (!backendReady) throw new Error("Notes backend is not configured yet.");
     await waitForUid();
     if (!myUid) throw new Error("Not signed in.");
     const clean = String(text || "").trim().slice(0, 2000);
+    const cleanName = normalizeDisplayName(name);
     if (!clean) throw new Error("Comment is empty.");
     if (!noteId) throw new Error("Missing note id.");
     const payload = {
       noteId,
       uid: myUid,
+      name: cleanName,
       text: clean,
       parentId: parentId || null,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -417,6 +429,7 @@ const NotesStore = (() => {
       id: ref.id,
       noteId,
       uid: myUid,
+      name: cleanName,
       text: clean,
       parentId: parentId || null,
       createdAt: new Date().toISOString(),
