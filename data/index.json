@@ -14,6 +14,19 @@
       }
     },
     {
+      "run_id": "6_layers_nanogpt",
+      "label": "6 layers nanoGPT",
+      "n_specs": 938,
+      "n_curves": 938,
+      "n_series": 938,
+      "has_loss": true,
+      "provenance": {
+        "commit": "unknown",
+        "torch": "2.5.1+cu121",
+        "python": "3.10.20"
+      }
+    },
+    {
       "run_id": "no_learning_rate_warmup",
       "label": "no learning rate warmup",
       "n_specs": 1820,
