@@ -11,9 +11,11 @@ weights, gradients, activations, and attention patterns evolve over time.
 - Navigate the model from embeddings through transformer blocks to the output head.
 - Inspect observables for individual modules and training steps.
 - Compare the same observable across layers or experimental setups.
+- Keep the same observable selected while moving between transformer blocks.
 - View residuals against a baseline run.
 - Zoom into curves, select step ranges, and open charts in fullscreen mode.
 - Read the mathematical definition and plain-language description of each observable.
+- Inspect each run's model, optimizer, learning-rate, and batching configuration.
 
 ## Observable Families
 
@@ -34,6 +36,7 @@ Available measurements depend on the data recorded for each training run.
 
 1. Select **Start Exploration** on the home page.
 2. Choose a recorded training run.
+   Use **Inspect training config** on a run card to review its setup first.
 3. Select a transformer layer and module.
 4. Choose an observable to display its curve.
 5. Enable layer or setup comparison when compatible data is available.

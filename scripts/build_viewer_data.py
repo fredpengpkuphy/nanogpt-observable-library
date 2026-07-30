@@ -39,6 +39,61 @@ from curve_tree import organize_curves, selector_to_ui_module  # noqa: E402
 _LAYER_RE = re.compile(r"^h\.(\d+)\.(.+)$")
 _RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
+TRAINING_SETUP = {
+    "name": "Karpathy nanoGPT GPT-2 / OpenWebText standard setup",
+    "source_url": "https://github.com/karpathy/nanoGPT/blob/master/config/train_gpt2.py",
+    "recorded_through_step": 100000,
+    "data": {
+        "dataset": "OpenWebText",
+        "init_from": "scratch",
+    },
+    "model": {
+        "n_layer": 12,
+        "n_head": 12,
+        "n_embd": 768,
+        "block_size": 1024,
+        "vocab_size": 50304,
+        "dropout": 0.0,
+        "bias": False,
+    },
+    "optimizer": {
+        "name": "AdamW",
+        "learning_rate": "6e-4",
+        "betas": "(0.9, 0.95)",
+        "weight_decay": 0.1,
+        "grad_clip": 1.0,
+    },
+    "lr_schedule": {
+        "decay": "cosine",
+        "warmup_iters": 2000,
+        "lr_decay_iters": 600000,
+        "min_lr": "6e-5",
+    },
+    "batching": {
+        "micro_batch_size_per_gpu": 12,
+        "gradient_accumulation_steps": 40,
+        "tokens_per_iteration": 491520,
+    },
+}
+
+KNOWN_RUN_METADATA = {
+    "baseline": {
+        "label": "baseline",
+        "setup_note": "Reference run: the standard 12-layer setup.",
+        "config_overrides": {},
+    },
+    "6_layers_nanogpt": {
+        "label": "6 layers nanoGPT",
+        "setup_note": "Only model depth differs from the reference run.",
+        "config_overrides": {"model": {"n_layer": 6}},
+    },
+    "no_learning_rate_warmup": {
+        "label": "no learning rate warmup",
+        "setup_note": "Only learning-rate warmup differs from the reference run.",
+        "config_overrides": {"lr_schedule": {"warmup_iters": 0}},
+    },
+}
+
 
 def validate_run_id(run_id: str) -> str:
     if (
@@ -350,7 +405,11 @@ def build_run(obs_dir: Path, run_id: str, *, allow_shared_loss: bool = False) ->
 
 def write_index(run_metas: list[dict]):
     with (VIEWER_DATA / "index.json").open("w", encoding="utf-8") as f:
-        json.dump({"runs": run_metas}, f, indent=2)
+        json.dump(
+            {"training_setup": TRAINING_SETUP, "runs": run_metas},
+            f,
+            indent=2,
+        )
 
 
 def meta_from_manifest(run_id: str, manifest: dict) -> dict:
@@ -359,7 +418,7 @@ def meta_from_manifest(run_id: str, manifest: dict) -> dict:
     n_available = sum(
         1 for s in manifest["specs"] if s.get("series") or s.get("curve_png")
     )
-    return {
+    meta = {
         "run_id": run_id,
         "label": run_id,
         "n_specs": n_available,
@@ -367,6 +426,8 @@ def meta_from_manifest(run_id: str, manifest: dict) -> dict:
         "n_series": n_series,
         "provenance": manifest.get("provenance", {}),
     }
+    meta.update(KNOWN_RUN_METADATA.get(run_id, {}))
+    return meta
 
 
 def load_existing_labels() -> dict[str, str]:

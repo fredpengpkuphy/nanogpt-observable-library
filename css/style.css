@@ -1066,7 +1066,7 @@ body.curator-mode .app-header {
   align-items: stretch;
   min-width: 0;
   gap: 0.55rem;
-  margin-top: 0;
+  margin-top: 0.2rem;
   padding: 0.75rem 0.85rem 0.85rem;
   border: 1px solid rgba(159, 212, 228, 0.18);
   border-radius: 12px;
@@ -1728,7 +1728,9 @@ body.curator-mode .app-header {
 
 .header-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.75rem;
 }
 
@@ -1748,6 +1750,242 @@ body.curator-mode .app-header {
   opacity: 1;
   border-bottom-color: rgba(196, 165, 116, 0.45);
   text-decoration: none;
+}
+
+.viewer-loading {
+  min-height: calc(100vh - 88px);
+  display: grid;
+  place-items: center;
+  padding: 2rem 1rem 5rem;
+}
+
+.viewer-loading-card {
+  width: min(580px, 100%);
+  padding: 1.35rem 1.45rem 1.25rem;
+  border: 1px solid rgba(159, 212, 228, 0.22);
+  border-radius: 14px;
+  background:
+    linear-gradient(145deg, rgba(159, 212, 228, 0.08), transparent 52%),
+    var(--bg-panel);
+  box-shadow: var(--shadow);
+}
+
+.viewer-loading-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+  font-family: var(--font-ui);
+  color: #fff;
+}
+
+.viewer-loading-heading span {
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.viewer-loading-heading strong {
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.viewer-progress {
+  position: relative;
+  height: 0.58rem;
+  overflow: hidden;
+  border: 1px solid rgba(159, 212, 228, 0.2);
+  border-radius: 999px;
+  background: rgba(5, 10, 14, 0.58);
+}
+
+.viewer-progress > span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--sand-deep), var(--ice));
+  box-shadow: 0 0 16px rgba(159, 212, 228, 0.3);
+  transition: width 0.2s ease;
+}
+
+.viewer-loading.is-indeterminate .viewer-progress > span {
+  width: 34% !important;
+  animation: viewer-progress-sweep 1.25s ease-in-out infinite;
+}
+
+.viewer-loading.is-error .viewer-progress > span {
+  background: var(--rose);
+}
+
+.viewer-loading.is-error .viewer-loading-heading strong,
+.viewer-loading.is-error #viewerLoadingStatus {
+  color: var(--rose);
+}
+
+#viewerLoadingStatus {
+  margin: 0.85rem 0 0;
+  color: #fff;
+  font: 700 0.9rem/1.4 var(--font-ui);
+}
+
+.viewer-loading-detail {
+  min-height: 1.35em;
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+@keyframes viewer-progress-sweep {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(310%);
+  }
+}
+
+.training-config {
+  color: var(--text);
+  font-family: var(--font-body);
+}
+
+.training-config > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  color: var(--fog);
+  font: 700 0.8rem/1.25 var(--font-ui);
+}
+
+.training-config > summary::-webkit-details-marker {
+  display: none;
+}
+
+.training-config > summary::after {
+  content: " +";
+  color: var(--accent);
+}
+
+.training-config[open] > summary::after {
+  content: " −";
+}
+
+.training-config-header {
+  position: relative;
+}
+
+.training-config-header > summary {
+  padding: 0.32rem 0.62rem;
+  border: 1px solid rgba(159, 212, 228, 0.28);
+  border-radius: 999px;
+  background: rgba(159, 212, 228, 0.08);
+}
+
+.training-config-header > summary:hover {
+  border-color: rgba(159, 212, 228, 0.5);
+  background: rgba(159, 212, 228, 0.14);
+}
+
+.training-config-popover {
+  position: absolute;
+  top: calc(100% + 0.65rem);
+  right: 0;
+  z-index: 30;
+  width: min(720px, calc(100vw - 2rem));
+  max-height: min(76vh, 720px);
+  overflow: auto;
+  padding: 1rem;
+  border: 1px solid rgba(159, 212, 228, 0.24);
+  border-radius: 12px;
+  background: rgba(14, 20, 25, 0.98);
+  box-shadow: 0 22px 58px rgba(0, 0, 0, 0.55);
+}
+
+.training-config-intro strong {
+  display: block;
+  color: #fff;
+  font: 700 0.92rem/1.35 var(--font-ui);
+}
+
+.training-config-intro p {
+  margin: 0.28rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.training-config-intro .training-config-recording {
+  color: rgba(232, 200, 136, 0.9);
+}
+
+.training-config-intro a {
+  display: inline-block;
+  margin-top: 0.42rem;
+  color: var(--accent);
+  font: 700 0.76rem/1.35 var(--font-ui);
+  text-decoration: none;
+}
+
+.training-config-intro a:hover {
+  text-decoration: underline;
+}
+
+.training-config-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+}
+
+.training-config-group {
+  min-width: 0;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.training-config-group h4 {
+  margin: 0 0 0.42rem;
+  color: rgba(159, 212, 228, 0.9);
+  font: 700 0.68rem/1.3 var(--font-ui);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.training-config-group dl {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+}
+
+.training-config-group dl > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.training-config-group dt,
+.training-config-group dd {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.training-config-group dt {
+  min-width: 0;
+  color: var(--muted);
+}
+
+.training-config-group dd {
+  flex-shrink: 0;
+  color: #fff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 .select-page {
@@ -1794,6 +2032,7 @@ body.curator-mode .app-header {
 .run-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  align-items: start;
   gap: 1rem;
 }
 
@@ -1808,15 +2047,45 @@ body.curator-mode .app-header {
     linear-gradient(165deg, rgba(196, 165, 116, 0.08), transparent 42%),
     var(--bg-panel);
   box-shadow: var(--shadow);
-  text-decoration: none;
   color: inherit;
   transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.run-card:hover {
+.run-card:hover,
+.run-card:focus-within {
   transform: translateY(-2px);
   border-color: rgba(196, 165, 116, 0.4);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+
+.run-card-open {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.run-card-action {
+  color: var(--accent);
+  font: 700 0.78rem/1.3 var(--font-ui);
+}
+
+.training-config-card {
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.training-config-card > summary {
+  color: var(--muted);
+}
+
+.training-config-card .training-config-body {
+  padding-top: 0.8rem;
+}
+
+.training-config-card .training-config-groups {
+  grid-template-columns: 1fr;
 }
 
 .run-card-title {
@@ -2767,5 +3036,23 @@ body.curator-mode .app-header {
 
   .reference-line-list {
     width: 100%;
+  }
+
+  .training-config-groups {
+    grid-template-columns: 1fr;
+  }
+
+  .training-config-popover {
+    right: -0.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viewer-loading.is-indeterminate .viewer-progress > span {
+    animation-duration: 2.5s;
+  }
+
+  .viewer-progress > span {
+    transition: none;
   }
 }

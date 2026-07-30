@@ -1,8 +1,46 @@
 {
+  "training_setup": {
+    "name": "Karpathy nanoGPT GPT-2 / OpenWebText standard setup",
+    "source_url": "https://github.com/karpathy/nanoGPT/blob/master/config/train_gpt2.py",
+    "recorded_through_step": 100000,
+    "data": {
+      "dataset": "OpenWebText",
+      "init_from": "scratch"
+    },
+    "model": {
+      "n_layer": 12,
+      "n_head": 12,
+      "n_embd": 768,
+      "block_size": 1024,
+      "vocab_size": 50304,
+      "dropout": 0.0,
+      "bias": false
+    },
+    "optimizer": {
+      "name": "AdamW",
+      "learning_rate": "6e-4",
+      "betas": "(0.9, 0.95)",
+      "weight_decay": 0.1,
+      "grad_clip": 1.0
+    },
+    "lr_schedule": {
+      "decay": "cosine",
+      "warmup_iters": 2000,
+      "lr_decay_iters": 600000,
+      "min_lr": "6e-5"
+    },
+    "batching": {
+      "micro_batch_size_per_gpu": 12,
+      "gradient_accumulation_steps": 40,
+      "tokens_per_iteration": 491520
+    }
+  },
   "runs": [
     {
       "run_id": "baseline",
       "label": "baseline",
+      "setup_note": "Reference run: the standard 12-layer setup.",
+      "config_overrides": {},
       "n_specs": 1820,
       "n_curves": 1820,
       "n_series": 1820,
@@ -16,6 +54,12 @@
     {
       "run_id": "6_layers_nanogpt",
       "label": "6 layers nanoGPT",
+      "setup_note": "Only model depth differs from the reference run.",
+      "config_overrides": {
+        "model": {
+          "n_layer": 6
+        }
+      },
       "n_specs": 938,
       "n_curves": 938,
       "n_series": 938,
@@ -29,6 +73,12 @@
     {
       "run_id": "no_learning_rate_warmup",
       "label": "no learning rate warmup",
+      "setup_note": "Only learning-rate warmup differs from the reference run.",
+      "config_overrides": {
+        "lr_schedule": {
+          "warmup_iters": 0
+        }
+      },
       "n_specs": 1820,
       "n_curves": 1820,
       "n_series": 1820,

@@ -7,13 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=44">
+  <link rel="stylesheet" href="css/style.css?v=45">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 </head>
 <body>
   <header class="app-header">
@@ -27,6 +22,12 @@
       <a class="header-link" href="announcements.html">Announcements</a>
       <a class="header-link" href="suggestions.html">Suggestions</a>
       <a class="header-link" href="reference.html">Formulas</a>
+      <details class="training-config training-config-header" id="runConfig" hidden>
+        <summary>Inspect config</summary>
+        <div class="training-config-popover">
+          <div class="training-config-body" id="runConfigBody"></div>
+        </div>
+      </details>
       <div class="badge" id="runBadge">—</div>
     </div>
   </header>
@@ -35,7 +36,31 @@
     <div class="curator-bar-inner" id="curatorBarInner"></div>
   </div>
 
-  <main class="layout">
+  <section class="viewer-loading" id="viewerLoading" role="status" aria-live="polite">
+    <div class="viewer-loading-card">
+      <div class="viewer-loading-heading">
+        <span>Preparing observable curves</span>
+        <strong id="viewerLoadingPercent">0%</strong>
+      </div>
+      <div
+        class="viewer-progress"
+        id="viewerProgress"
+        role="progressbar"
+        aria-label="Loading run data"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      >
+        <span id="viewerProgressBar"></span>
+      </div>
+      <p id="viewerLoadingStatus">Connecting to the selected run…</p>
+      <p class="viewer-loading-detail" id="viewerLoadingDetail">
+        Large runs can take a few seconds to download and parse.
+      </p>
+    </div>
+  </section>
+
+  <main class="layout" id="viewerLayout" hidden>
     <section class="panel">
       <div class="panel-head">
         <h2>Model Architecture</h2>
@@ -107,7 +132,6 @@
                 </label>
               </div>
             </div>
-            <div id="chartDef" class="chart-def" hidden></div>
           </div>
           <div class="layer-pick" id="runPickWrap" hidden>
             <div class="layer-pick-head">
@@ -135,6 +159,7 @@
             <canvas id="curveChart"></canvas>
             <img id="curveImage" alt="Observable curve" hidden>
           </div>
+          <div id="chartDef" class="chart-def" hidden></div>
           <p class="chart-hint" id="chartHint">Scroll to zoom · Alt+drag to pan · double-click to reset</p>
         </div>
       </div>
@@ -290,6 +315,11 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
@@ -299,7 +329,8 @@
   <script src="js/curator-ui.js?v=6"></script>
   <script src="js/maintenance-gate.js?v=1"></script>
   <script src="js/notes-ui.js?v=24"></script>
-  <script src="js/observable_defs.js?v=12"></script>
-  <script src="js/app.js?v=56"></script>
+  <script src="js/observable_defs.js?v=13"></script>
+  <script src="js/training-config.js?v=1"></script>
+  <script src="js/app.js?v=57"></script>
 </body>
 </html>

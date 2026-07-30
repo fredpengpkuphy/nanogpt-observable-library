@@ -110,8 +110,15 @@ function pipelineOpsForSpec(spec) {
 }
 
 function observableDisplayLabel(spec, knownTemporalOps = null) {
-  const base =
+  let base =
     spec?.label || `${spec?.source_kind || "observable"} · ${spec?.reduction || ""}`;
+  if (
+    spec?.source_kind === "logits" &&
+    spec?.reduction === "entropy" &&
+    !/magnitude entropy/i.test(base)
+  ) {
+    base = base.replace(/entropy/i, "magnitude entropy");
+  }
   const temporalOps = knownTemporalOps || pipelineOpsForSpec(spec).temporalOps;
   if (!temporalOps.length) return base;
   if (temporalOps.every((op) => base.includes(op))) {
@@ -588,7 +595,9 @@ function reductionMeaningEn(reduction, sourceKind) {
       if (sourceKind === "logits") {
         return (
           "measures how evenly absolute score magnitudes are distributed; " +
-          "it is not prediction uncertainty"
+          "it is not prediction uncertainty. It flattens the full batch × token × vocabulary " +
+          "tensor and is unchanged by a global rescaling of the logits, so this curve can stay " +
+          "nearly constant while logit mean, spread, and extremes change"
         );
       }
       return "measures how evenly the total magnitude is distributed; higher means more diffuse";

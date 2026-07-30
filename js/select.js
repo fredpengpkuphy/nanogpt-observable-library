@@ -15,7 +15,7 @@ async function bootSelect() {
     grid.innerHTML = "";
 
     for (const run of runs) {
-      grid.appendChild(createRunCard(run));
+      grid.appendChild(createRunCard(run, data.training_setup));
     }
   } catch (err) {
     loading.hidden = true;
@@ -26,10 +26,13 @@ async function bootSelect() {
   }
 }
 
-function createRunCard(run) {
-  const btn = document.createElement("a");
-  btn.className = "run-card";
-  btn.href =
+function createRunCard(run, trainingSetup) {
+  const card = document.createElement("article");
+  card.className = "run-card";
+
+  const link = document.createElement("a");
+  link.className = "run-card-open";
+  link.href =
     typeof CuratorUI !== "undefined"
       ? CuratorUI.withAdminParam(`explorer.html?run=${encodeURIComponent(run.run_id)}`)
       : `explorer.html?run=${encodeURIComponent(run.run_id)}`;
@@ -42,9 +45,29 @@ function createRunCard(run) {
   meta.className = "run-card-meta";
   meta.innerHTML = `<span>${run.n_specs ?? "—"} observables</span>`;
 
-  btn.appendChild(title);
-  btn.appendChild(meta);
-  return btn;
+  const action = document.createElement("span");
+  action.className = "run-card-action";
+  action.textContent = "Open explorer →";
+
+  link.appendChild(title);
+  link.appendChild(meta);
+  link.appendChild(action);
+  card.appendChild(link);
+
+  if (trainingSetup && typeof TrainingConfig !== "undefined") {
+    const details = document.createElement("details");
+    details.className = "training-config training-config-card";
+    const summary = document.createElement("summary");
+    summary.textContent = "Inspect training config";
+    const body = document.createElement("div");
+    body.className = "training-config-body";
+    TrainingConfig.render(body, trainingSetup, run);
+    details.appendChild(summary);
+    details.appendChild(body);
+    card.appendChild(details);
+  }
+
+  return card;
 }
 
 function escapeHtml(text) {
@@ -63,4 +86,3 @@ function escapeHtml(text) {
   }
   await bootSelect();
 })();
-

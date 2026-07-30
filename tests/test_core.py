@@ -1,4 +1,5 @@
 import csv
+import math
 import sys
 import tempfile
 import unittest
@@ -12,13 +13,19 @@ SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(SCRIPTS))
 
-from build_viewer_data import load_series, validate_run_id  # noqa: E402
+from build_viewer_data import (  # noqa: E402
+    TRAINING_SETUP,
+    load_series,
+    meta_from_manifest,
+    validate_run_id,
+)
 from curve_tree import curve_tree_relpath  # noqa: E402
 from model import GPT, GPTConfig  # noqa: E402
 from observable_lib import (  # noqa: E402
     ObservableEngine,
     ObservableSpec,
     TypedTensor,
+    _r_entropy,
     _r_std,
     check_spec,
 )
@@ -80,11 +87,46 @@ class ViewerDataTests(unittest.TestCase):
                 {"steps": [10, 20], "values": [1.0, 3.0]},
             )
 
+    def test_known_run_config_overrides_are_preserved_on_rebuild(self):
+        manifest = {"specs": [], "provenance": {}}
+        six_layer = meta_from_manifest("6_layers_nanogpt", manifest)
+        no_warmup = meta_from_manifest("no_learning_rate_warmup", manifest)
+        self.assertEqual(TRAINING_SETUP["optimizer"]["weight_decay"], 0.1)
+        self.assertEqual(six_layer["config_overrides"]["model"]["n_layer"], 6)
+        self.assertEqual(
+            no_warmup["config_overrides"]["lr_schedule"]["warmup_iters"],
+            0,
+        )
+
 
 class ObservableTests(unittest.TestCase):
     def test_singleton_std_is_zero(self):
         tensor = TypedTensor(torch.tensor([3.0]), ("feature",), "x", "test")
         self.assertEqual(_r_std(tensor), 0.0)
+
+    def test_magnitude_entropy_is_scale_invariant(self):
+        tensor = TypedTensor(
+            torch.tensor([1.0, -2.0, 3.0, -4.0]),
+            ("feature",),
+            "lm_head",
+            "logits",
+        )
+        scaled = TypedTensor(
+            tensor.value * 100,
+            tensor.axes,
+            tensor.source_id,
+            tensor.stage,
+        )
+        self.assertAlmostEqual(_r_entropy(tensor), _r_entropy(scaled), places=6)
+
+    def test_uniform_magnitude_entropy_matches_log_element_count(self):
+        tensor = TypedTensor(
+            torch.ones(8),
+            ("feature",),
+            "lm_head",
+            "logits",
+        )
+        self.assertAlmostEqual(_r_entropy(tensor), math.log(8), places=6)
 
     def test_schedule_must_be_positive(self):
         spec = ObservableSpec("weight", "weight", "mean", every=0)

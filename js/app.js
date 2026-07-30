@@ -76,6 +76,7 @@ function arrayOrEmpty(value) {
 let manifest = null;
 let runId = null;
 let availableRuns = [];
+let trainingSetup = null;
 let manifestCache = new Map();
 let lossLogByRun = new Map();
 let compareRuns = false;
@@ -119,6 +120,67 @@ let referenceLineDragCanvas = null;
 let referenceLineSuppressClick = false;
 /** Snapshot of main-page compare state while fullscreen is open. */
 let fullscreenCompareSnapshot = null;
+
+function nextPaint() {
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => setTimeout(resolve, 0));
+    } else {
+      setTimeout(resolve, 0);
+    }
+  });
+}
+
+function formatByteCount(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) return "";
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 ** 2)).toFixed(1)} MB`;
+}
+
+function updateViewerLoading(percent, status, detail = "", indeterminate = false) {
+  const loading = document.getElementById("viewerLoading");
+  const progress = document.getElementById("viewerProgress");
+  const bar = document.getElementById("viewerProgressBar");
+  const percentEl = document.getElementById("viewerLoadingPercent");
+  const statusEl = document.getElementById("viewerLoadingStatus");
+  const detailEl = document.getElementById("viewerLoadingDetail");
+  if (!loading || !progress || !bar || !percentEl || !statusEl || !detailEl) return;
+
+  const safePercent = Math.max(0, Math.min(100, Number(percent) || 0));
+  loading.classList.toggle("is-indeterminate", !!indeterminate);
+  bar.style.width = `${safePercent}%`;
+  percentEl.textContent = indeterminate ? "Loading" : `${Math.round(safePercent)}%`;
+  statusEl.textContent = status;
+  detailEl.textContent = detail;
+  if (indeterminate) progress.removeAttribute("aria-valuenow");
+  else progress.setAttribute("aria-valuenow", String(Math.round(safePercent)));
+}
+
+async function finishViewerLoading() {
+  updateViewerLoading(100, "Ready", "All recorded curves are available.");
+  await nextPaint();
+  const loading = document.getElementById("viewerLoading");
+  const layout = document.getElementById("viewerLayout");
+  if (loading) loading.hidden = true;
+  if (layout) layout.hidden = false;
+}
+
+function showViewerLoadError(err) {
+  const loading = document.getElementById("viewerLoading");
+  const progress = document.getElementById("viewerProgress");
+  const percentEl = document.getElementById("viewerLoadingPercent");
+  const statusEl = document.getElementById("viewerLoadingStatus");
+  const detailEl = document.getElementById("viewerLoadingDetail");
+  if (loading) {
+    loading.classList.remove("is-indeterminate");
+    loading.classList.add("is-error");
+  }
+  if (progress) progress.removeAttribute("aria-valuenow");
+  if (percentEl) percentEl.textContent = "Failed";
+  if (statusEl) statusEl.textContent = "The selected run could not be loaded.";
+  if (detailEl) detailEl.textContent = err?.message || "Choose another dataset and try again.";
+}
 
 function displaySpecLabel(spec) {
   return typeof observableDisplayLabel === "function"
@@ -170,6 +232,7 @@ async function boot() {
   }
 
   try {
+    updateViewerLoading(2, "Connecting to the selected run…", "Loading run metadata.");
     if (window.Chart && window.ChartZoom) {
       try { Chart.register(window.ChartZoom); } catch (_) { /* already registered */ }
     }
@@ -180,16 +243,53 @@ async function boot() {
     if (window.Chart && annPlugin) {
       try { Chart.register(annPlugin); } catch (_) { /* already registered */ }
     }
-    manifest = await fetchJson(`data/${runId}/manifest.json`);
+
+    const availableRunsPromise = loadAvailableRuns().then(() => renderRunIdentity());
+    let lastProgressUpdate = 0;
+    manifest = await fetchJson(`data/${runId}/manifest.json`, {
+      onProgress: ({ phase, loaded, total }) => {
+        if (phase === "parse") {
+          updateViewerLoading(
+            90,
+            "Parsing curve data…",
+            `${formatByteCount(loaded)} downloaded. Building the in-memory dataset.`,
+          );
+          return;
+        }
+        const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+        if (now - lastProgressUpdate < 80 && (total <= 0 || loaded < total)) return;
+        lastProgressUpdate = now;
+        const ratio = total > 0 ? Math.min(1, loaded / total) : 0;
+        const percent = total > 0 ? 4 + ratio * 84 : 18;
+        const detail =
+          total > 0 && loaded <= total * 1.05
+            ? `${formatByteCount(loaded)} of ${formatByteCount(total)}`
+            : `${formatByteCount(loaded)} downloaded`;
+        updateViewerLoading(
+          percent,
+          "Downloading recorded curves…",
+          detail,
+          total <= 0,
+        );
+      },
+    });
+
+    updateViewerLoading(
+      93,
+      "Indexing observables…",
+      `${(manifest.specs || []).length.toLocaleString("en-US")} recorded observables found.`,
+    );
+    await nextPaint();
     const visibleSpecs = (manifest.specs || []).filter(specHasCurveData);
     specById = new Map(visibleSpecs.map((s) => [s.id, s]));
     specsByModule = groupSpecsByModule(visibleSpecs);
     specsByFamily = groupSpecsByFamily(visibleSpecs);
     manifestCache.set(runId, { specById, model: manifest.model });
-    await loadAvailableRuns();
+    await availableRunsPromise;
     wireEvents();
     if (typeof wireNotesUi === "function") wireNotesUi();
-    await renderHeader();
+    renderHeader();
+    updateViewerLoading(96, "Loading training summary…", "Preparing loss and learning-rate data.");
     lossLog = await loadLossLog();
     lossLogByRun.set(runId, lossLog);
     syncLossRangeInputs();
@@ -197,12 +297,11 @@ async function boot() {
     renderLossChart();
     renderLayerTabs();
     renderArchitecture();
+    updateViewerLoading(99, "Rendering the explorer…", "Finalizing controls and curves.");
     if (typeof refreshNotes === "function") refreshNotes();
+    await finishViewerLoading();
   } catch (err) {
-    document.getElementById("architecture").innerHTML =
-      `<div class="error">Failed to load viewer data: ${escapeHtml(err.message)}<br><br>` +
-      `Run <code>python3 scripts/build_viewer_data.py</code> or ` +
-      `<a href="select.html">choose another dataset</a>.</div>`;
+    showViewerLoadError(err);
   }
 }
 
@@ -382,8 +481,10 @@ async function loadAvailableRuns() {
   try {
     const data = await fetchJson("data/index.json");
     availableRuns = Array.isArray(data.runs) ? data.runs : [];
+    trainingSetup = data.training_setup || null;
   } catch (_) {
     availableRuns = [{ run_id: runId, label: runId }];
+    trainingSetup = null;
   }
   if (!availableRuns.some((r) => r.run_id === runId)) {
     availableRuns = [{ run_id: runId, label: runId }, ...availableRuns];
@@ -660,11 +761,35 @@ function updateLossCompareToggle() {
   updateResidualToggles();
 }
 
-async function fetchJson(url) {
+async function fetchJson(url, { onProgress = null } = {}) {
   const sep = url.includes("?") ? "&" : "?";
   const res = await fetch(`${url}${sep}t=${Date.now()}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`${url} (${res.status})`);
-  return res.json();
+
+  if (!onProgress || !res.body || typeof TransformStream === "undefined") {
+    if (onProgress) onProgress({ phase: "download", loaded: 0, total: 0 });
+    const text = await res.text();
+    if (onProgress) {
+      onProgress({ phase: "parse", loaded: text.length, total: 0 });
+      await nextPaint();
+    }
+    return JSON.parse(text);
+  }
+
+  const headerTotal = Number(res.headers.get("content-length"));
+  const total = Number.isFinite(headerTotal) && headerTotal > 0 ? headerTotal : 0;
+  let loaded = 0;
+  const monitor = new TransformStream({
+    transform(chunk, controller) {
+      loaded += chunk.byteLength;
+      onProgress({ phase: "download", loaded, total });
+      controller.enqueue(chunk);
+    },
+  });
+  const text = await new Response(res.body.pipeThrough(monitor)).text();
+  onProgress({ phase: "parse", loaded, total });
+  await nextPaint();
+  return JSON.parse(text);
 }
 
 async function fetchText(url) {
@@ -708,22 +833,48 @@ function groupSpecsByFamily(specs) {
   return map;
 }
 
-async function resolveRunLabel() {
-  try {
-    const data = await fetchJson("data/index.json");
-    const run = (data.runs || []).find((r) => r.run_id === runId);
-    return run?.label || runId;
-  } catch (_) {
-    return runId;
-  }
-}
-
-async function renderHeader() {
-  const label = await resolveRunLabel();
-  document.getElementById("runSubtitle").textContent =
-    `${specById.size} observables`;
+function renderRunIdentity() {
+  const label = runLabel(runId);
   document.getElementById("runBadge").textContent = label;
   document.title = `${label} · nanoGPT Observable Explorer`;
+
+  const config = document.getElementById("runConfig");
+  const body = document.getElementById("runConfigBody");
+  const run = availableRuns.find((item) => item.run_id === runId);
+  const rendered =
+    config &&
+    body &&
+    trainingSetup &&
+    typeof TrainingConfig !== "undefined" &&
+    TrainingConfig.render(body, trainingSetup, run);
+  if (config) config.hidden = !rendered;
+}
+
+function renderHeader() {
+  renderRunIdentity();
+  document.getElementById("runSubtitle").textContent =
+    `${specById.size} observables`;
+}
+
+function equivalentSpecForLayer(spec, layer) {
+  if (!spec) return null;
+  if (spec.layer === null || spec.layer === undefined) return spec;
+  const family = specsByFamily.get(spec.family_id) || [];
+  return family.find((candidate) => candidate.layer === layer && specHasCurveData(candidate)) || null;
+}
+
+function switchActiveLayer(layer) {
+  if (layer === activeLayer) return;
+  const previousSpec = activeSpec();
+  const nextSpec = equivalentSpecForLayer(previousSpec, layer);
+  activeLayer = layer;
+  renderLayerTabs();
+  if (nextSpec) {
+    selectModule(nextSpec.ui_module, "", "", nextSpec.id);
+    return;
+  }
+  renderArchitecture();
+  clearSelection();
 }
 
 function renderLayerTabs() {
@@ -733,12 +884,7 @@ function renderLayerTabs() {
     const btn = document.createElement("button");
     btn.className = `layer-tab${i === activeLayer ? " active" : ""}`;
     btn.textContent = `L${i}`;
-    btn.addEventListener("click", () => {
-      activeLayer = i;
-      renderLayerTabs();
-      renderArchitecture();
-      clearSelection();
-    });
+    btn.addEventListener("click", () => switchActiveLayer(i));
     tabs.appendChild(btn);
   }
   document.getElementById("layerBadge").textContent = `Block ${activeLayer}`;
@@ -874,22 +1020,24 @@ function friendlyModuleLabel(moduleKey, fallback) {
   return raw || fallback || moduleKey;
 }
 
-function selectModule(moduleKey, title, subtitle) {
+function selectModule(moduleKey, title, subtitle, preferredSpecId = null) {
+  const specs = specsByModule.get(moduleKey) || [];
+  const preferredSpec = specs.find((spec) => spec.id === preferredSpecId) || null;
   activeModuleId = moduleKey;
-  activeSpecId = null;
+  activeSpecId = preferredSpec?.id || null;
   renderArchitecture();
 
-  const specs = specsByModule.get(moduleKey) || [];
   document.getElementById("detailEmpty").style.display = "none";
   document.getElementById("detailContent").classList.add("visible");
 
   document.getElementById("moduleTitle").textContent = friendlyModuleLabel(moduleKey, title);
-  const exampleSelector = specs[0]?.selector || `transformer.${moduleKey}`;
+  const exampleSelector = preferredSpec?.selector || specs[0]?.selector || `transformer.${moduleKey}`;
   document.getElementById("modulePath").textContent = exampleSelector;
 
   // Auto-selects first spec via renderSpecGroups → selectSpec → renderChart.
   // Do not call renderChart(null) afterward (that blanked the chart).
   renderSpecGroups(specs);
+  if (preferredSpec) renderChart(preferredSpec);
 }
 
 function renderSpecGroups(specs) {
