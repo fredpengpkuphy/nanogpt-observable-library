@@ -82,6 +82,7 @@ const CuratorUI = (() => {
       document.body.classList.add("curator-mode");
       const announceHref = withAdminParam("announcements.html");
       const suggestHref = withAdminParam("suggestions.html");
+      const discoveriesHref = withAdminParam("discoveries.html");
       const maintLabel = maintenanceOn ? "Maintenance ON" : "Maintenance OFF";
       const maintClass = maintenanceOn
         ? "chart-btn curator-bar-btn curator-maint-on"
@@ -90,6 +91,7 @@ const CuratorUI = (() => {
         <div class="curator-bar-main">
           <div class="curator-bar-status">
             <span class="curator-pill">Curator</span>
+            <a class="curator-link" href="${discoveriesHref}">Discoveries</a>
             <a class="curator-link" href="${announceHref}">Announcements</a>
             <a class="curator-link" href="${suggestHref}">Suggestions</a>
             <button type="button" class="${maintClass}" id="maintToggle" title="Block public access to the explorer">${maintLabel}</button>

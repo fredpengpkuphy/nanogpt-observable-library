@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta
+    name="description"
+    content="Detailed public findings with zoomed nanoGPT observable curve regions and discussion."
+  >
+  <title>Discoveries — nanoGPT Observable Library</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="stylesheet" href="css/style.css?v=47">
+</head>
+<body class="discoveries-page">
+  <div class="curator-bar" id="curatorBar" hidden>
+    <div class="curator-bar-inner" id="curatorBarInner"></div>
+  </div>
+
+  <header class="app-header">
+    <div>
+      <h1>Discoveries</h1>
+      <p>Detailed findings, grounded in selected regions of recorded curves.</p>
+    </div>
+    <nav class="header-actions" id="discoveryHeaderLinks" aria-label="Primary">
+      <a class="header-link" href="index.html">Home</a>
+      <a class="header-link" href="select.html">Select run</a>
+      <a class="header-link" href="announcements.html">Announcements</a>
+      <a class="header-link" href="suggestions.html">Suggestions</a>
+      <a class="header-link" href="reference.html">Formulas</a>
+    </nav>
+  </header>
+
+  <main class="discoveries-shell">
+    <section class="panel discovery-composer" aria-labelledby="discoveryComposerTitle">
+      <div class="discovery-section-head">
+        <div>
+          <p class="discovery-kicker">Share a finding</p>
+          <h2 id="discoveryComposerTitle">Document a discovery</h2>
+        </div>
+        <span class="discovery-limit">Up to 6 curve regions</span>
+      </div>
+
+      <form id="discoveryForm">
+        <label class="discovery-field">
+          <span>Title</span>
+          <input
+            type="text"
+            id="discoveryTitle"
+            maxlength="180"
+            placeholder="A concise statement of the finding"
+            required
+          >
+        </label>
+
+        <label class="discovery-field">
+          <span>Detailed finding</span>
+          <textarea
+            id="discoveryBody"
+            rows="8"
+            maxlength="10000"
+            placeholder="Describe what you found, why it matters, and how the evidence supports it…"
+            required
+          ></textarea>
+        </label>
+
+        <label class="discovery-field discovery-name-field">
+          <span>Leave your name <span class="field-optional">(optional)</span></span>
+          <input
+            type="text"
+            id="discoveryName"
+            maxlength="80"
+            autocomplete="name"
+            placeholder="Your name"
+          >
+        </label>
+
+        <fieldset class="discovery-reference-builder">
+          <legend>Refer to a curve region <span class="field-optional">(optional)</span></legend>
+          <p>
+            Choose any setup, layer or block, observable, and step range. The
+            discovery will show that region as a zoomed curve.
+          </p>
+          <div class="discovery-reference-grid">
+            <label>
+              <span>Setup</span>
+              <select id="discoveryRun" aria-label="Setup"></select>
+            </label>
+            <label>
+              <span>Layer / block / module</span>
+              <select id="discoveryModule" aria-label="Layer, block, or module"></select>
+            </label>
+            <label class="discovery-observable-field">
+              <span>Observable</span>
+              <select id="discoverySpec" aria-label="Observable"></select>
+            </label>
+            <label>
+              <span>From step</span>
+              <input type="number" id="discoveryStepStart" min="0" step="1" inputmode="numeric">
+            </label>
+            <label>
+              <span>To step</span>
+              <input type="number" id="discoveryStepEnd" min="0" step="1" inputmode="numeric">
+            </label>
+            <button type="button" class="chart-btn discovery-add-reference" id="discoveryAddReference">
+              Add curve region
+            </button>
+          </div>
+          <p class="discovery-inline-status" id="discoveryReferenceStatus" role="status"></p>
+          <div class="discovery-draft-references" id="discoveryDraftReferences"></div>
+        </fieldset>
+
+        <div class="discovery-publish-row">
+          <p>
+            Discoveries, names, and replies are public. Do not include
+            private or sensitive information.
+          </p>
+          <button type="submit" class="chart-btn note-submit" id="discoveryPublish">
+            Publish discovery
+          </button>
+        </div>
+        <p class="discovery-form-status" id="discoveryFormStatus" role="status"></p>
+      </form>
+    </section>
+
+    <section class="discovery-feed" aria-labelledby="discoveryFeedTitle">
+      <div class="discovery-feed-head">
+        <div>
+          <p class="discovery-kicker">Research log</p>
+          <h2 id="discoveryFeedTitle">Published discoveries</h2>
+        </div>
+        <button type="button" class="chart-btn" id="discoveryRefresh">Refresh</button>
+      </div>
+      <p class="discovery-feed-status" id="discoveryFeedStatus" role="status">Loading discoveries…</p>
+      <div class="discovery-list" id="discoveryList"></div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="js/notes-config.js?v=3"></script>
+  <script src="js/notes-store.js?v=18"></script>
+  <script src="js/announcement-banner.js?v=2"></script>
+  <script src="js/curator-ui.js?v=7"></script>
+  <script src="js/maintenance-gate.js?v=1"></script>
+  <script src="js/observable_defs.js?v=13"></script>
+  <script src="js/discoveries-ui.js?v=2"></script>
+</body>
+</html>

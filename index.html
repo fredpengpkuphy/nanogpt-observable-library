@@ -41,6 +41,7 @@
     </p>
     <div class="landing-cta">
       <a class="landing-btn" id="startExploration" href="select.html">Start Exploration</a>
+      <a class="landing-btn landing-btn-secondary" id="browseDiscoveries" href="discoveries.html">Browse Discoveries</a>
     </div>
   </main>
 
@@ -48,9 +49,9 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
   <script src="js/notes-config.js?v=3"></script>
-  <script src="js/notes-store.js?v=15"></script>
+  <script src="js/notes-store.js?v=17"></script>
   <script src="js/announcement-banner.js?v=2"></script>
-  <script src="js/curator-ui.js?v=6"></script>
+  <script src="js/curator-ui.js?v=7"></script>
   <script>
     (function () {
       try {
@@ -63,6 +64,8 @@
         if (sessionStorage.getItem("notesAdminEntry") === "1") {
           const a = document.getElementById("startExploration");
           if (a) a.href = "select.html?admin=1";
+          const discoveries = document.getElementById("browseDiscoveries");
+          if (discoveries) discoveries.href = "discoveries.html?admin=1";
         }
       } catch (_) {}
 

@@ -295,8 +295,10 @@ async function boot() {
     syncLossRangeInputs();
     updateLossCompareToggle();
     renderLossChart();
-    renderLayerTabs();
-    renderArchitecture();
+    if (!applyExplorerReferenceLink()) {
+      renderLayerTabs();
+      renderArchitecture();
+    }
     updateViewerLoading(99, "Rendering the explorer…", "Finalizing controls and curves.");
     if (typeof refreshNotes === "function") refreshNotes();
     await finishViewerLoading();
@@ -854,6 +856,46 @@ function renderHeader() {
   renderRunIdentity();
   document.getElementById("runSubtitle").textContent =
     `${specById.size} observables`;
+}
+
+function applyExplorerReferenceLink() {
+  const params = new URLSearchParams(location.search);
+  const requestedSpec = specById.get(params.get("spec") || "");
+  if (!requestedSpec) return false;
+
+  const requestedLayer = Number(requestedSpec.layer);
+  if (
+    Number.isInteger(requestedLayer) &&
+    requestedLayer >= 0 &&
+    requestedLayer < manifest.model.n_layer
+  ) {
+    activeLayer = requestedLayer;
+  }
+  renderLayerTabs();
+  selectModule(requestedSpec.ui_module, "", "", requestedSpec.id);
+
+  if (params.get("focus") !== "1") return true;
+  const stepStart = Number(params.get("stepStart"));
+  const stepEnd = Number(params.get("stepEnd"));
+  openFullscreen();
+  if (!isValidStep(stepStart) || !isValidStep(stepEnd) || stepEnd <= stepStart) {
+    return true;
+  }
+  requestAnimationFrame(() => {
+    if (!fullChart) return;
+    try {
+      if (typeof fullChart.zoomScale === "function") {
+        fullChart.zoomScale("x", { min: stepStart, max: stepEnd }, "none");
+      } else {
+        fullChart.options.scales.x.min = stepStart;
+        fullChart.options.scales.x.max = stepEnd;
+        fullChart.update("none");
+      }
+    } catch (err) {
+      console.warn("Could not focus linked curve region", err);
+    }
+  });
+  return true;
 }
 
 function equivalentSpecForLayer(spec, layer) {

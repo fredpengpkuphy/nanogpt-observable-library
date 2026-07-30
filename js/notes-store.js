@@ -6,6 +6,10 @@
  *     { runId, specId, context, step|null, stepEnd|null, uid, name, text, createdAt }
  *   notes/{id}/comments/{id}
  *     { uid, name, text, parentId|null, createdAt }
+ *   discoveries/{id}
+ *     { title, body, uid, name, references[], createdAt }
+ *   discoveries/{id}/comments/{id}
+ *     { discoveryId, uid, name, text, parentId|null, createdAt }
  *   announcements/{id}
  *     { text, uid, createdAt, updatedAt }
  *   suggestions/{id}
@@ -14,8 +18,8 @@
  *     { text, uid, createdAt }  // curator-only
  *
  * Visitors sign in anonymously under the hood and may leave a public display name.
- * Only the curator (email/password) may delete notes/comments, manage announcements,
- * or reply to site suggestions.
+ * Only the curator (email/password) may delete notes, discoveries, comments,
+ * manage announcements, or reply to site suggestions.
  */
 const NotesStore = (() => {
   let app = null;
@@ -200,6 +204,26 @@ const NotesStore = (() => {
     return String(name || "").trim().replace(/\s+/g, " ").slice(0, 80);
   }
 
+  function normalizeDiscoveryReference(reference) {
+    if (!reference || typeof reference !== "object") return null;
+    const stepStart = normalizeStep(reference.stepStart);
+    const stepEnd = normalizeStep(reference.stepEnd);
+    if (stepStart == null || stepEnd == null || stepEnd <= stepStart) return null;
+    const runId = String(reference.runId || "").trim().slice(0, 200);
+    const specId = String(reference.specId || "").trim().slice(0, 500);
+    if (!runId || !specId) return null;
+    return {
+      runId,
+      runLabel: String(reference.runLabel || runId).trim().slice(0, 200),
+      moduleId: String(reference.moduleId || "").trim().slice(0, 300),
+      moduleLabel: String(reference.moduleLabel || "").trim().slice(0, 300),
+      specId,
+      specLabel: String(reference.specLabel || specId).trim().slice(0, 500),
+      stepStart,
+      stepEnd,
+    };
+  }
+
   function parseNote(doc) {
     const d = doc.data() || {};
     const stepRaw = d.step;
@@ -237,6 +261,35 @@ const NotesStore = (() => {
     return {
       id: doc.id,
       noteId: d.noteId || "",
+      uid: d.uid || "",
+      name: normalizeDisplayName(d.name),
+      text: d.text || "",
+      parentId: d.parentId || null,
+      createdAt: tsToIso(d.createdAt),
+    };
+  }
+
+  function parseDiscovery(doc) {
+    const d = doc.data() || {};
+    return {
+      id: doc.id,
+      uid: d.uid || "",
+      name: normalizeDisplayName(d.name),
+      title: String(d.title || "").trim(),
+      body: String(d.body || "").trim(),
+      references: (Array.isArray(d.references) ? d.references : [])
+        .map(normalizeDiscoveryReference)
+        .filter(Boolean),
+      createdAt: tsToIso(d.createdAt),
+      comments: [],
+    };
+  }
+
+  function parseDiscoveryComment(doc) {
+    const d = doc.data() || {};
+    return {
+      id: doc.id,
+      discoveryId: d.discoveryId || "",
       uid: d.uid || "",
       name: normalizeDisplayName(d.name),
       text: d.text || "",
@@ -464,6 +517,149 @@ const NotesStore = (() => {
       }
     }
     await deleteRefs(all.filter((c) => toDelete.has(c.id)).map((c) => c.ref));
+  }
+
+  async function listDiscoveryComments(discoveryId) {
+    const snap = await db
+      .collection("discoveries")
+      .doc(discoveryId)
+      .collection("comments")
+      .orderBy("createdAt", "asc")
+      .limit(500)
+      .get();
+    return snap.docs.map(parseDiscoveryComment);
+  }
+
+  async function listDiscoveries() {
+    await init();
+    if (!backendReady) return [];
+    const snap = await db
+      .collection("discoveries")
+      .orderBy("createdAt", "desc")
+      .limit(200)
+      .get();
+    const discoveries = snap.docs.map(parseDiscovery);
+    await mapConcurrent(discoveries, READ_CONCURRENCY, async (discovery) => {
+      try {
+        discovery.comments = await listDiscoveryComments(discovery.id);
+      } catch (err) {
+        console.warn("listDiscoveryComments failed", discovery.id, err);
+        discovery.comments = [];
+      }
+    });
+    return discoveries;
+  }
+
+  async function createDiscovery({
+    title,
+    body,
+    name = "",
+    references = [],
+  }) {
+    await init();
+    if (!backendReady) throw new Error("Discoveries backend is not configured yet.");
+    await waitForUid();
+    if (!myUid) throw new Error("Not signed in.");
+    const cleanTitle = String(title || "").trim().slice(0, 180);
+    const cleanBody = String(body || "").trim().slice(0, 10000);
+    const cleanName = normalizeDisplayName(name);
+    if (!cleanTitle) throw new Error("Add a title for this discovery.");
+    if (!cleanBody) throw new Error("The discovery is empty.");
+    const cleanReferences = (Array.isArray(references) ? references : [])
+      .map(normalizeDiscoveryReference)
+      .filter(Boolean)
+      .slice(0, 6);
+    if (cleanReferences.length !== (Array.isArray(references) ? references.length : 0)) {
+      throw new Error("One or more curve references are invalid.");
+    }
+    const payload = {
+      title: cleanTitle,
+      body: cleanBody,
+      uid: myUid,
+      name: cleanName,
+      references: cleanReferences,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+    const ref = await db.collection("discoveries").add(payload);
+    return {
+      id: ref.id,
+      ...payload,
+      createdAt: new Date().toISOString(),
+      comments: [],
+    };
+  }
+
+  async function createDiscoveryComment({
+    discoveryId,
+    text,
+    parentId = null,
+    name = "",
+  }) {
+    await init();
+    if (!backendReady) throw new Error("Discoveries backend is not configured yet.");
+    await waitForUid();
+    if (!myUid) throw new Error("Not signed in.");
+    const clean = String(text || "").trim().slice(0, 2000);
+    const cleanName = normalizeDisplayName(name);
+    if (!clean) throw new Error("Reply is empty.");
+    if (!discoveryId) throw new Error("Missing discovery id.");
+    const payload = {
+      discoveryId,
+      uid: myUid,
+      name: cleanName,
+      text: clean,
+      parentId: parentId || null,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+    const ref = await db
+      .collection("discoveries")
+      .doc(discoveryId)
+      .collection("comments")
+      .add(payload);
+    return {
+      id: ref.id,
+      ...payload,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  async function deleteDiscovery(id) {
+    await init();
+    if (!backendReady) throw new Error("Discoveries backend is not configured yet.");
+    if (!adminMode) throw new Error("Only the curator can delete discoveries.");
+    const discoveryRef = db.collection("discoveries").doc(id);
+    await deleteCollection(discoveryRef.collection("comments"));
+    await discoveryRef.delete();
+  }
+
+  async function deleteDiscoveryComment(discoveryId, commentId) {
+    await init();
+    if (!backendReady) throw new Error("Discoveries backend is not configured yet.");
+    if (!adminMode) throw new Error("Only the curator can delete replies.");
+    const col = db
+      .collection("discoveries")
+      .doc(discoveryId)
+      .collection("comments");
+    const docs = await readCollection(col);
+    const all = docs.map((d) => ({ id: d.id, ...d.data(), ref: d.ref }));
+    const toDelete = new Set([commentId]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const comment of all) {
+        if (
+          comment.parentId &&
+          toDelete.has(comment.parentId) &&
+          !toDelete.has(comment.id)
+        ) {
+          toDelete.add(comment.id);
+          grew = true;
+        }
+      }
+    }
+    await deleteRefs(
+      all.filter((comment) => toDelete.has(comment.id)).map((comment) => comment.ref)
+    );
   }
 
   function friendlyAdminSignInError(err) {
@@ -878,6 +1074,11 @@ const NotesStore = (() => {
     createComment,
     deleteNote,
     deleteComment,
+    listDiscoveries,
+    createDiscovery,
+    createDiscoveryComment,
+    deleteDiscovery,
+    deleteDiscoveryComment,
     listAnnouncements,
     watchAnnouncements,
     createAnnouncement,

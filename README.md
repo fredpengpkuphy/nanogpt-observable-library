@@ -15,6 +15,7 @@ weights, gradients, activations, and attention patterns evolve over time.
 - View residuals against a baseline run.
 - Zoom into curves, select step ranges, and open charts in fullscreen mode.
 - Read the mathematical definition and plain-language description of each observable.
+- Publish detailed discoveries with zoomed curve evidence and discussion.
 - Inspect each run's model, optimizer, learning-rate, and batching configuration.
 
 ## Observable Families
@@ -46,13 +47,23 @@ The **Formulas** page provides a searchable catalog of observable definitions.
 The **Announcements** and **Suggestions** pages provide project updates and a
 public channel for feedback.
 
-## Public Notes and Suggestions
+## Public Notes, Discoveries, and Suggestions
 
 Visitors can post notes on charts and add replies with an optional public display
 name. Leaving the name blank keeps the post anonymous. Notes, names, and replies
 are visible to everyone, so please do not include private or sensitive information.
 The public **Navigate** control on a note or reply focuses the chart on its
 attached step or step range.
+
+The separate **Discoveries** page is intended for longer research findings. A
+discovery can cite up to six regions from any recorded setup, layer or block,
+observable, and step range. Each cited region is rendered directly in the post as
+a zoomed curve. Authors can hold nested public discussions with optional names.
+
+Discovery records and replies use the same Firebase Authentication and Firestore
+backend as Notes. Deploy `firestore.rules` (or use the included `firebase.json`)
+before enabling Discoveries in production. Curators can delete discoveries and
+any reply.
 
 ## About the Data
 

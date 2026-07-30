@@ -124,6 +124,9 @@ body.landing {
 }
 
 .landing-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
   opacity: 0;
   transform: translateY(18px);
   animation: rise 1s cubic-bezier(0.22, 1, 0.36, 1) 0.75s forwards;
@@ -153,6 +156,13 @@ body.landing {
 
 .landing-btn:active {
   transform: translateY(0);
+}
+
+.landing-btn-secondary {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(10, 16, 20, 0.56);
+  border-color: rgba(159, 212, 228, 0.34);
+  backdrop-filter: blur(8px);
 }
 
 @keyframes rise {

@@ -16,6 +16,18 @@ service cloud.firestore {
         && request.resource.data.text.size() <= 2000;
     }
 
+    function validDiscoveryTitle() {
+      return request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 180;
+    }
+
+    function validDiscoveryBody() {
+      return request.resource.data.body is string
+        && request.resource.data.body.size() > 0
+        && request.resource.data.body.size() <= 10000;
+    }
+
     function validOptionalName() {
       return !request.resource.data.keys().hasAny(["name"])
         || (request.resource.data.name is string
@@ -68,6 +80,46 @@ service cloud.firestore {
           && validOptionalName()
           && validText()
           && request.resource.data.noteId == noteId
+          && (request.resource.data.parentId == null
+            || (request.resource.data.parentId is string
+              && request.resource.data.parentId.size() <= 200
+              && request.resource.data.parentId != commentId))
+          && isServerCreate();
+
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // Detailed, public research findings with embedded curve regions.
+    match /discoveries/{discoveryId} {
+      allow read: if true;
+
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly([
+          "title", "body", "uid", "name", "references", "createdAt"
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && validOptionalName()
+        && validDiscoveryTitle()
+        && validDiscoveryBody()
+        && request.resource.data.references is list
+        && request.resource.data.references.size() <= 6
+        && isServerCreate();
+
+      allow update: if false;
+      allow delete: if isAdmin();
+
+      match /comments/{commentId} {
+        allow read: if true;
+
+        allow create: if request.auth != null
+          && request.resource.data.keys().hasOnly([
+            "discoveryId", "uid", "name", "text", "parentId", "createdAt"
+          ])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.discoveryId == discoveryId
+          && validOptionalName()
+          && validText()
           && (request.resource.data.parentId == null
             || (request.resource.data.parentId is string
               && request.resource.data.parentId.size() <= 200
