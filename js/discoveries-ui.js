@@ -1,9 +1,18 @@
 /**
- * Discoveries page: long-form public findings with zoomed curve references,
+ * Discoveries page: long-form public findings with combined curve references,
  * nested replies, and curator deletion controls.
  */
 const DiscoveriesUI = (() => {
   const MAX_REFERENCES = 6;
+  const CURVE_COLORS = [
+    "#9fd4e4",
+    "#e8c888",
+    "#ef8a8a",
+    "#b8d982",
+    "#c7a6e8",
+    "#f0a4cf",
+  ];
+  const CURVE_DASHES = [[], [8, 4], [2, 3], [10, 4, 2, 4], [5, 3], [12, 4]];
   const manifestCache = new Map();
   const draftCharts = new Set();
   const feedCharts = new Set();
@@ -228,7 +237,7 @@ const DiscoveriesUI = (() => {
 
   async function addDraftReference() {
     if (draftReferences.length >= MAX_REFERENCES) {
-      setReferenceStatus(`A discovery can contain up to ${MAX_REFERENCES} curve regions.`, true);
+      setReferenceStatus(`A chart can contain up to ${MAX_REFERENCES} curves.`, true);
       return;
     }
     const runSelect = document.getElementById("discoveryRun");
@@ -275,7 +284,7 @@ const DiscoveriesUI = (() => {
     draftReferences.push(reference);
     document.getElementById("discoveryStepStart").value = String(range.stepStart);
     document.getElementById("discoveryStepEnd").value = String(range.stepEnd);
-    setReferenceStatus("Curve region added.");
+    setReferenceStatus("Curve added to the combined chart.");
     renderDraftReferences();
   }
 
@@ -289,7 +298,31 @@ const DiscoveriesUI = (() => {
   }
 
   function referenceHeading(reference) {
-    return `${reference.runLabel} · ${reference.moduleLabel} · ${reference.specLabel}`;
+    return [
+      reference.runLabel || reference.runId,
+      reference.moduleLabel || reference.moduleId,
+      reference.specLabel || reference.specId,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  function referenceBounds(references) {
+    const starts = references.map((reference) => reference.stepStart).filter(validStep);
+    const ends = references.map((reference) => reference.stepEnd).filter(validStep);
+    if (!starts.length || !ends.length) return null;
+    return {
+      stepStart: Math.min(...starts),
+      stepEnd: Math.max(...ends),
+    };
+  }
+
+  function curveColor(index) {
+    return CURVE_COLORS[index % CURVE_COLORS.length];
+  }
+
+  function curveLabel(reference) {
+    return `${referenceHeading(reference)} · steps ${reference.stepStart}–${reference.stepEnd}`;
   }
 
   function focusedExplorerUrl(reference) {
@@ -310,50 +343,121 @@ const DiscoveriesUI = (() => {
     return `explorer.html?${params.toString()}`;
   }
 
-  async function renderReferenceChart(canvas, reference, chartSet) {
-    try {
-      const manifest = await loadManifest(reference.runId);
-      const spec = manifest._specMap.get(reference.specId);
-      if (!spec) throw new Error("This observable is no longer available.");
-      const steps = spec.series.steps || [];
-      const values = spec.series.values || [];
-      const points = [];
-      const count = Math.min(steps.length, values.length);
-      for (let index = 0; index < count; index += 1) {
-        if (validStep(steps[index]) && Number.isFinite(values[index])) {
-          points.push({ x: steps[index], y: values[index] });
-        }
+  async function loadReferencePoints(reference) {
+    const manifest = await loadManifest(reference.runId);
+    const spec = manifest._specMap.get(reference.specId);
+    if (!spec) throw new Error("This observable is no longer available.");
+
+    // Keep the final finite value for a repeated step, then sort it. This avoids
+    // backward segments and ambiguous hover targets in older manifests.
+    const byStep = new Map();
+    const steps = spec.series.steps || [];
+    const values = spec.series.values || [];
+    const count = Math.min(steps.length, values.length);
+    for (let index = 0; index < count; index += 1) {
+      if (validStep(steps[index]) && Number.isFinite(values[index])) {
+        byStep.set(steps[index], values[index]);
       }
-      const regionPoints = points.filter(
+    }
+    const points = [...byStep]
+      .sort(([left], [right]) => left - right)
+      .map(([x, y]) => ({ x, y }))
+      .filter(
         (point) =>
           point.x >= reference.stepStart && point.x <= reference.stepEnd
       );
-      if (regionPoints.length < 2) {
-        throw new Error("This region no longer contains enough recorded points.");
+    if (points.length < 2) {
+      throw new Error("This region no longer contains enough recorded points.");
+    }
+    return points;
+  }
+
+  function setCurveKeyError(canvas, index, message) {
+    const item = canvas
+      .closest(".discovery-curve-group")
+      ?.querySelector(`[data-curve-key-index="${index}"]`);
+    if (!item) return;
+    item.classList.add("is-error");
+    const status = item.querySelector(".discovery-curve-state");
+    if (status) status.textContent = message;
+  }
+
+  async function renderCombinedCurveChart(canvas, references, chartSet) {
+    try {
+      const requestedReferences = Array.isArray(references) ? references : [];
+      const loaded = await Promise.all(
+        requestedReferences.map(async (reference, index) => {
+          try {
+            return {
+              index,
+              reference,
+              points: await loadReferencePoints(reference),
+            };
+          } catch (err) {
+            return {
+              index,
+              reference,
+              error: err?.message || String(err),
+            };
+          }
+        })
+      );
+
+      // A refresh or removal may have replaced this canvas while data loaded.
+      if (!canvas.isConnected) return;
+
+      loaded.forEach((item) => {
+        if (item.error) setCurveKeyError(canvas, item.index, item.error);
+      });
+      const available = loaded.filter((item) => item.points);
+      if (!available.length) {
+        throw new Error(
+          requestedReferences.length
+            ? "None of the selected curves could be loaded."
+            : "No curves were selected."
+        );
       }
+      if (typeof Chart !== "function") {
+        throw new Error("The chart library could not be loaded.");
+      }
+
+      const bounds = referenceBounds(requestedReferences);
+      if (!bounds || bounds.stepEnd <= bounds.stepStart) {
+        throw new Error("The selected curve range is invalid.");
+      }
+      const onlyOne = available.length === 1;
+      const datasets = available.map(({ index, reference, points }) => {
+        const color = curveColor(index);
+        return {
+          label: curveLabel(reference),
+          data: points,
+          borderColor: color,
+          backgroundColor: `${color}20`,
+          borderWidth: onlyOne ? 2.5 : 2.15,
+          borderDash: CURVE_DASHES[index % CURVE_DASHES.length],
+          pointRadius: 0,
+          pointHoverRadius: 3.5,
+          pointHitRadius: 8,
+          cubicInterpolationMode: "monotone",
+          tension: 0.18,
+          spanGaps: false,
+          fill: onlyOne,
+        };
+      });
+
       const chart = new Chart(canvas, {
         type: "line",
-        data: {
-          datasets: [{
-            label: reference.specLabel,
-            data: regionPoints,
-            borderColor: "#9fd4e4",
-            backgroundColor: "rgba(159, 212, 228, 0.1)",
-            borderWidth: 2.25,
-            pointRadius: 0,
-            pointHoverRadius: 3,
-            tension: 0.18,
-            fill: true,
-          }],
-        },
+        data: { datasets },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           animation: false,
           parsing: false,
-          normalized: true,
-          interaction: { intersect: false, mode: "nearest" },
+          // Curves may use different recording cadences and x positions.
+          normalized: false,
+          interaction: { intersect: false, mode: "nearest", axis: "x" },
           plugins: {
+            // The HTML key stays readable with six long run/module/spec labels.
             legend: { display: false },
             tooltip: {
               callbacks: {
@@ -365,13 +469,13 @@ const DiscoveriesUI = (() => {
           scales: {
             x: {
               type: "linear",
-              min: reference.stepStart,
-              max: reference.stepEnd,
+              min: bounds.stepStart,
+              max: bounds.stepEnd,
               grid: { color: "rgba(255,255,255,0.08)" },
               ticks: { color: "rgba(255,255,255,0.7)", maxTicksLimit: 6 },
               title: {
                 display: true,
-                text: `steps ${reference.stepStart}–${reference.stepEnd}`,
+                text: `steps ${bounds.stepStart}–${bounds.stepEnd}`,
                 color: "rgba(255,255,255,0.7)",
               },
             },
@@ -384,6 +488,7 @@ const DiscoveriesUI = (() => {
       });
       chartSet.add(chart);
     } catch (err) {
+      if (!canvas.isConnected) return;
       const host = canvas.closest(".discovery-curve-canvas");
       if (host) {
         host.innerHTML = `<p class="discovery-chart-error">${escapeHtml(
@@ -393,6 +498,34 @@ const DiscoveriesUI = (() => {
     }
   }
 
+  function renderCurveKeyItem(reference, index, { removable = false } = {}) {
+    const heading = referenceHeading(reference);
+    return `
+      <div class="discovery-curve-key-item" data-curve-key-index="${index}" role="listitem">
+        <span
+          class="discovery-curve-swatch"
+          style="--curve-color: ${curveColor(index)}"
+          aria-hidden="true"
+        ></span>
+        <div class="discovery-curve-key-copy">
+          <strong>${escapeHtml(heading)}</strong>
+          <span>steps ${reference.stepStart}–${reference.stepEnd}</span>
+          <span class="discovery-curve-state" role="status"></span>
+        </div>
+        ${
+          removable
+            ? `<button type="button" class="note-delete" data-remove-reference="${index}" aria-label="Remove ${escapeHtml(heading)}">✕</button>`
+            : `<a class="header-link" href="${escapeHtml(focusedExplorerUrl(reference))}">Open curve</a>`
+        }
+      </div>`;
+  }
+
+  function combinedRangeText(references) {
+    const bounds = referenceBounds(references);
+    if (!bounds) return "";
+    return `steps ${bounds.stepStart}–${bounds.stepEnd}`;
+  }
+
   function renderDraftReferences() {
     const host = document.getElementById("discoveryDraftReferences");
     destroyCharts(draftCharts);
@@ -400,33 +533,33 @@ const DiscoveriesUI = (() => {
       host.innerHTML = "";
       return;
     }
-    host.innerHTML = draftReferences
-      .map(
-        (reference, index) => `
-        <article class="discovery-draft-reference">
-          <div class="discovery-reference-head">
-            <div>
-              <strong>${escapeHtml(referenceHeading(reference))}</strong>
-              <span>steps ${reference.stepStart}–${reference.stepEnd}</span>
-            </div>
-            <button type="button" class="note-delete" data-remove-reference="${index}" aria-label="Remove curve region">✕</button>
+    host.innerHTML = `
+      <article class="discovery-draft-reference discovery-curve-group">
+        <div class="discovery-reference-head">
+          <div>
+            <strong>Combined curve preview</strong>
+            <span>${draftReferences.length} ${draftReferences.length === 1 ? "curve" : "curves"} · ${combinedRangeText(draftReferences)}</span>
           </div>
-          <div class="discovery-curve-canvas">
-            <canvas data-draft-chart="${index}" aria-label="Zoomed curve preview"></canvas>
-          </div>
-        </article>`
-      )
-      .join("");
+        </div>
+        <div class="discovery-curve-key" role="list" aria-label="Selected curves">
+          ${draftReferences
+            .map((reference, index) =>
+              renderCurveKeyItem(reference, index, { removable: true })
+            )
+            .join("")}
+        </div>
+        <div class="discovery-curve-canvas">
+          <canvas data-draft-chart aria-label="Combined preview of ${draftReferences.length} selected ${draftReferences.length === 1 ? "curve" : "curves"}"></canvas>
+        </div>
+      </article>`;
     host.querySelectorAll("[data-remove-reference]").forEach((button) => {
       button.addEventListener("click", () => {
         draftReferences.splice(Number(button.dataset.removeReference), 1);
         renderDraftReferences();
       });
     });
-    host.querySelectorAll("[data-draft-chart]").forEach((canvas) => {
-      const reference = draftReferences[Number(canvas.dataset.draftChart)];
-      if (reference) renderReferenceChart(canvas, reference, draftCharts);
-    });
+    const canvas = host.querySelector("[data-draft-chart]");
+    if (canvas) renderCombinedCurveChart(canvas, draftReferences, draftCharts);
   }
 
   function buildCommentTree(comments, discoveryId) {
@@ -476,21 +609,24 @@ const DiscoveriesUI = (() => {
     return html;
   }
 
-  function renderDiscoveryReference(reference, discoveryIndex, referenceIndex) {
+  function renderDiscoveryReferences(references, discoveryIndex) {
     return `
-      <figure class="discovery-curve-reference">
+      <figure class="discovery-curve-reference discovery-curve-group">
         <figcaption>
           <div>
-            <strong>${escapeHtml(referenceHeading(reference))}</strong>
-            <span>Zoomed to steps ${reference.stepStart}–${reference.stepEnd}</span>
+            <strong>Combined curve evidence</strong>
+            <span>${references.length} ${references.length === 1 ? "curve" : "curves"} · ${combinedRangeText(references)}</span>
           </div>
-          <a class="header-link" href="${escapeHtml(focusedExplorerUrl(reference))}">Open curve</a>
         </figcaption>
+        <div class="discovery-curve-key" role="list" aria-label="Curves in this chart">
+          ${references
+            .map((reference, index) => renderCurveKeyItem(reference, index))
+            .join("")}
+        </div>
         <div class="discovery-curve-canvas">
           <canvas
             data-feed-discovery="${discoveryIndex}"
-            data-feed-reference="${referenceIndex}"
-            aria-label="Zoomed curve for ${escapeHtml(referenceHeading(reference))}"
+            aria-label="Combined chart of ${references.length} ${references.length === 1 ? "curve" : "curves"}"
           ></canvas>
         </div>
       </figure>`;
@@ -525,15 +661,10 @@ const DiscoveriesUI = (() => {
             <div class="discovery-body">${escapeHtml(discovery.body)}</div>
             ${
               discovery.references?.length
-                ? `<div class="discovery-reference-list">${discovery.references
-                    .map((reference, referenceIndex) =>
-                      renderDiscoveryReference(
-                        reference,
-                        discoveryIndex,
-                        referenceIndex
-                      )
-                    )
-                    .join("")}</div>`
+                ? `<div class="discovery-reference-list">${renderDiscoveryReferences(
+                    discovery.references,
+                    discoveryIndex
+                  )}</div>`
                 : ""
             }
             <section class="discovery-discussion" aria-label="Replies">
@@ -550,8 +681,10 @@ const DiscoveriesUI = (() => {
 
     host.querySelectorAll("[data-feed-discovery]").forEach((canvas) => {
       const discovery = discoveries[Number(canvas.dataset.feedDiscovery)];
-      const reference = discovery?.references?.[Number(canvas.dataset.feedReference)];
-      if (reference) renderReferenceChart(canvas, reference, feedCharts);
+      const references = discovery?.references || [];
+      if (references.length) {
+        renderCombinedCurveChart(canvas, references, feedCharts);
+      }
     });
     host.querySelectorAll("[data-reply-discovery]").forEach((button) => {
       button.addEventListener("click", () =>

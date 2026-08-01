@@ -14,7 +14,7 @@
     href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap"
     rel="stylesheet"
   >
-  <link rel="stylesheet" href="css/style.css?v=47">
+  <link rel="stylesheet" href="css/style.css?v=48">
 </head>
 <body class="discoveries-page">
   <div class="curator-bar" id="curatorBar" hidden>
@@ -42,7 +42,7 @@
           <p class="discovery-kicker">Share a finding</p>
           <h2 id="discoveryComposerTitle">Document a discovery</h2>
         </div>
-        <span class="discovery-limit">Up to 6 curve regions</span>
+        <span class="discovery-limit">Up to 6 curves per chart</span>
       </div>
 
       <form id="discoveryForm">
@@ -80,10 +80,11 @@
         </label>
 
         <fieldset class="discovery-reference-builder">
-          <legend>Refer to a curve region <span class="field-optional">(optional)</span></legend>
+          <legend>Add curves to one chart <span class="field-optional">(optional)</span></legend>
           <p>
             Choose any setup, layer or block, observable, and step range. The
-            discovery will show that region as a zoomed curve.
+            selected curves will be overlaid in one zoomed chart with shared step
+            and raw-value axes, so compare compatible observables directly.
           </p>
           <div class="discovery-reference-grid">
             <label>
@@ -107,7 +108,7 @@
               <input type="number" id="discoveryStepEnd" min="0" step="1" inputmode="numeric">
             </label>
             <button type="button" class="chart-btn discovery-add-reference" id="discoveryAddReference">
-              Add curve region
+              Add curve to chart
             </button>
           </div>
           <p class="discovery-inline-status" id="discoveryReferenceStatus" role="status"></p>
@@ -150,6 +151,6 @@
   <script src="js/curator-ui.js?v=7"></script>
   <script src="js/maintenance-gate.js?v=1"></script>
   <script src="js/observable_defs.js?v=13"></script>
-  <script src="js/discoveries-ui.js?v=2"></script>
+  <script src="js/discoveries-ui.js?v=3"></script>
 </body>
 </html>
