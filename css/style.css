@@ -3283,6 +3283,51 @@ body.curator-mode .app-header {
   font-size: 0.7rem;
 }
 
+.discovery-curve-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(159, 212, 228, 0.025);
+}
+
+.discovery-curve-toolbar .chart-btn:disabled,
+.discovery-curve-key .chart-btn:disabled {
+  cursor: wait;
+  opacity: 0.42;
+}
+
+.discovery-axis-btn.active {
+  border-color: rgba(126, 184, 201, 0.45);
+  background: rgba(126, 184, 201, 0.16);
+  color: var(--text);
+}
+
+.discovery-curve-view-status {
+  flex: 1 1 13rem;
+  min-height: 1em;
+  color: var(--muted-soft);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.discovery-curve-view-status.is-error {
+  color: #ff9d92;
+}
+
+.discovery-curve-hint {
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted-soft);
+  font-family: var(--font-ui);
+  font-size: 0.66rem;
+  line-height: 1.4;
+}
+
 .discovery-curve-key {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
@@ -3345,6 +3390,28 @@ body.curator-mode .app-header {
   color: #ff9d92;
 }
 
+.discovery-curve-key-item.is-error .chart-btn:disabled {
+  cursor: not-allowed;
+}
+
+.discovery-curve-key-item.is-hidden .discovery-curve-swatch,
+.discovery-curve-key-item.is-hidden .discovery-curve-key-copy {
+  opacity: 0.42;
+}
+
+.discovery-curve-key-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.discovery-curve-visibility {
+  min-width: 2.7rem;
+  padding-inline: 0.42rem;
+  font-size: 0.66rem;
+}
+
 .discovery-curve-key-item .header-link,
 .discovery-curve-key-item .note-delete {
   align-self: center;
@@ -3354,6 +3421,60 @@ body.curator-mode .app-header {
   position: relative;
   height: 270px;
   padding: 0.5rem;
+}
+
+.discovery-curve-canvas canvas {
+  cursor: grab;
+  touch-action: none;
+}
+
+.discovery-curve-canvas canvas:active {
+  cursor: grabbing;
+}
+
+body.discovery-chart-expanded {
+  overflow: hidden;
+}
+
+body.discovery-chart-expanded::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 499;
+  background: rgba(8, 12, 16, 0.78);
+  backdrop-filter: blur(6px);
+}
+
+.discovery-curve-group.is-expanded {
+  position: fixed;
+  inset: 2vh 2vw;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: hidden;
+  border-color: rgba(159, 212, 228, 0.42);
+  background: #0b1117;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.7);
+}
+
+.discovery-curve-group.is-expanded .discovery-curve-key {
+  flex: 0 1 auto;
+  max-height: 24vh;
+  overflow: auto;
+}
+
+.discovery-curve-group.is-expanded .discovery-curve-canvas {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+.discovery-curve-group.is-expanded .discovery-expand-curve {
+  border-color: rgba(255, 157, 146, 0.45);
+  color: #ffaaa1;
 }
 
 .discovery-chart-error {
@@ -3511,6 +3632,28 @@ body.curator-mode .app-header {
 
   .discovery-curve-swatch {
     width: 1.5rem;
+  }
+
+  .discovery-curve-toolbar {
+    align-items: flex-start;
+    padding-inline: 0.55rem;
+  }
+
+  .discovery-curve-view-status {
+    flex-basis: 100%;
+  }
+
+  .discovery-curve-key-actions {
+    align-items: flex-end;
+    flex-direction: column;
+  }
+
+  .discovery-curve-group.is-expanded {
+    inset: 0.35rem;
+  }
+
+  .discovery-curve-group.is-expanded .discovery-curve-key {
+    max-height: 28vh;
   }
 
   .discovery-publish-row .note-submit {

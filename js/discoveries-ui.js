@@ -14,12 +14,15 @@ const DiscoveriesUI = (() => {
   ];
   const CURVE_DASHES = [[], [8, 4], [2, 3], [10, 4, 2, 4], [5, 3], [12, 4]];
   const manifestCache = new Map();
+  const learningRateCache = new Map();
+  const chartStateByCanvas = new WeakMap();
   const draftCharts = new Set();
   const feedCharts = new Set();
   let runs = [];
   let draftReferences = [];
   let discoveries = [];
   let isAdmin = false;
+  let expandedCurveGroup = null;
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -53,6 +56,169 @@ const DiscoveriesUI = (() => {
     });
     if (!response.ok) throw new Error(`Could not load ${url}`);
     return response.json();
+  }
+
+  async function fetchText(url) {
+    const separator = url.includes("?") ? "&" : "?";
+    const response = await fetch(`${url}${separator}t=${Date.now()}`, {
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`Could not load ${url}`);
+    return response.text();
+  }
+
+  function parseCsvRow(line) {
+    const columns = [];
+    let value = "";
+    let quoted = false;
+    for (let index = 0; index < line.length; index += 1) {
+      const char = line[index];
+      if (char === '"') {
+        if (quoted && line[index + 1] === '"') {
+          value += '"';
+          index += 1;
+        } else {
+          quoted = !quoted;
+        }
+      } else if (char === "," && !quoted) {
+        columns.push(value);
+        value = "";
+      } else {
+        value += char;
+      }
+    }
+    columns.push(value);
+    return columns;
+  }
+
+  function parseLearningRateCsv(text) {
+    const lines = String(text || "").trim().split(/\r?\n/);
+    if (lines.length < 2) return null;
+    const headers = parseCsvRow(lines[0]).map((header, index) =>
+      (index === 0 ? header.replace(/^\uFEFF/, "") : header).trim()
+    );
+    const stepIndex = headers.indexOf("iter");
+    const lrIndex = headers.indexOf("lr");
+    if (stepIndex < 0 || lrIndex < 0) return null;
+
+    const byStep = new Map();
+    for (let index = 1; index < lines.length; index += 1) {
+      if (!lines[index].trim()) continue;
+      const columns = parseCsvRow(lines[index]);
+      const rawStep = columns[stepIndex];
+      const rawRate = columns[lrIndex];
+      if (
+        rawStep == null ||
+        rawRate == null ||
+        String(rawStep).trim() === "" ||
+        String(rawRate).trim() === ""
+      ) {
+        continue;
+      }
+      const step = Number(rawStep);
+      const rate = Number(rawRate);
+      if (validStep(step) && Number.isFinite(rate) && rate >= 0) {
+        byStep.set(step, { x: step, y: rate });
+      }
+    }
+    const lr = [...byStep.values()].sort((left, right) => left.x - right.x);
+    return lr.length ? { lr } : null;
+  }
+
+  async function loadLearningRateLog(runId) {
+    if (learningRateCache.has(runId)) return learningRateCache.get(runId);
+    const promise = fetchText(
+      `data/${encodeURIComponent(runId)}/eval_loss_log.csv`
+    ).then((text) => {
+      const parsed = parseLearningRateCsv(text);
+      if (!parsed) throw new Error(`Learning-rate data is unavailable for ${runId}.`);
+      return parsed;
+    });
+    learningRateCache.set(runId, promise);
+    try {
+      return await promise;
+    } catch (err) {
+      learningRateCache.delete(runId);
+      throw err;
+    }
+  }
+
+  function learningRateAtStep(log, step) {
+    const points = log?.lr || [];
+    if (!points.length || !Number.isFinite(step) || step < 0) return NaN;
+    if (step <= points[0].x) return points[0].y;
+    const last = points[points.length - 1];
+    if (step >= last.x) return last.y;
+
+    let low = 0;
+    let high = points.length - 1;
+    while (high - low > 1) {
+      const middle = Math.floor((low + high) / 2);
+      if (points[middle].x <= step) low = middle;
+      else high = middle;
+    }
+    const left = points[low];
+    const right = points[high];
+    const span = right.x - left.x;
+    if (!(span > 0)) return left.y;
+    const fraction = (step - left.x) / span;
+    return left.y + fraction * (right.y - left.y);
+  }
+
+  function ensureLearningRatePrefix(log) {
+    if (log?._lrIntegral) return log._lrIntegral;
+    const points = log?.lr || [];
+    if (!points.length) return null;
+    const prefixAtPoint = new Array(points.length).fill(0);
+    prefixAtPoint[0] = points[0].x * points[0].y;
+    for (let index = 0; index + 1 < points.length; index += 1) {
+      const left = points[index];
+      const right = points[index + 1];
+      const count = right.x - left.x;
+      const slope = count > 0 ? (right.y - left.y) / count : 0;
+      const area = count * left.y + slope * count * (count - 1) / 2;
+      prefixAtPoint[index + 1] = prefixAtPoint[index] + area;
+      if (!Number.isFinite(prefixAtPoint[index + 1])) return null;
+    }
+    log._lrIntegral = { points, prefixAtPoint };
+    return log._lrIntegral;
+  }
+
+  function cumulativeLearningRateAt(log, step) {
+    if (!Number.isFinite(step) || step < 0) return NaN;
+    if (step === 0) return 0;
+    const integral = ensureLearningRatePrefix(log);
+    if (!integral) return NaN;
+    const { points, prefixAtPoint } = integral;
+    const whole = Math.floor(step);
+    let tau;
+    if (whole <= points[0].x) {
+      tau = whole * points[0].y;
+    } else {
+      let low = 0;
+      let high = points.length - 1;
+      while (low < high) {
+        const middle = Math.ceil((low + high) / 2);
+        if (points[middle].x <= whole) low = middle;
+        else high = middle - 1;
+      }
+      const left = points[low];
+      const count = whole - left.x;
+      tau = prefixAtPoint[low];
+      if (count > 0) {
+        if (low + 1 < points.length) {
+          const right = points[low + 1];
+          const span = right.x - left.x;
+          const slope = span > 0 ? (right.y - left.y) / span : 0;
+          tau += count * left.y + slope * count * (count - 1) / 2;
+        } else {
+          tau += count * left.y;
+        }
+      }
+    }
+    const fraction = step - whole;
+    if (fraction > 0) tau += fraction * learningRateAtStep(log, whole);
+    return Number.isFinite(tau) && tau >= 0 ? tau : NaN;
   }
 
   function specHasSeries(spec) {
@@ -290,6 +456,14 @@ const DiscoveriesUI = (() => {
 
   function destroyCharts(set) {
     for (const chart of set) {
+      const canvas = chart?.canvas;
+      if (canvas?.closest(".discovery-curve-group") === expandedCurveGroup) {
+        closeExpandedCurveGroup();
+      }
+      if (canvas) {
+        canvas.ondblclick = null;
+        chartStateByCanvas.delete(canvas);
+      }
       try {
         chart.destroy();
       } catch (_) {}
@@ -382,6 +556,560 @@ const DiscoveriesUI = (() => {
     if (status) status.textContent = message;
   }
 
+  function setCurveViewStatus(group, message = "", isError = false) {
+    const status = group?.querySelector(".discovery-curve-view-status");
+    if (!status) return;
+    status.textContent = message;
+    status.classList.toggle("is-error", !!isError);
+  }
+
+  function stateForGroup(group) {
+    const canvas = group?.querySelector("canvas[data-discovery-curve-chart]");
+    return canvas ? chartStateByCanvas.get(canvas) : null;
+  }
+
+  function setCurveControlsReady(group, state = null) {
+    group?.querySelectorAll("[data-curve-view-control]").forEach((control) => {
+      control.disabled = !state;
+    });
+    group?.querySelectorAll("[data-toggle-curve]").forEach((button) => {
+      const index = Number(button.dataset.toggleCurve);
+      button.disabled =
+        !state || !state.definitions.some((definition) => definition.index === index);
+    });
+  }
+
+  function scaleUsesLogY(scaleMode) {
+    return scaleMode === "loglinear" || scaleMode === "loglog";
+  }
+
+  function formatAxisValue(value) {
+    if (!Number.isFinite(value)) return "";
+    const magnitude = Math.abs(value);
+    if ((magnitude > 0 && magnitude < 1e-3) || magnitude >= 1e6) {
+      return value.toExponential(3);
+    }
+    return value.toLocaleString(undefined, { maximumSignificantDigits: 6 });
+  }
+
+  function axisValueForStep(state, reference, step, axisMode) {
+    if (axisMode === "step") return step;
+    return cumulativeLearningRateAt(
+      state.learningRateByRun.get(reference.runId),
+      step
+    );
+  }
+
+  function buildCurveDatasets(state, scaleMode, axisMode) {
+    const logX = scaleMode === "loglog";
+    const mapped = state.definitions.map((definition) => ({
+      definition,
+      points: definition.rawPoints
+        .map((point) => ({
+          axisX: axisValueForStep(
+            state,
+            definition.reference,
+            point.x,
+            axisMode
+          ),
+          y: point.y,
+          step: point.x,
+        }))
+        .filter((point) => Number.isFinite(point.axisX) && point.axisX >= 0),
+    }));
+    const axisValues = mapped.flatMap((item) =>
+      item.points.map((point) => point.axisX)
+    );
+    if (!axisValues.length) {
+      throw new Error(
+        axisMode === "tau"
+          ? "No curves can be mapped to τ."
+          : "No valid horizontal-axis values are available."
+      );
+    }
+    const rangeValues =
+      axisMode === "step" && state.bounds
+        ? [state.bounds.stepStart, state.bounds.stepEnd]
+        : axisValues;
+    const positiveValues = [...axisValues, ...rangeValues].filter(
+      (value) => value > 0
+    );
+    if (logX && !positiveValues.length) {
+      throw new Error("Log–log view requires at least one positive x value.");
+    }
+    const zeroPlotX = positiveValues.length
+      ? Math.min(...positiveValues) / 10
+      : Number.EPSILON;
+    const plottedValues = rangeValues.map((value) =>
+      logX && value === 0 ? zeroPlotX : value
+    );
+    let xMin = Math.min(...plottedValues);
+    let xMax = Math.max(...plottedValues);
+    if (!(xMax > xMin)) {
+      if (logX) {
+        xMin = Math.max(xMin / 10, Number.EPSILON);
+        xMax = Math.max(xMax * 10, xMin * 10);
+      } else {
+        const span = axisMode === "tau" ? 1e-12 : 1;
+        xMin = Math.max(0, xMin - span / 2);
+        xMax = xMin + span;
+      }
+    }
+
+    const visibleCount = state.definitions.filter(
+      (definition) => !definition.hidden
+    ).length;
+    return {
+      xMin,
+      xMax,
+      datasets: mapped.map(({ definition, points }) => {
+        const displayPoints = scaleUsesLogY(scaleMode)
+          ? points.filter((point) => point.y > 0)
+          : points;
+        return {
+          label: curveLabel(definition.reference),
+          data: displayPoints.map((point) => ({
+            x: logX && point.axisX === 0 ? zeroPlotX : point.axisX,
+            y: point.y,
+            _step: point.step,
+            ...(axisMode === "tau" ? { _tau: point.axisX } : {}),
+          })),
+          borderColor: curveColor(definition.index),
+          backgroundColor: `${curveColor(definition.index)}20`,
+          borderWidth: visibleCount === 1 ? 2.5 : 2.15,
+          borderDash: CURVE_DASHES[definition.index % CURVE_DASHES.length],
+          pointRadius: 0,
+          pointHoverRadius: 3.5,
+          pointHitRadius: 8,
+          cubicInterpolationMode: "monotone",
+          tension: 0.18,
+          spanGaps: false,
+          fill: visibleCount === 1 && !scaleUsesLogY(scaleMode),
+          hidden: definition.hidden,
+          _referenceIndex: definition.index,
+        };
+      }),
+    };
+  }
+
+  function curveChartOptions(state, xMin, xMax) {
+    const logX = state.scaleMode === "loglog";
+    const logY = scaleUsesLogY(state.scaleMode);
+    const axisColor = "rgba(255,255,255,0.7)";
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      parsing: false,
+      // Curves may use different recording cadences and x positions.
+      normalized: false,
+      interaction: { intersect: false, mode: "nearest", axis: "x" },
+      plugins: {
+        // The HTML key stays readable with six long run/module/spec labels.
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => {
+              if (!items.length) return "";
+              const raw = items[0].raw;
+              if (state.axisMode === "tau" && Number.isFinite(raw?._tau)) {
+                return `τ ${formatAxisValue(raw._tau)} · step ${raw._step}`;
+              }
+              return Number.isFinite(raw?._step) ? `step ${raw._step}` : "";
+            },
+          },
+        },
+        zoom: {
+          zoom: {
+            wheel: { enabled: true, speed: 0.1 },
+            pinch: { enabled: true },
+            mode: "xy",
+            drag: {
+              enabled: !!state.expanded,
+              threshold: 8,
+              backgroundColor: "rgba(159, 212, 228, 0.14)",
+              borderColor: "rgba(159, 212, 228, 0.85)",
+              borderWidth: 1,
+            },
+          },
+          pan: {
+            enabled: true,
+            mode: "xy",
+            modifierKey: "alt",
+            threshold: 10,
+          },
+          limits: {
+            x: {
+              min: "original",
+              max: "original",
+              minRange: state.axisMode === "tau" ? 1e-12 : 1,
+            },
+            y: { min: "original", max: "original", minRange: 1e-12 },
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: logX ? "logarithmic" : "linear",
+          min: xMin,
+          max: xMax,
+          grid: { color: "rgba(255,255,255,0.08)" },
+          ticks: { color: axisColor, maxTicksLimit: 6 },
+          title: {
+            display: true,
+            text: `${state.axisMode === "tau" ? "τ" : "steps"}${logX ? " (log)" : ""}`,
+            color: axisColor,
+          },
+        },
+        y: {
+          type: logY ? "logarithmic" : "linear",
+          grid: { color: "rgba(255,255,255,0.08)" },
+          ticks: { color: axisColor, maxTicksLimit: 5 },
+          title: {
+            display: true,
+            text: logY ? "Value (log)" : "Value",
+            color: axisColor,
+          },
+        },
+      },
+    };
+  }
+
+  function syncCurveViewControls(state) {
+    const group = state.group;
+    group.querySelectorAll("[data-curve-scale]").forEach((button) => {
+      button.classList.toggle("active", button.dataset.curveScale === state.scaleMode);
+    });
+    group.querySelectorAll("[data-curve-axis]").forEach((button) => {
+      button.classList.toggle("active", button.dataset.curveAxis === state.axisMode);
+    });
+    for (const definition of state.definitions) {
+      const item = group.querySelector(
+        `[data-curve-key-index="${definition.index}"]`
+      );
+      const button = item?.querySelector("[data-toggle-curve]");
+      item?.classList.toggle("is-hidden", definition.hidden);
+      if (button) {
+        button.textContent = definition.hidden ? "Show" : "Hide";
+        button.setAttribute("aria-pressed", String(!definition.hidden));
+        button.setAttribute(
+          "aria-label",
+          `${definition.hidden ? "Show" : "Hide"} ${referenceHeading(
+            definition.reference
+          )}`
+        );
+      }
+    }
+    const expand = group.querySelector('[data-curve-action="expand"]');
+    if (expand) {
+      expand.textContent = state.expanded ? "✕ Close" : "⤢ Expand";
+      expand.setAttribute(
+        "aria-label",
+        state.expanded ? "Close expanded chart" : "Expand chart"
+      );
+    }
+  }
+
+  function mountCurveChart(state) {
+    const built = buildCurveDatasets(state, state.scaleMode, state.axisMode);
+    const previous = state.chart;
+    if (previous) {
+      state.chartSet.delete(previous);
+      try {
+        previous.destroy();
+      } catch (_) {}
+    }
+    state.canvas.removeAttribute("width");
+    state.canvas.removeAttribute("height");
+    state.canvas.style.width = "";
+    state.canvas.style.height = "";
+    const chart = new Chart(state.canvas, {
+      type: "line",
+      data: { datasets: built.datasets },
+      options: curveChartOptions(state, built.xMin, built.xMax),
+    });
+    state.chart = chart;
+    state.chartSet.add(chart);
+    chartStateByCanvas.set(state.canvas, state);
+    state.canvas.ondblclick = (event) => {
+      event.preventDefault();
+      resetCurveChart(state);
+    };
+    setCurveControlsReady(state.group, state);
+    syncCurveViewControls(state);
+    return chart;
+  }
+
+  function replaceCurveChartView(state, { scaleMode, axisMode } = {}) {
+    const nextScale = scaleMode || state.scaleMode;
+    const nextAxis = axisMode || state.axisMode;
+    if (scaleUsesLogY(nextScale)) {
+      const blocker = state.definitions.find(
+        (definition) =>
+          !definition.hidden &&
+          definition.rawPoints.some(
+            (point) => Number.isFinite(point.y) && point.y <= 0
+          )
+      );
+      if (blocker) {
+        setCurveViewStatus(
+          state.group,
+          `Logarithmic y-axis unavailable: ${referenceHeading(
+            blocker.reference
+          )} contains zero or negative values.`,
+          true
+        );
+        return false;
+      }
+    }
+
+    const previousScale = state.scaleMode;
+    const previousAxis = state.axisMode;
+    state.scaleMode = nextScale;
+    state.axisMode = nextAxis;
+    try {
+      mountCurveChart(state);
+      const visible = state.definitions.filter(
+        (definition) => !definition.hidden
+      ).length;
+      setCurveViewStatus(
+        state.group,
+        visible ? "" : "All curves are hidden. Use Show to restore one."
+      );
+      return true;
+    } catch (err) {
+      state.scaleMode = previousScale;
+      state.axisMode = previousAxis;
+      try {
+        mountCurveChart(state);
+      } catch (_) {
+        state.chart = null;
+        setCurveControlsReady(state.group, null);
+      }
+      setCurveViewStatus(state.group, err?.message || String(err), true);
+      return false;
+    }
+  }
+
+  async function setCurveAxisMode(state, axisMode) {
+    if (!state || !["step", "tau"].includes(axisMode)) return;
+    const request = ++state.axisRequest;
+    if (axisMode === "step") {
+      replaceCurveChartView(state, { axisMode });
+      return;
+    }
+    setCurveViewStatus(state.group, "Loading learning-rate data…");
+    try {
+      const runIds = [...new Set(
+        state.definitions.map((definition) => definition.reference.runId)
+      )];
+      const logs = await Promise.all(
+        runIds.map(async (runId) => [runId, await loadLearningRateLog(runId)])
+      );
+      if (
+        request !== state.axisRequest ||
+        !state.canvas.isConnected ||
+        chartStateByCanvas.get(state.canvas) !== state
+      ) {
+        return;
+      }
+      state.learningRateByRun = new Map(logs);
+      const hasPositiveTau = state.definitions.some((definition) =>
+        definition.rawPoints.some(
+          (point) =>
+            cumulativeLearningRateAt(
+              state.learningRateByRun.get(definition.reference.runId),
+              point.x
+            ) > 0
+        )
+      );
+      if (!hasPositiveTau) {
+        throw new Error("τ view requires a positive recorded learning rate.");
+      }
+      replaceCurveChartView(state, { axisMode });
+    } catch (err) {
+      if (request !== state.axisRequest) return;
+      setCurveViewStatus(state.group, err?.message || String(err), true);
+      syncCurveViewControls(state);
+    }
+  }
+
+  function fallbackZoomScale(scale, magnification) {
+    const min = Number(scale?.min);
+    const max = Number(scale?.max);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || !(max > min)) return null;
+    if (scale.type === "logarithmic") {
+      if (!(min > 0)) return null;
+      const logMin = Math.log(min);
+      const logMax = Math.log(max);
+      const center = (logMin + logMax) / 2;
+      const halfSpan = (logMax - logMin) / (2 * magnification);
+      return {
+        min: Math.exp(center - halfSpan),
+        max: Math.exp(center + halfSpan),
+      };
+    }
+    const center = min + (max - min) / 2;
+    const span = (max - min) / magnification;
+    let nextMin = center - span / 2;
+    let nextMax = center + span / 2;
+    if (scale.axis === "x" && nextMin < 0) {
+      nextMax -= nextMin;
+      nextMin = 0;
+    }
+    return { min: nextMin, max: nextMax };
+  }
+
+  function zoomCurveChart(state, magnification) {
+    const chart = state?.chart;
+    if (!chart || !(magnification > 0) || magnification === 1) return;
+    try {
+      if (typeof chart.zoom === "function") {
+        chart.zoom({ x: magnification, y: magnification }, "none");
+      } else {
+        for (const axis of ["x", "y"]) {
+          const bounds = fallbackZoomScale(chart.scales?.[axis], magnification);
+          if (!bounds) continue;
+          chart.options.scales[axis].min = bounds.min;
+          chart.options.scales[axis].max = bounds.max;
+        }
+        chart.update("none");
+      }
+      setCurveViewStatus(state.group, "");
+    } catch (err) {
+      setCurveViewStatus(state.group, "Chart zoom failed.", true);
+      console.warn("Discovery chart zoom failed", err);
+    }
+  }
+
+  function resetCurveChart(state) {
+    if (!state?.chart) return;
+    replaceCurveChartView(state);
+  }
+
+  function scheduleCurveResize(state) {
+    const resize = () => {
+      try {
+        state?.chart?.resize();
+      } catch (_) {}
+    };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(resize);
+    else setTimeout(resize, 0);
+  }
+
+  function closeExpandedCurveGroup() {
+    const group = expandedCurveGroup;
+    if (!group) return;
+    const state = stateForGroup(group);
+    group.classList.remove("is-expanded");
+    group.removeAttribute("role");
+    group.removeAttribute("aria-modal");
+    document.body.classList.remove("discovery-chart-expanded");
+    expandedCurveGroup = null;
+    if (state) {
+      state.expanded = false;
+      const drag = state.chart?.options?.plugins?.zoom?.zoom?.drag;
+      if (drag) drag.enabled = false;
+      try {
+        state.chart?.update?.("none");
+      } catch (_) {}
+      syncCurveViewControls(state);
+      scheduleCurveResize(state);
+    }
+  }
+
+  function toggleExpandedCurveGroup(state) {
+    if (!state?.group) return;
+    if (expandedCurveGroup === state.group) {
+      closeExpandedCurveGroup();
+      return;
+    }
+    closeExpandedCurveGroup();
+    expandedCurveGroup = state.group;
+    state.expanded = true;
+    state.group.classList.add("is-expanded");
+    state.group.setAttribute("role", "dialog");
+    state.group.setAttribute("aria-modal", "true");
+    document.body.classList.add("discovery-chart-expanded");
+    const drag = state.chart?.options?.plugins?.zoom?.zoom?.drag;
+    if (drag) drag.enabled = true;
+    try {
+      state.chart?.update?.("none");
+    } catch (_) {}
+    syncCurveViewControls(state);
+    scheduleCurveResize(state);
+  }
+
+  function toggleCurveVisibility(state, referenceIndex) {
+    const definition = state?.definitions.find(
+      (candidate) => candidate.index === referenceIndex
+    );
+    if (!definition || !state.chart) return;
+    if (
+      definition.hidden &&
+      scaleUsesLogY(state.scaleMode) &&
+      definition.rawPoints.some(
+        (point) => Number.isFinite(point.y) && point.y <= 0
+      )
+    ) {
+      setCurveViewStatus(
+        state.group,
+        "This curve contains zero or negative values and cannot be shown on a logarithmic y-axis.",
+        true
+      );
+      return;
+    }
+    definition.hidden = !definition.hidden;
+    const datasetIndex = state.chart.data.datasets.findIndex(
+      (dataset) => dataset._referenceIndex === referenceIndex
+    );
+    if (datasetIndex >= 0) {
+      state.chart.setDatasetVisibility(datasetIndex, !definition.hidden);
+      state.chart.update("none");
+    }
+    syncCurveViewControls(state);
+    const visible = state.definitions.filter((item) => !item.hidden).length;
+    setCurveViewStatus(
+      state.group,
+      visible ? "" : "All curves are hidden. Use Show to restore one."
+    );
+  }
+
+  function wireCurveGroup(group) {
+    group.querySelectorAll("[data-curve-scale]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const state = stateForGroup(group);
+        if (state) {
+          replaceCurveChartView(state, { scaleMode: button.dataset.curveScale });
+        }
+      });
+    });
+    group.querySelectorAll("[data-curve-axis]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const state = stateForGroup(group);
+        if (state) setCurveAxisMode(state, button.dataset.curveAxis);
+      });
+    });
+    group.querySelectorAll("[data-curve-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const state = stateForGroup(group);
+        if (!state) return;
+        if (button.dataset.curveAction === "zoom-in") zoomCurveChart(state, 1.25);
+        else if (button.dataset.curveAction === "zoom-out") zoomCurveChart(state, 0.8);
+        else if (button.dataset.curveAction === "reset") resetCurveChart(state);
+        else if (button.dataset.curveAction === "expand") {
+          toggleExpandedCurveGroup(state);
+        }
+      });
+    });
+    group.querySelectorAll("[data-toggle-curve]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const state = stateForGroup(group);
+        if (state) toggleCurveVisibility(state, Number(button.dataset.toggleCurve));
+      });
+    });
+  }
+
   async function renderCombinedCurveChart(canvas, references, chartSet) {
     try {
       const requestedReferences = Array.isArray(references) ? references : [];
@@ -425,68 +1153,27 @@ const DiscoveriesUI = (() => {
       if (!bounds || bounds.stepEnd <= bounds.stepStart) {
         throw new Error("The selected curve range is invalid.");
       }
-      const onlyOne = available.length === 1;
-      const datasets = available.map(({ index, reference, points }) => {
-        const color = curveColor(index);
-        return {
-          label: curveLabel(reference),
-          data: points,
-          borderColor: color,
-          backgroundColor: `${color}20`,
-          borderWidth: onlyOne ? 2.5 : 2.15,
-          borderDash: CURVE_DASHES[index % CURVE_DASHES.length],
-          pointRadius: 0,
-          pointHoverRadius: 3.5,
-          pointHitRadius: 8,
-          cubicInterpolationMode: "monotone",
-          tension: 0.18,
-          spanGaps: false,
-          fill: onlyOne,
-        };
-      });
-
-      const chart = new Chart(canvas, {
-        type: "line",
-        data: { datasets },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          animation: false,
-          parsing: false,
-          // Curves may use different recording cadences and x positions.
-          normalized: false,
-          interaction: { intersect: false, mode: "nearest", axis: "x" },
-          plugins: {
-            // The HTML key stays readable with six long run/module/spec labels.
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                title: (items) =>
-                  items.length ? `step ${Math.round(items[0].parsed.x)}` : "",
-              },
-            },
-          },
-          scales: {
-            x: {
-              type: "linear",
-              min: bounds.stepStart,
-              max: bounds.stepEnd,
-              grid: { color: "rgba(255,255,255,0.08)" },
-              ticks: { color: "rgba(255,255,255,0.7)", maxTicksLimit: 6 },
-              title: {
-                display: true,
-                text: `steps ${bounds.stepStart}–${bounds.stepEnd}`,
-                color: "rgba(255,255,255,0.7)",
-              },
-            },
-            y: {
-              grid: { color: "rgba(255,255,255,0.08)" },
-              ticks: { color: "rgba(255,255,255,0.7)", maxTicksLimit: 5 },
-            },
-          },
-        },
-      });
-      chartSet.add(chart);
+      const group = canvas.closest(".discovery-curve-group");
+      if (!group) throw new Error("The chart container is unavailable.");
+      const state = {
+        canvas,
+        group,
+        chartSet,
+        chart: null,
+        bounds,
+        definitions: available.map(({ index, reference, points }) => ({
+          index,
+          reference,
+          rawPoints: points,
+          hidden: false,
+        })),
+        scaleMode: "linear",
+        axisMode: "step",
+        learningRateByRun: new Map(),
+        axisRequest: 0,
+        expanded: false,
+      };
+      mountCurveChart(state);
     } catch (err) {
       if (!canvas.isConnected) return;
       const host = canvas.closest(".discovery-curve-canvas");
@@ -496,6 +1183,29 @@ const DiscoveriesUI = (() => {
         )}</p>`;
       }
     }
+  }
+
+  function renderCurveToolbar() {
+    return `
+      <div class="discovery-curve-toolbar" aria-label="Curve view controls">
+        <div class="loss-view-toggle" title="Axis scale">
+          <button type="button" class="chart-btn curve-scale-btn active" data-curve-scale="linear" data-curve-view-control disabled>Linear</button>
+          <button type="button" class="chart-btn curve-scale-btn" data-curve-scale="loglinear" data-curve-view-control disabled>Log–linear</button>
+          <button type="button" class="chart-btn curve-scale-btn" data-curve-scale="loglog" data-curve-view-control disabled>Log–log</button>
+        </div>
+        <div class="loss-view-toggle discovery-axis-toggle" title="Horizontal axis">
+          <button type="button" class="chart-btn discovery-axis-btn active" data-curve-axis="step" data-curve-view-control disabled>Step</button>
+          <button type="button" class="chart-btn discovery-axis-btn" data-curve-axis="tau" data-curve-view-control disabled>τ</button>
+        </div>
+        <div class="chart-zoom-controls" aria-label="Curve zoom">
+          <button type="button" class="chart-btn chart-zoom-btn" data-curve-action="zoom-in" data-curve-view-control title="Zoom in" aria-label="Zoom in" disabled>＋</button>
+          <button type="button" class="chart-btn chart-zoom-btn" data-curve-action="zoom-out" data-curve-view-control title="Zoom out" aria-label="Zoom out" disabled>−</button>
+        </div>
+        <button type="button" class="chart-btn" data-curve-action="reset" data-curve-view-control title="Reset zoom and view" disabled>Reset</button>
+        <button type="button" class="chart-btn discovery-expand-curve" data-curve-action="expand" data-curve-view-control title="Expand chart" disabled>⤢ Expand</button>
+        <span class="discovery-curve-view-status" role="status"></span>
+      </div>
+      <p class="discovery-curve-hint">Scroll or pinch to zoom · Alt+drag to pan · double-click to reset · expanded view also supports drag-to-zoom</p>`;
   }
 
   function renderCurveKeyItem(reference, index, { removable = false } = {}) {
@@ -512,11 +1222,14 @@ const DiscoveriesUI = (() => {
           <span>steps ${reference.stepStart}–${reference.stepEnd}</span>
           <span class="discovery-curve-state" role="status"></span>
         </div>
-        ${
-          removable
-            ? `<button type="button" class="note-delete" data-remove-reference="${index}" aria-label="Remove ${escapeHtml(heading)}">✕</button>`
-            : `<a class="header-link" href="${escapeHtml(focusedExplorerUrl(reference))}">Open curve</a>`
-        }
+        <div class="discovery-curve-key-actions">
+          <button type="button" class="chart-btn discovery-curve-visibility" data-toggle-curve="${index}" data-curve-view-control aria-pressed="true" aria-label="Hide ${escapeHtml(heading)}" disabled>Hide</button>
+          ${
+            removable
+              ? `<button type="button" class="note-delete" data-remove-reference="${index}" aria-label="Remove ${escapeHtml(heading)}">✕</button>`
+              : `<a class="header-link" href="${escapeHtml(focusedExplorerUrl(reference))}">Open curve</a>`
+          }
+        </div>
       </div>`;
   }
 
@@ -541,6 +1254,7 @@ const DiscoveriesUI = (() => {
             <span>${draftReferences.length} ${draftReferences.length === 1 ? "curve" : "curves"} · ${combinedRangeText(draftReferences)}</span>
           </div>
         </div>
+        ${renderCurveToolbar()}
         <div class="discovery-curve-key" role="list" aria-label="Selected curves">
           ${draftReferences
             .map((reference, index) =>
@@ -549,7 +1263,7 @@ const DiscoveriesUI = (() => {
             .join("")}
         </div>
         <div class="discovery-curve-canvas">
-          <canvas data-draft-chart aria-label="Combined preview of ${draftReferences.length} selected ${draftReferences.length === 1 ? "curve" : "curves"}"></canvas>
+          <canvas data-discovery-curve-chart data-draft-chart aria-label="Combined preview of ${draftReferences.length} selected ${draftReferences.length === 1 ? "curve" : "curves"}"></canvas>
         </div>
       </article>`;
     host.querySelectorAll("[data-remove-reference]").forEach((button) => {
@@ -558,6 +1272,8 @@ const DiscoveriesUI = (() => {
         renderDraftReferences();
       });
     });
+    const group = host.querySelector(".discovery-curve-group");
+    if (group) wireCurveGroup(group);
     const canvas = host.querySelector("[data-draft-chart]");
     if (canvas) renderCombinedCurveChart(canvas, draftReferences, draftCharts);
   }
@@ -618,6 +1334,7 @@ const DiscoveriesUI = (() => {
             <span>${references.length} ${references.length === 1 ? "curve" : "curves"} · ${combinedRangeText(references)}</span>
           </div>
         </figcaption>
+        ${renderCurveToolbar()}
         <div class="discovery-curve-key" role="list" aria-label="Curves in this chart">
           ${references
             .map((reference, index) => renderCurveKeyItem(reference, index))
@@ -625,6 +1342,7 @@ const DiscoveriesUI = (() => {
         </div>
         <div class="discovery-curve-canvas">
           <canvas
+            data-discovery-curve-chart
             data-feed-discovery="${discoveryIndex}"
             aria-label="Combined chart of ${references.length} ${references.length === 1 ? "curve" : "curves"}"
           ></canvas>
@@ -678,6 +1396,8 @@ const DiscoveriesUI = (() => {
           </article>`;
       })
       .join("");
+
+    host.querySelectorAll(".discovery-curve-group").forEach(wireCurveGroup);
 
     host.querySelectorAll("[data-feed-discovery]").forEach((canvas) => {
       const discovery = discoveries[Number(canvas.dataset.feedDiscovery)];
@@ -875,6 +1595,12 @@ const DiscoveriesUI = (() => {
     document
       .getElementById("discoveryRefresh")
       .addEventListener("click", refreshDiscoveries);
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && expandedCurveGroup) {
+        event.preventDefault();
+        closeExpandedCurveGroup();
+      }
+    });
 
     await NotesStore.init();
     await Promise.all([

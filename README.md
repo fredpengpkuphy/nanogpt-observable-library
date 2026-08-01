@@ -58,8 +58,10 @@ attached step or step range.
 The separate **Discoveries** page is intended for longer research findings. A
 discovery can cite up to six regions from any recorded setup, layer or block,
 observable, and step range. All cited regions are overlaid in one zoomed chart,
-with a labeled key and a direct Explorer link for each curve. Authors can hold
-nested public discussions with optional names.
+with a labeled key and a direct Explorer link for each curve. Discovery charts
+support curve visibility, linear/logarithmic scales, step/τ axes, zoom, reset,
+and an expanded view. Authors can hold nested public discussions with optional
+names.
 
 Discovery records and replies use the same Firebase Authentication and Firestore
 backend as Notes. Deploy `firestore.rules` (or use the included `firebase.json`)
