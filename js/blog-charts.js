@@ -2,14 +2,14 @@
   "use strict";
 
   const COLORS = {
-    ink: "#101920",
-    grid: "rgba(237, 242, 245, 0.13)",
-    tick: "rgba(237, 242, 245, 0.62)",
-    label: "rgba(237, 242, 245, 0.82)",
-    ice: "#9fd4e4",
-    sand: "#e0c08a",
-    coral: "#e89278",
-    green: "#9ac9ad",
+    ink: "#ffffff",
+    grid: "rgba(41, 37, 45, 0.12)",
+    tick: "#6a646d",
+    label: "#514b54",
+    ice: "#7714cf",
+    sand: "#998dc7",
+    coral: "#d66a5e",
+    green: "#4d9871",
   };
 
   let chartData = null;
@@ -74,7 +74,7 @@
       ctx.fillStyle = band.fill;
       ctx.fillRect(left, plot.top, right - left, plot.bottom - plot.top);
       ctx.fillStyle = band.text;
-      ctx.font = `700 ${compact ? 10 : 11}px Nunito, sans-serif`;
+      ctx.font = `650 ${compact ? 10 : 11}px "Geist Mono Variable", monospace`;
       ctx.textAlign = "center";
       ctx.fillText(band.label, (left + right) / 2, plot.top + 18);
     });
@@ -82,7 +82,7 @@
     const xTicks = compact ? [0, 50000, 100000] : [0, 25000, 50000, 75000, 100000];
     const yTicks = options.yTicks || [2, 3, 4, 5, 6];
     ctx.lineWidth = 1;
-    ctx.font = `${compact ? 10 : 11}px Nunito, sans-serif`;
+    ctx.font = `${compact ? 10 : 11}px "Geist Mono Variable", monospace`;
 
     xTicks.forEach((tick) => {
       const x = xAt(tick);
@@ -113,7 +113,7 @@
       const x = xAt(step);
       ctx.save();
       ctx.setLineDash([5, 5]);
-      ctx.strokeStyle = "rgba(237, 242, 245, 0.28)";
+      ctx.strokeStyle = "rgba(41, 37, 45, 0.24)";
       ctx.beginPath();
       ctx.moveTo(x, plot.top);
       ctx.lineTo(x, plot.bottom);
@@ -157,7 +157,7 @@
       ctx.restore();
     });
 
-    ctx.strokeStyle = "rgba(237, 242, 245, 0.34)";
+    ctx.strokeStyle = "rgba(41, 37, 45, 0.32)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(plot.left, plot.top);
@@ -166,7 +166,7 @@
     ctx.stroke();
 
     ctx.fillStyle = COLORS.label;
-    ctx.font = `600 ${compact ? 10 : 11}px Nunito, sans-serif`;
+    ctx.font = `600 ${compact ? 10 : 11}px "Geist Mono Variable", monospace`;
     ctx.textAlign = "center";
     ctx.fillText("training step", (plot.left + plot.right) / 2, height - 9);
     ctx.save();
@@ -195,9 +195,9 @@
         yTicks: [2, 3, 4, 5, 6],
         transitions: [12000, 50000],
         bands: [
-          { start: 1500, end: 12000, label: "≈ 4 plateau", fill: "rgba(224, 192, 138, 0.09)", text: COLORS.sand },
-          { start: 18000, end: 50000, label: "≈ 2 plateau", fill: "rgba(159, 212, 228, 0.07)", text: COLORS.ice },
-          { start: 50000, end: 100000, label: "toward 2.5", fill: "rgba(154, 201, 173, 0.06)", text: COLORS.green },
+          { start: 1500, end: 12000, label: "≈ 4 plateau", fill: "rgba(153, 141, 199, 0.10)", text: COLORS.sand },
+          { start: 18000, end: 50000, label: "≈ 2 plateau", fill: "rgba(119, 20, 207, 0.07)", text: COLORS.ice },
+          { start: 50000, end: 100000, label: "toward 2.5", fill: "rgba(77, 152, 113, 0.07)", text: COLORS.green },
         ],
       },
     );
@@ -207,8 +207,8 @@
     const canvas = document.getElementById("layerChart");
     if (!canvas) return;
     const mutedColors = [
-      "#86949d", "#8c8798", "#778d8a", "#998b78", "#7f899d", "#768f9a",
-      "#8a8390", "#6f8980", "#918778", "#778898", "#828c86", "#8d8181",
+      "#8b858e", "#99939c", "#817b84", "#aaa4ac", "#777179", "#948e97",
+      "#858087", "#a19ba3", "#79747b", "#918b93", "#878189", "#a7a1a9",
     ];
     const layers = chartData.runs.baseline.layers;
     const series = Object.keys(layers)
@@ -286,6 +286,28 @@
     });
   }
 
+  function wireOutline() {
+    const links = Array.from(document.querySelectorAll(".contents a[href^='#']"));
+    if (!links.length || !("IntersectionObserver" in window)) return;
+    const sections = links
+      .map((link) => document.querySelector(link.getAttribute("href")))
+      .filter(Boolean);
+    const linkById = new Map(links.map((link) => [link.getAttribute("href").slice(1), link]));
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (!visible.length) return;
+        links.forEach((link) => link.classList.remove("is-current"));
+        const active = linkById.get(visible[0].target.id);
+        if (active) active.classList.add("is-current");
+      },
+      { rootMargin: "-18% 0px -68% 0px", threshold: 0 },
+    );
+    sections.forEach((section) => observer.observe(section));
+  }
+
   const fontReady = document.fonts && document.fonts.ready
     ? document.fonts.ready
     : Promise.resolve();
@@ -313,4 +335,6 @@
     window.clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(renderAll, 120);
   });
+
+  wireOutline();
 })();

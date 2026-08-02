@@ -5,143 +5,63 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta
     name="description"
-    content="Why we built the nanoGPT Observable Library—and what a three-regime transition in Block 1 attention entropy shows about looking inside training."
+    content="Introducing the nanoGPT Observable Library: a way to inspect, compare, and discuss the internal dynamics of model training."
   >
-  <title>Looking Inside Learning — nanoGPT Observable Library</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap"
-    rel="stylesheet"
-  >
-  <link rel="stylesheet" href="css/blog.css?v=3">
+  <title>See How Training Changes — nanoGPT Observable Library</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5.3.0/index.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5.3.0/index.css">
+  <link rel="stylesheet" href="css/blog.css?v=4">
 </head>
 <body>
-  <header class="blog-header">
-    <a class="blog-brand" href="index.html">nanoGPT Observable Library</a>
-    <nav aria-label="Primary">
-      <a href="index.html">Home</a>
-      <a href="select.html">Explorer</a>
-      <a href="discoveries.html">Discoveries</a>
-    </nav>
+  <header class="site-header">
+    <div class="nav-shell">
+      <a class="site-brand" href="index.html" aria-label="nanoGPT Observable Library home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>nanoGPT Observable Library</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="index.html">Home</a>
+        <a class="is-current" href="blog.html">Blog</a>
+        <a href="select.html">Explorer</a>
+      </nav>
+    </div>
   </header>
 
-  <main>
+  <main class="blog-page">
+    <div class="back-to-blog-bar">
+      <a href="index.html">← Back to Home</a>
+    </div>
+
     <article>
-      <header class="article-hero">
-        <p class="eyebrow">Introducing the Observable Library <span aria-hidden="true">·</span> August 2, 2026</p>
-        <h1>Look inside<br><em>learning.</em></h1>
-        <p class="dek">
-          Training loss tells us whether a model improves. It rarely tells us how.
-          The nanoGPT Observable Library turns a training run into something we
-          can navigate, compare, and reason about from the inside.
-        </p>
-        <div class="hero-actions">
-          <a class="primary-button" href="select.html">Start exploring <span aria-hidden="true">→</span></a>
-          <a class="text-link" href="#demo">See one discovery <span aria-hidden="true">↓</span></a>
-        </div>
-      </header>
-
-      <section class="motivation-section" aria-labelledby="motivationHeading">
-        <div class="section-heading split-heading">
-          <div>
-            <p class="section-number">01 / Motivation</p>
-            <h2 id="motivationHeading">A loss curve is a summary, not an explanation</h2>
-          </div>
-          <p>
-            Two models can reach similar loss while their layers organize in very
-            different ways. Those differences are easy to miss when weights,
-            gradients, activations, and attention are buried in separate logs.
+      <header class="launch-hero" aria-labelledby="pageTitle">
+        <div class="hero-copy">
+          <p class="article-meta">
+            <time datetime="2026-08-02">August 2, 2026</time>
+            <span>Introducing the Observable Library</span>
+            <span>6 min read</span>
           </p>
-        </div>
-
-        <div class="motivation-grid">
-          <div class="motivation-statement">
-            <p>
-              We built this site as a microscope for training: connect internal
-              measurements to the architecture, keep training time visible, and make
-              comparisons cheap enough that an odd curve can become a research question.
-            </p>
-          </div>
-          <dl class="site-facts">
-            <div>
-              <dt>3</dt>
-              <dd>training setups</dd>
-            </div>
-            <div>
-              <dt>1,820</dt>
-              <dd>curves in the baseline run</dd>
-            </div>
-            <div>
-              <dt>100k</dt>
-              <dd>recorded training steps</dd>
-            </div>
-          </dl>
-        </div>
-      </section>
-
-      <section class="workflow-section" aria-labelledby="workflowHeading">
-        <div class="section-heading">
-          <div>
-            <p class="section-number">02 / What the site does</p>
-            <h2 id="workflowHeading">From architecture to evidence, in a few clicks</h2>
-          </div>
-        </div>
-
-        <ol class="workflow-grid">
-          <li>
-            <span class="workflow-index">01</span>
-            <h3>Choose a setup</h3>
-            <p>Start from the 12-layer baseline, a 6-layer model, or a run without learning-rate warmup.</p>
-          </li>
-          <li>
-            <span class="workflow-index">02</span>
-            <h3>Navigate the model</h3>
-            <p>Move from embeddings through transformer blocks to the output head, following the actual architecture.</p>
-          </li>
-          <li>
-            <span class="workflow-index">03</span>
-            <h3>Inspect an observable</h3>
-            <p>Open recorded weights, gradients, updates, activations, attention statistics, and their definitions.</p>
-          </li>
-          <li>
-            <span class="workflow-index">04</span>
-            <h3>Compare and share</h3>
-            <p>Overlay layers or setups, zoom into a transition, then preserve the finding as a public discovery.</p>
-          </li>
-        </ol>
-
-        <div class="feature-links" aria-label="Explore site features">
-          <a href="select.html">Open the Explorer <span aria-hidden="true">↗</span></a>
-          <a href="reference.html">Browse observable formulas <span aria-hidden="true">↗</span></a>
-          <a href="discoveries.html">Read community discoveries <span aria-hidden="true">↗</span></a>
-        </div>
-      </section>
-
-      <section class="demo-section" id="demo" aria-labelledby="demoHeading">
-        <div class="demo-intro">
-          <p class="section-number">03 / A small demo</p>
-          <h2 id="demoHeading">One layer moves through three regimes</h2>
-          <p>
-            Consider <code>attention_entropy_mean</code>, a measure of how diffuse
-            attention is across key positions. In the baseline run, Block 1 pauses
-            near 4, drops to a second plateau near 2, then rises toward 2.5.
+          <h1 id="pageTitle">See how<br>training changes.</h1>
+          <p class="hero-deck">
+            A visual library for navigating nanoGPT from its architecture to the
+            internal signals that change while it learns.
           </p>
-          <p class="index-note">Block 1 is zero-indexed: it is the second transformer block.</p>
+          <div class="hero-actions">
+            <a class="hero-action is-primary" href="select.html">Start exploring <span aria-hidden="true">↗</span></a>
+            <a class="hero-action" href="reference.html">Observable formulas <span aria-hidden="true">↗</span></a>
+            <a class="hero-action" href="discoveries.html">Discoveries <span aria-hidden="true">↗</span></a>
+          </div>
         </div>
 
-        <figure class="chart-figure focus-figure">
-          <div class="figure-head">
+        <figure class="hero-figure" aria-labelledby="heroFigureTitle">
+          <div class="figure-toolbar">
             <div>
-              <p>12-layer baseline · Block 1</p>
-              <h3>Mean attention entropy</h3>
+              <span>Baseline · Block 1</span>
+              <strong id="heroFigureTitle">attention_entropy_mean</strong>
             </div>
-            <a
-              class="text-link"
-              href="explorer.html?run=baseline&amp;spec=attention%3A%3Atransformer.h.1.attn%3A%3A-%3A%3Aattention_entropy_mean%3A%3A-"
-            >Open live curve <span aria-hidden="true">↗</span></a>
+            <span>0–100,000 steps</span>
           </div>
-          <div class="canvas-wrap canvas-wrap-large">
+          <div class="canvas-wrap hero-canvas-wrap">
             <canvas
               id="focusChart"
               role="img"
@@ -150,127 +70,241 @@
             <p class="chart-status" role="status">Loading processed curve…</p>
           </div>
           <figcaption>
-            <span><strong>I</strong> ≈4 plateau</span>
-            <span><strong>II</strong> ≈2 plateau</span>
-            <span><strong>III</strong> recovery toward 2.5</span>
+            <span>Figure 01</span>
+            <p><strong>A small example of what becomes visible.</strong> Block 1 pauses near 4, drops to a second regime near 2, then rises toward 2.5.</p>
           </figcaption>
         </figure>
+      </header>
 
-        <aside class="metric-note" aria-label="How to read mean attention entropy">
-          <strong>Reading the metric.</strong>
-          Higher values mean more diffuse attention; lower values mean more
-          concentrated attention.
-        </aside>
-      </section>
-
-      <section class="comparison-section" aria-labelledby="comparisonHeading">
-        <div class="section-heading split-heading">
+      <div class="article-layout">
+        <aside class="contents" aria-label="On this page">
           <div>
-            <p class="section-number">04 / Compare in place</p>
-            <h2 id="comparisonHeading">The pattern becomes clear only in context</h2>
+            <p>On this page</p>
+            <a class="is-current" href="#abstract">Abstract</a>
+            <a href="#motivation">Why observables</a>
+            <a href="#workflow">What the site does</a>
+            <a href="#observation">A small observation</a>
+            <a href="#layers">Across layers</a>
+            <a href="#setups">Across setups</a>
+            <a href="#looking-forward">Looking forward</a>
           </div>
-          <p>
-            A strange curve is more useful when we can ask whether it is specific
-            to one layer or one setup. These are the comparisons the Explorer is
-            designed to make directly.
-          </p>
-        </div>
-
-        <div class="comparison-stack">
-          <figure class="chart-figure">
-            <div class="figure-head">
-              <div>
-                <p>Same setup · all 12 blocks overlaid</p>
-                <h3>Block 1 is the depth-wise outlier</h3>
-              </div>
-              <div class="chart-legend" aria-label="Legend">
-                <span><i class="swatch swatch-ice"></i>Block 1</span>
-                <span><i class="swatch swatch-muted"></i>Blocks 0, 2–11</span>
-              </div>
-            </div>
-            <div class="canvas-wrap">
-              <canvas
-                id="layerChart"
-                role="img"
-                aria-label="All twelve baseline transformer blocks overlaid. Block 1 is highlighted and uniquely shows three regimes."
-              ></canvas>
-              <p class="chart-status" role="status">Loading layer comparison…</p>
-            </div>
-            <figcaption class="figure-note">
-              Other blocks settle along smoother paths; none reproduce Block 1's plateau–drop–recovery sequence.
-            </figcaption>
-          </figure>
-
-          <figure class="chart-figure">
-            <div class="figure-head">
-              <div>
-                <p>Same Block 1 · three setups overlaid</p>
-                <h3>The dynamics change with the training configuration</h3>
-              </div>
-              <div class="chart-legend setup-legend" aria-label="Legend">
-                <span><i class="swatch swatch-ice"></i>12-layer baseline</span>
-                <span><i class="swatch swatch-sand"></i>6-layer</span>
-                <span><i class="swatch swatch-coral"></i>No warmup</span>
-              </div>
-            </div>
-            <div class="canvas-wrap">
-              <canvas
-                id="setupChart"
-                role="img"
-                aria-label="Block 1 mean attention entropy for three training setups overlaid: baseline, six-layer nanoGPT, and no learning-rate warmup."
-              ></canvas>
-              <p class="chart-status" role="status">Loading setup comparison…</p>
-            </div>
-            <figcaption class="setup-findings">
-              <span><strong>Baseline</strong> plateaus, drops, then recovers.</span>
-              <span><strong>6-layer</strong> rapidly collapses to ≈2 and stays there.</span>
-              <span><strong>No warmup</strong> drops to ≈2, rebounds near 4, then slowly declines.</span>
-            </figcaption>
-          </figure>
-        </div>
-
-        <aside class="guess-note" aria-label="Questions suggested by the comparison">
-          <span>Two guesses to test</span>
-          <p>
-            The repeated levels near 2 and 4 may be attractor-like regimes, and
-            warmup may help attention entropy descend more stably instead of first
-            collapsing to 2 and rebounding to 4. Block 0 also loses entropy much
-            faster without warmup, which may behave like an early reduction in
-            effective context length. These are prompts for experiments, not conclusions.
-          </p>
-          <a
-            class="text-link"
-            href="explorer.html?run=no_learning_rate_warmup&amp;spec=attention%3A%3Atransformer.h.0.attn%3A%3A-%3A%3Aattention_entropy_mean%3A%3A-"
-          >Inspect no-warmup Block 0 <span aria-hidden="true">↗</span></a>
         </aside>
 
-        <p class="processing-note">
-          Visualization note: these charts are redrawn from the recorded series on
-          shared axes using a centered five-point moving average. Values are not normalized.
-        </p>
-      </section>
+        <div class="article-main">
+          <aside class="abstract-card" id="abstract">
+            <h2>Abstract</h2>
+            <p>
+              Training loss tells us whether a model improves, but rarely explains
+              how its internal computation changes. The nanoGPT Observable Library
+              connects recorded weights, gradients, activations, and attention
+              statistics to the modules that produced them.
+            </p>
+            <p>
+              Researchers can move through the architecture, compare the same signal
+              across layers or setups, zoom into a transition, and preserve the result
+              as a public discovery. The goal is simple: make unusual internal dynamics
+              easy to see and easy to turn into research questions.
+            </p>
+          </aside>
 
-      <section class="takeaway" aria-labelledby="takeawayHeading">
-        <p class="section-number">From observation to research question</p>
-        <h2 id="takeawayHeading">This is what the library is for</h2>
-        <p>
-          The curves localize the transition, show that it is layer-specific, and
-          reveal that depth and warmup change its character. That turns an unusual
-          shape into a testable research question.
-        </p>
-        <a class="primary-button" href="select.html">Find another signal <span aria-hidden="true">→</span></a>
-      </section>
+          <section class="prose" id="motivation" aria-labelledby="motivationTitle">
+            <p class="section-kicker">Why observables</p>
+            <h2 id="motivationTitle">A final metric cannot show the path learning took.</h2>
+            <p>
+              Two models can reach a similar loss while their layers organize in very
+              different ways. One layer may change smoothly; another may pause, collapse,
+              or reorganize long after the headline metric stops looking interesting.
+            </p>
+            <p>
+              Those dynamics are usually scattered across logs and notebooks. The
+              Observable Library keeps them attached to the architecture and to training
+              time, so a strange curve is not an isolated image—it is evidence that can
+              be compared with the rest of the model.
+            </p>
+          </section>
+
+          <div class="facts-table" aria-label="Observable Library dataset summary">
+            <p class="table-caption">What is available in the current library</p>
+            <dl>
+              <div><dt>Training setups</dt><dd>3 recorded configurations</dd></div>
+              <div><dt>Baseline run</dt><dd>1,820 observable curves</dd></div>
+              <div><dt>Training horizon</dt><dd>100,000 recorded steps</dd></div>
+              <div><dt>Signals</dt><dd>Weights, gradients, updates, activations, attention, loss</dd></div>
+            </dl>
+          </div>
+
+          <section class="prose" id="workflow" aria-labelledby="workflowTitle">
+            <p class="section-kicker">What the site does</p>
+            <h2 id="workflowTitle">Move from architecture to evidence.</h2>
+            <p>
+              The Explorer is organized around the model itself. Choose a run, select a
+              transformer block and module, then open an observable with its definition
+              and recorded history beside it.
+            </p>
+          </section>
+
+          <ol class="workflow-list">
+            <li>
+              <span>01</span>
+              <h3>Choose a setup</h3>
+              <p>Start from the 12-layer baseline, a 6-layer model, or a run without learning-rate warmup.</p>
+            </li>
+            <li>
+              <span>02</span>
+              <h3>Navigate the model</h3>
+              <p>Move from embeddings through transformer blocks to the output head.</p>
+            </li>
+            <li>
+              <span>03</span>
+              <h3>Inspect a signal</h3>
+              <p>Open recorded curves and their definitions at the module that produced them.</p>
+            </li>
+            <li>
+              <span>04</span>
+              <h3>Compare and share</h3>
+              <p>Overlay layers or setups, focus a step range, and publish the finding.</p>
+            </li>
+          </ol>
+
+          <div class="inline-links" aria-label="Explore the library">
+            <a href="select.html">Open Explorer ↗</a>
+            <a href="reference.html">Browse formulas ↗</a>
+            <a href="discoveries.html">Read discoveries ↗</a>
+          </div>
+
+          <section class="prose" id="observation" aria-labelledby="observationTitle">
+            <p class="section-kicker">A small observation</p>
+            <h2 id="observationTitle">Block 1 moves through three entropy regimes.</h2>
+            <p>
+              Mean attention entropy measures how diffuse attention is across key
+              positions. In the baseline run, Block 1 first pauses near 4, drops to a
+              second plateau near 2, then rises toward 2.5. The curve in Figure 01 makes
+              the stages visible; comparison tells us whether they are special.
+            </p>
+            <p class="small-note">Block 1 is zero-indexed: it is the second transformer block.</p>
+          </section>
+
+          <section class="figure-section" id="layers" aria-labelledby="layersTitle">
+            <div class="prose figure-intro">
+              <p class="section-kicker">Compare depth</p>
+              <h2 id="layersTitle">The other blocks do not take the same path.</h2>
+              <p>
+                Overlaying all 12 blocks on shared axes turns the unusual shape into a
+                depth-wise comparison. Block 1 is highlighted; the remaining blocks are
+                drawn in neutral tones.
+              </p>
+            </div>
+            <figure class="data-figure">
+              <div class="figure-toolbar">
+                <div>
+                  <span>12-layer baseline · all blocks</span>
+                  <strong>Mean attention entropy</strong>
+                </div>
+                <div class="figure-legend" aria-label="Legend">
+                  <span><i class="swatch swatch-primary"></i>Block 1</span>
+                  <span><i class="swatch swatch-muted"></i>Blocks 0, 2–11</span>
+                </div>
+              </div>
+              <div class="canvas-wrap">
+                <canvas
+                  id="layerChart"
+                  role="img"
+                  aria-label="All twelve baseline transformer blocks overlaid. Block 1 is highlighted and uniquely shows three regimes."
+                ></canvas>
+                <p class="chart-status" role="status">Loading layer comparison…</p>
+              </div>
+              <figcaption>
+                <span>Figure 02</span>
+                <p><strong>Block 1 is the depth-wise outlier.</strong> Other blocks settle along smoother paths; none reproduces its plateau–drop–recovery sequence.</p>
+              </figcaption>
+            </figure>
+          </section>
+
+          <section class="figure-section" id="setups" aria-labelledby="setupsTitle">
+            <div class="prose figure-intro">
+              <p class="section-kicker">Compare setups</p>
+              <h2 id="setupsTitle">Warmup changes the order of the dynamics.</h2>
+              <p>
+                Hold Block 1 and the observable fixed, then change the training setup.
+                The three trajectories are qualitatively different, not small variations
+                of one shared curve.
+              </p>
+            </div>
+            <figure class="data-figure">
+              <div class="figure-toolbar">
+                <div>
+                  <span>Block 1 · three setups</span>
+                  <strong>Mean attention entropy</strong>
+                </div>
+                <div class="figure-legend setup-legend" aria-label="Legend">
+                  <span><i class="swatch swatch-primary"></i>Baseline</span>
+                  <span><i class="swatch swatch-secondary"></i>6-layer</span>
+                  <span><i class="swatch swatch-coral"></i>No warmup</span>
+                </div>
+              </div>
+              <div class="canvas-wrap">
+                <canvas
+                  id="setupChart"
+                  role="img"
+                  aria-label="Block 1 mean attention entropy for the baseline, six-layer nanoGPT, and no-learning-rate-warmup setups overlaid."
+                ></canvas>
+                <p class="chart-status" role="status">Loading setup comparison…</p>
+              </div>
+              <figcaption>
+                <span>Figure 03</span>
+                <p><strong>The same levels appear in a different order.</strong> Baseline moves through ≈4 then ≈2; without warmup the curve first collapses to ≈2 and rebounds toward ≈4.</p>
+              </figcaption>
+            </figure>
+
+            <aside class="question-note">
+              <p class="section-kicker">Questions to test</p>
+              <p>
+                The repeated levels near 2 and 4 may be attractor-like regimes, and
+                warmup may help entropy decrease more stably. Block 0 also loses entropy
+                much faster without warmup, which may act like an early reduction in
+                effective context length. These are prompts for experiments, not conclusions.
+              </p>
+              <a href="explorer.html?run=no_learning_rate_warmup&amp;spec=attention%3A%3Atransformer.h.0.attn%3A%3A-%3A%3Aattention_entropy_mean%3A%3A-">Inspect no-warmup Block 0 ↗</a>
+            </aside>
+          </section>
+
+          <p class="processing-note">
+            Visualization note: figures are redrawn from the recorded series on shared
+            axes using a centered five-point moving average. Values are not normalized.
+          </p>
+
+          <section class="prose closing-section" id="looking-forward" aria-labelledby="lookingForwardTitle">
+            <p class="section-kicker">Looking forward</p>
+            <h2 id="lookingForwardTitle">Make the next observation easier to find.</h2>
+            <p>
+              The curves do not yet explain the mechanism behind these transitions.
+              They do something important first: localize the event, show that it is
+              layer-specific, and reveal which setup changes its character.
+            </p>
+            <p>
+              That is what the Observable Library is for—turning the path of learning
+              into inspectable evidence, then turning evidence into a better question.
+            </p>
+            <a class="closing-action" href="select.html">Start exploring <span aria-hidden="true">↗</span></a>
+          </section>
+        </div>
+
+        <div aria-hidden="true"></div>
+      </div>
     </article>
   </main>
 
-  <footer>
-    <p>Built from recorded nanoGPT training dynamics, from embeddings to the output head.</p>
+  <footer class="site-footer">
+    <div>
+      <p>nanoGPT Observable Library</p>
+      <p>Measured training dynamics, connected to the model.</p>
+    </div>
     <p>
       Inspired by the observation-first spirit of
       <a href="https://www.meta-circle.com/blog/ophis-a-new-paradigm-for-autoresearch" target="_blank" rel="noopener">mechanistic auto-research</a>.
     </p>
   </footer>
 
-  <script src="js/blog-charts.js?v=1"></script>
+  <script src="js/blog-charts.js?v=2"></script>
 </body>
 </html>
