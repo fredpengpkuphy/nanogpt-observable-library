@@ -357,6 +357,11 @@ p {
   color: var(--ink);
 }
 
+.data-figure figcaption.key-caption {
+  font-size: 16px;
+  line-height: 1.58;
+}
+
 .article-layout {
   display: grid;
   grid-template-columns: minmax(150px, 190px) minmax(0, 900px) minmax(150px, 190px);
@@ -567,13 +572,9 @@ p {
   color: var(--ink-soft);
 }
 
-.facts-table + .prose {
-  margin-top: 96px;
-}
-
 .workflow-list {
   width: min(var(--media), 100%);
-  margin: 44px auto 0;
+  margin: 72px auto 0;
   padding: 0;
   border-top: 2px solid var(--brand);
   list-style: none;
@@ -618,16 +619,14 @@ p {
   margin: 20px auto 0;
 }
 
-.inline-links a,
-.question-note a {
+.inline-links a {
   color: var(--brand);
   font-size: 14px;
   font-weight: 560;
   text-decoration: none;
 }
 
-.inline-links a:hover,
-.question-note a:hover {
+.inline-links a:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -642,6 +641,67 @@ p {
 
 .data-figure {
   width: min(var(--media), 100%);
+}
+
+.setup-config-shell {
+  width: min(var(--media), 100%);
+  margin: 0 auto 36px;
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  border-top: 2px solid var(--brand);
+  border-radius: 4px;
+  background: var(--surface);
+  box-shadow: 0 14px 36px rgba(41, 37, 45, 0.05);
+}
+
+.setup-config-table {
+  width: 100%;
+  min-width: 650px;
+  border-collapse: collapse;
+}
+
+.setup-config-table caption {
+  padding: 18px;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 620;
+  letter-spacing: -0.025em;
+  text-align: left;
+}
+
+.setup-config-table th,
+.setup-config-table td {
+  padding: 13px 16px;
+  border-top: 1px solid var(--rule);
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.setup-config-table th {
+  background: var(--surface-subtle);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.setup-config-table td:first-child {
+  color: var(--ink);
+  font-weight: 620;
+}
+
+.setup-config-shell > p {
+  margin: 0;
+  padding: 12px 16px;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.5;
 }
 
 .figure-legend {
@@ -683,37 +743,6 @@ p {
 
 .swatch-coral {
   background: var(--coral);
-}
-
-.question-note {
-  max-width: var(--reading);
-  margin: 48px auto 0;
-  padding: 24px 26px;
-  border: 1px solid var(--rule);
-  border-left: 3px solid var(--brand);
-  border-radius: 4px;
-  background: var(--surface-subtle);
-}
-
-.question-note > p:not(.section-kicker) {
-  margin: 0;
-  color: var(--ink-soft);
-  font-size: 16px;
-  line-height: 1.58;
-}
-
-.question-note a {
-  display: inline-block;
-  margin-top: 16px;
-}
-
-.processing-note {
-  max-width: var(--reading);
-  margin: 32px auto 0;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 10px;
-  line-height: 1.55;
 }
 
 .closing-section {
@@ -880,7 +909,6 @@ p {
   .prose + .prose,
   .figure-section,
   .closing-section,
-  .facts-table + .prose,
   .inline-links + .prose {
     margin-top: 76px;
   }
@@ -929,15 +957,6 @@ p {
 
   .figure-legend {
     justify-content: flex-start;
-  }
-
-  .question-note {
-    margin-top: 36px;
-    padding: 22px 20px;
-  }
-
-  .question-note > p:not(.section-kicker) {
-    font-size: 16px;
   }
 
   .closing-section {

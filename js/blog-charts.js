@@ -157,6 +157,33 @@
       ctx.restore();
     });
 
+    (options.annotations || []).forEach((annotation) => {
+      const x = xAt(annotation.step);
+      const y = yAt(annotation.value);
+      const fontSize = compact ? 10 : 11;
+      const labelX = x + (annotation.dx === undefined ? 8 : annotation.dx);
+      const labelY = y + (annotation.dy === undefined ? -10 : annotation.dy);
+
+      ctx.save();
+      ctx.fillStyle = annotation.color;
+      ctx.strokeStyle = COLORS.ink;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.font = `650 ${fontSize}px "Geist Mono Variable", monospace`;
+      ctx.textAlign = annotation.align || "left";
+      const labelWidth = ctx.measureText(annotation.label).width;
+      const left = ctx.textAlign === "right" ? labelX - labelWidth - 5 : labelX - 5;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+      ctx.fillRect(left, labelY - fontSize - 3, labelWidth + 10, fontSize + 7);
+      ctx.fillStyle = annotation.color;
+      ctx.fillText(annotation.label, labelX, labelY);
+      ctx.restore();
+    });
+
     ctx.strokeStyle = "rgba(41, 37, 45, 0.32)";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -268,6 +295,12 @@
         yMin: 1.75,
         yMax: 6.1,
         yTicks: [2, 3, 4, 5, 6],
+        annotations: [
+          { step: 7000, value: 3.93, label: "≈4 · baseline", color: COLORS.ice, dx: 8, dy: -12 },
+          { step: 30000, value: 2.08, label: "≈2 · baseline", color: COLORS.ice, dx: 8, dy: -10 },
+          { step: 500, value: 2.01, label: "≈2 · no warmup", color: COLORS.coral, dx: 10, dy: 20 },
+          { step: 8000, value: 3.94, label: "≈4 · no warmup", color: COLORS.coral, dx: 8, dy: 18 },
+        ],
       },
     );
   }
