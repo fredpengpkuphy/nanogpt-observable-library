@@ -298,7 +298,7 @@
         annotations: [
           { step: 7000, value: 3.93, label: "≈4 · baseline", color: COLORS.ice, dx: 8, dy: -12 },
           { step: 30000, value: 2.08, label: "≈2 · baseline", color: COLORS.ice, dx: 8, dy: -10 },
-          { step: 500, value: 2.01, label: "≈2 · no warmup", color: COLORS.coral, dx: 10, dy: 20 },
+          { step: 5000, value: 2, label: "≈2 · 6-layer", color: COLORS.sand, dx: 10, dy: 20 },
           { step: 8000, value: 3.94, label: "≈4 · no warmup", color: COLORS.coral, dx: 8, dy: 18 },
         ],
       },

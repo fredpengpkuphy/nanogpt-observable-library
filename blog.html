@@ -7,7 +7,7 @@
     name="description"
     content="Introducing the nanoGPT Observable Library: a way to inspect, compare, and discuss the internal dynamics of model training."
   >
-  <title>Observe Training in Full — nanoGPT Observable Library</title>
+  <title>Observe Learning in Full — nanoGPT Observable Library</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5.3.0/index.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5.3.0/index.css">
@@ -41,15 +41,13 @@
             <span>Introducing the Observable Library</span>
             <span>6 min read</span>
           </p>
-          <h1 id="pageTitle">Observe training<br>in full.</h1>
+          <h1 id="pageTitle">Observe learning<br>in full.</h1>
           <p class="hero-deck">
             A visual library for navigating nanoGPT from its architecture to the
             internal signals that change while it learns.
           </p>
           <div class="hero-actions">
             <a class="hero-action is-primary" href="select.html">Start exploring <span aria-hidden="true">↗</span></a>
-            <a class="hero-action" href="reference.html">Observable formulas <span aria-hidden="true">↗</span></a>
-            <a class="hero-action" href="discoveries.html">Discoveries <span aria-hidden="true">↗</span></a>
           </div>
         </div>
 
@@ -145,6 +143,21 @@
             <a href="discoveries.html">Read discoveries ↗</a>
           </div>
 
+          <div class="setup-config-shell">
+            <table class="setup-config-table">
+              <caption>Three controlled training setups</caption>
+              <thead>
+                <tr><th>Setup</th><th>Layers</th><th>Warmup</th><th>Change from reference</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Baseline</td><td>12</td><td>2,000 steps</td><td>Standard Karpathy nanoGPT</td></tr>
+                <tr><td>6-layer nanoGPT</td><td>6</td><td>2,000 steps</td><td>Model depth only</td></tr>
+                <tr><td>No LR warmup</td><td>12</td><td>0 steps</td><td>Warmup schedule only</td></tr>
+              </tbody>
+            </table>
+            <p>All other recorded settings follow the same reference setup where applicable.</p>
+          </div>
+
           <section class="prose" id="observation" aria-labelledby="observationTitle">
             <p class="section-kicker">A small observation</p>
             <h2 id="observationTitle">Block 1 undergoes a sequence of phase transitions.</h2>
@@ -203,20 +216,6 @@
                 learning-rate warmup.
               </p>
             </div>
-            <div class="setup-config-shell">
-              <table class="setup-config-table">
-                <caption>Three controlled training setups</caption>
-                <thead>
-                  <tr><th>Setup</th><th>Layers</th><th>Warmup</th><th>Change from reference</th></tr>
-                </thead>
-                <tbody>
-                  <tr><td>Baseline</td><td>12</td><td>2,000 steps</td><td>Standard Karpathy nanoGPT</td></tr>
-                  <tr><td>6-layer nanoGPT</td><td>6</td><td>2,000 steps</td><td>Model depth only</td></tr>
-                  <tr><td>No LR warmup</td><td>12</td><td>0 steps</td><td>Warmup schedule only</td></tr>
-                </tbody>
-              </table>
-              <p>All other recorded settings follow the same reference setup where applicable.</p>
-            </div>
             <figure class="data-figure">
               <div class="figure-toolbar">
                 <div>
@@ -239,7 +238,7 @@
               </div>
               <figcaption class="key-caption">
                 <span>Figure 03</span>
-                <p><strong>Two recurring levels, traversed in opposite order.</strong> Baseline moves through ≈4 then ≈2; without warmup the curve first collapses to ≈2 and rebounds toward ≈4.</p>
+                <p><strong>The levels are distributed across different trajectories.</strong> Baseline moves through ≈4 then ≈2; the 6-layer run settles near ≈2 early, while the no-warmup run rebounds toward ≈4.</p>
               </figcaption>
             </figure>
           </section>

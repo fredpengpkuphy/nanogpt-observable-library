@@ -654,6 +654,14 @@ p {
   box-shadow: 0 14px 36px rgba(41, 37, 45, 0.05);
 }
 
+.inline-links + .setup-config-shell {
+  margin-top: 72px;
+}
+
+.setup-config-shell + .prose {
+  margin-top: 96px;
+}
+
 .setup-config-table {
   width: 100%;
   min-width: 650px;
@@ -909,6 +917,7 @@ p {
   .prose + .prose,
   .figure-section,
   .closing-section,
+  .setup-config-shell + .prose,
   .inline-links + .prose {
     margin-top: 76px;
   }
