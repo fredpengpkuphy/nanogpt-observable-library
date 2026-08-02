@@ -58,7 +58,7 @@
         <div class="motivation-grid">
           <div class="motivation-statement">
             <p>
-              We built this site as a microscope for optimization: connect internal
+              We built this site as a microscope for training: connect internal
               measurements to the architecture, keep training time visible, and make
               comparisons cheap enough that an odd curve can become a research question.
             </p>
@@ -156,14 +156,10 @@
           </figcaption>
         </figure>
 
-        <aside class="definition" aria-label="Definition of mean attention entropy">
-          <p class="definition-label">What is being measured?</p>
-          <p class="formula">H̄ = E<sub>b,h,q</sub> [ −Σ<sub>k</sub> p<sub>k</sub> log p<sub>k</sub> ]</p>
-          <p>
-            Higher values mean more diffuse attention; lower values mean more
-            concentrated attention. The site keeps the formula beside the curve
-            so the visual pattern stays tied to a precise quantity.
-          </p>
+        <aside class="metric-note" aria-label="How to read mean attention entropy">
+          <strong>Reading the metric.</strong>
+          Higher values mean more diffuse attention; lower values mean more
+          concentrated attention.
         </aside>
       </section>
 
@@ -233,57 +229,20 @@
           </figure>
         </div>
 
-        <div class="hypothesis-grid">
-          <aside class="hypothesis-card attractor-card" aria-labelledby="attractorHeading">
-            <p class="hypothesis-kicker"><span>Working hypothesis</span> · not yet a conclusion</p>
-            <h3 id="attractorHeading">Are 2 and 4 attractor-like entropy regimes?</h3>
-            <p>
-              Block 1 repeatedly returns to the same approximate levels, but in a
-              different order. With warmup, entropy settles near 4 before descending
-              to 2. Without warmup, it falls to 2 almost immediately, then rebounds
-              toward 4.
-            </p>
-            <div class="trajectory-compare" aria-label="Block 1 regime order with and without warmup">
-              <div>
-                <span>With warmup</span>
-                <strong>≈4 <i>→</i> ≈2 <i>→</i> 2.5</strong>
-                <small>staged descent, then partial recovery</small>
-              </div>
-              <div>
-                <span>Without warmup</span>
-                <strong>≈2 <i>→</i> ≈4 <i>→</i> 3.5</strong>
-                <small>early collapse, then rebound</small>
-              </div>
-            </div>
-            <p>
-              One possible reading is that learning-rate warmup helps attention
-              entropy decrease in a controlled order: it prevents an immediate
-              collapse into the low-entropy state and allows the ≈4 regime to
-              stabilize before the transition toward ≈2.
-            </p>
-          </aside>
-
-          <aside class="hypothesis-card context-card" aria-labelledby="contextHeading">
-            <p class="hypothesis-kicker"><span>Secondary clue</span> · speculative</p>
-            <h3 id="contextHeading">A faster Block 0 collapse may shorten the effective context</h3>
-            <p>
-              Without warmup, Block 0 attention entropy falls much faster and
-              finishes far below the baseline. If <em>e</em><sup>H</sup> is used as
-              a rough effective number of attended positions, this resembles a
-              sharp reduction in effective context length—even though the model's
-              literal context window has not changed.
-            </p>
-            <p>
-              Our guess is that warmup may preserve broader early attention long
-              enough for the rest of the network to organize more stably. This is
-              a mechanism to test, not an explanation established by the curves.
-            </p>
-            <a
-              class="text-link"
-              href="explorer.html?run=no_learning_rate_warmup&amp;spec=attention%3A%3Atransformer.h.0.attn%3A%3A-%3A%3Aattention_entropy_mean%3A%3A-"
-            >Inspect no-warmup Block 0 <span aria-hidden="true">↗</span></a>
-          </aside>
-        </div>
+        <aside class="guess-note" aria-label="Questions suggested by the comparison">
+          <span>Two guesses to test</span>
+          <p>
+            The repeated levels near 2 and 4 may be attractor-like regimes, and
+            warmup may help attention entropy descend more stably instead of first
+            collapsing to 2 and rebounding to 4. Block 0 also loses entropy much
+            faster without warmup, which may behave like an early reduction in
+            effective context length. These are prompts for experiments, not conclusions.
+          </p>
+          <a
+            class="text-link"
+            href="explorer.html?run=no_learning_rate_warmup&amp;spec=attention%3A%3Atransformer.h.0.attn%3A%3A-%3A%3Aattention_entropy_mean%3A%3A-"
+          >Inspect no-warmup Block 0 <span aria-hidden="true">↗</span></a>
+        </aside>
 
         <p class="processing-note">
           Visualization note: these charts are redrawn from the recorded series on
@@ -295,13 +254,9 @@
         <p class="section-number">From observation to research question</p>
         <h2 id="takeawayHeading">This is what the library is for</h2>
         <p>
-          The curves do not yet explain why Block 1 reorganizes around 10–20k and
-          50k steps. They do something equally important first: localize the event,
-          show that it is layer-specific, and reveal that depth and warmup change
-          its character. A concrete next test is whether warmup prevents an early
-          loss of effective context in Block 0, allowing Block 1 to move between
-          the ≈4 and ≈2 regimes in a more stable order. That turns an impression
-          into a testable question.
+          The curves localize the transition, show that it is layer-specific, and
+          reveal that depth and warmup change its character. That turns an unusual
+          shape into a testable research question.
         </p>
         <a class="primary-button" href="select.html">Find another signal <span aria-hidden="true">→</span></a>
       </section>

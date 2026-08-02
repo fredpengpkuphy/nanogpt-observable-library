@@ -94,7 +94,7 @@ article {
 .article-hero {
   position: relative;
   max-width: 1000px;
-  padding: clamp(5rem, 12vw, 9rem) 0 clamp(4rem, 9vw, 7rem);
+  padding: clamp(4.25rem, 9vw, 7rem) 0 clamp(3.5rem, 7vw, 5.5rem);
 }
 
 .article-hero::after {
@@ -104,7 +104,7 @@ article {
   top: -0.12em;
   right: -0.08em;
   color: rgba(159, 212, 228, 0.035);
-  font-size: clamp(20rem, 48vw, 38rem);
+  font-size: clamp(12rem, 32vw, 24rem);
   font-weight: 400;
   line-height: 1;
   user-select: none;
@@ -112,7 +112,6 @@ article {
 
 .eyebrow,
 .section-number,
-.definition-label,
 .index-note,
 .primary-button,
 .text-link,
@@ -152,7 +151,7 @@ h1 {
   max-width: 10ch;
   margin: 0;
   color: #fff;
-  font-size: clamp(4rem, 10.4vw, 8.7rem);
+  font-size: clamp(3.3rem, 7.7vw, 6.2rem);
   font-weight: 500;
   letter-spacing: -0.055em;
   line-height: 0.87;
@@ -167,7 +166,7 @@ h1 em {
   max-width: 790px;
   margin: 2.6rem 0 0;
   color: rgba(255, 255, 255, 0.82);
-  font-size: clamp(1.22rem, 2.35vw, 1.68rem);
+  font-size: clamp(1.05rem, 1.9vw, 1.35rem);
   line-height: 1.55;
 }
 
@@ -214,7 +213,7 @@ h1 em {
 }
 
 section {
-  margin-top: clamp(5.5rem, 11vw, 9rem);
+  margin-top: clamp(3.75rem, 7vw, 6rem);
 }
 
 .motivation-section {
@@ -238,7 +237,7 @@ section {
   max-width: 18ch;
   margin: 0;
   color: #fff;
-  font-size: clamp(2.25rem, 4.8vw, 4rem);
+  font-size: clamp(1.9rem, 3.7vw, 3.05rem);
   font-weight: 500;
   letter-spacing: -0.04em;
   line-height: 1.05;
@@ -247,7 +246,7 @@ section {
 .split-heading > p {
   margin: 0 0 0.25rem;
   color: var(--muted);
-  font-size: 1.02rem;
+  font-size: 0.94rem;
   line-height: 1.7;
 }
 
@@ -260,8 +259,8 @@ section {
 .motivation-statement {
   display: flex;
   align-items: flex-end;
-  min-height: 280px;
-  padding: clamp(1.5rem, 4vw, 3rem);
+  min-height: 220px;
+  padding: clamp(1.35rem, 3vw, 2.25rem);
   border: 1px solid rgba(159, 212, 228, 0.22);
   background:
     linear-gradient(150deg, rgba(159, 212, 228, 0.1), transparent 55%),
@@ -272,7 +271,7 @@ section {
   max-width: 680px;
   margin: 0;
   color: rgba(255, 255, 255, 0.9);
-  font-size: clamp(1.28rem, 2.6vw, 1.8rem);
+  font-size: clamp(1.05rem, 2vw, 1.35rem);
   line-height: 1.5;
 }
 
@@ -297,7 +296,7 @@ section {
 .site-facts dt {
   color: var(--sand);
   font-family: var(--font-display);
-  font-size: clamp(2rem, 4vw, 3rem);
+  font-size: clamp(1.65rem, 3vw, 2.35rem);
 }
 
 .site-facts dd {
@@ -318,8 +317,8 @@ section {
 }
 
 .workflow-grid li {
-  min-height: 235px;
-  padding: 1.5rem;
+  min-height: 190px;
+  padding: 1.3rem;
   border-right: 1px solid var(--line);
 }
 
@@ -335,10 +334,10 @@ section {
 }
 
 .workflow-grid h3 {
-  margin: 3.4rem 0 0.75rem;
+  margin: 2.5rem 0 0.65rem;
   color: #fff;
   font-family: var(--font-display);
-  font-size: 1.35rem;
+  font-size: 1.18rem;
   font-weight: 600;
 }
 
@@ -381,7 +380,7 @@ section {
   max-width: 730px;
   margin: 1.5rem 0 0;
   color: var(--muted);
-  font-size: 1.12rem;
+  font-size: 1.02rem;
   line-height: 1.7;
 }
 
@@ -435,7 +434,7 @@ figure {
   margin: 0;
   color: #fff;
   font-family: var(--font-display);
-  font-size: clamp(1.25rem, 2.5vw, 1.75rem);
+  font-size: clamp(1.1rem, 2vw, 1.45rem);
   font-weight: 600;
 }
 
@@ -448,11 +447,11 @@ figure {
 .canvas-wrap canvas {
   display: block;
   width: 100%;
-  height: clamp(310px, 43vw, 460px);
+  height: clamp(290px, 38vw, 420px);
 }
 
 .canvas-wrap-large canvas {
-  height: clamp(340px, 49vw, 520px);
+  height: clamp(315px, 43vw, 460px);
 }
 
 .chart-status {
@@ -489,39 +488,20 @@ figure {
   color: var(--sand);
 }
 
-.definition {
-  display: grid;
-  grid-template-columns: 0.75fr 1.1fr 1.35fr;
-  gap: 2rem;
-  align-items: center;
-  margin: clamp(2rem, 5vw, 3.5rem) 0 0;
-  padding: 1.65rem 2rem;
+.metric-note {
+  margin: 1.5rem 0 0;
+  padding: 0.9rem 1.1rem;
   border-left: 3px solid var(--sand-deep);
   background: rgba(255, 255, 255, 0.035);
-}
-
-.definition p {
-  margin: 0;
-}
-
-.definition-label {
-  color: var(--sand);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.definition .formula {
-  color: #fff;
-  font-size: clamp(1rem, 1.8vw, 1.3rem);
-  white-space: nowrap;
-}
-
-.definition p:last-child {
   color: var(--muted);
-  font-size: 0.92rem;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
   line-height: 1.55;
+}
+
+.metric-note strong {
+  margin-right: 0.35rem;
+  color: var(--sand);
 }
 
 .comparison-stack {
@@ -600,123 +580,37 @@ figure {
   color: #fff;
 }
 
-.hypothesis-grid {
+.guess-note {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(290px, 0.75fr);
-  gap: 1rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 1.1rem;
+  align-items: center;
   margin-top: 1.25rem;
-}
-
-.hypothesis-card {
-  padding: clamp(1.4rem, 3vw, 2.25rem);
+  padding: 1rem 1.15rem;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.028);
-}
-
-.attractor-card {
-  border-color: rgba(159, 212, 228, 0.28);
-  background:
-    linear-gradient(145deg, rgba(159, 212, 228, 0.07), transparent 58%),
-    rgba(255, 255, 255, 0.025);
-}
-
-.context-card {
-  border-color: rgba(224, 192, 138, 0.28);
-  background:
-    linear-gradient(145deg, rgba(224, 192, 138, 0.07), transparent 58%),
-    rgba(255, 255, 255, 0.025);
-}
-
-.hypothesis-kicker {
-  margin: 0 0 0.8rem;
-  color: var(--muted-soft);
+  border-left: 3px solid var(--ice);
+  background: rgba(159, 212, 228, 0.045);
   font-family: var(--font-ui);
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
-.hypothesis-kicker span {
+.guess-note > span {
   color: var(--sand);
-}
-
-.hypothesis-card h3 {
-  max-width: 24ch;
-  margin: 0 0 1rem;
-  color: #fff;
-  font-size: clamp(1.4rem, 2.7vw, 2rem);
-  font-weight: 600;
-  line-height: 1.16;
-}
-
-.hypothesis-card > p:not(.hypothesis-kicker) {
-  margin: 0 0 1.15rem;
-  color: var(--muted);
-  font-size: 0.94rem;
-  line-height: 1.65;
-}
-
-.hypothesis-card > p:last-of-type {
-  margin-bottom: 0;
-}
-
-.context-card .text-link {
-  display: inline-block;
-  margin-top: 0.45rem;
-}
-
-.trajectory-compare {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1px;
-  margin: 1.5rem 0;
-  border: 1px solid var(--line);
-  background: var(--line);
-  font-family: var(--font-ui);
-}
-
-.trajectory-compare > div {
-  padding: 1rem 1.1rem;
-  background: rgba(14, 20, 25, 0.96);
-}
-
-.trajectory-compare span,
-.trajectory-compare small {
-  display: block;
-}
-
-.trajectory-compare span {
-  color: var(--muted-soft);
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.trajectory-compare strong {
-  display: block;
-  margin: 0.55rem 0 0.35rem;
-  color: var(--ice);
-  font-family: var(--font-display);
-  font-size: clamp(1.2rem, 2.3vw, 1.65rem);
-  font-weight: 500;
-}
-
-.trajectory-compare > div:last-child strong {
-  color: var(--coral);
-}
-
-.trajectory-compare strong i {
-  margin: 0 0.2em;
-  color: var(--muted-soft);
-  font-style: normal;
-}
-
-.trajectory-compare small {
+.guess-note p {
+  margin: 0;
   color: var(--muted);
-  font-size: 0.68rem;
-  line-height: 1.45;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.guess-note .text-link {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .processing-note {
@@ -729,7 +623,7 @@ figure {
 .takeaway {
   position: relative;
   overflow: hidden;
-  padding: clamp(2rem, 5vw, 4.5rem);
+  padding: clamp(1.75rem, 4vw, 3.25rem);
   border: 1px solid rgba(224, 192, 138, 0.3);
   background:
     radial-gradient(circle at 88% 18%, rgba(159, 212, 228, 0.16), transparent 36%),
@@ -742,7 +636,7 @@ figure {
   right: 3%;
   bottom: -0.35em;
   color: rgba(255, 255, 255, 0.035);
-  font-size: clamp(14rem, 35vw, 28rem);
+  font-size: clamp(10rem, 25vw, 19rem);
   line-height: 1;
   pointer-events: none;
 }
@@ -759,7 +653,7 @@ figure {
   max-width: 720px;
   margin: 1.5rem 0 2rem;
   color: var(--muted);
-  font-size: 1.12rem;
+  font-size: 1rem;
   line-height: 1.7;
 }
 
@@ -793,7 +687,7 @@ footer a:hover {
 @media (max-width: 900px) {
   .split-heading,
   .motivation-grid,
-  .hypothesis-grid {
+  .guess-note {
     grid-template-columns: 1fr;
   }
 
@@ -813,9 +707,8 @@ footer a:hover {
     border-bottom: 1px solid var(--line);
   }
 
-  .definition {
-    grid-template-columns: 1fr;
-    gap: 0.9rem;
+  .guess-note {
+    gap: 0.65rem;
   }
 }
 
@@ -838,11 +731,7 @@ footer a:hover {
   }
 
   h1 {
-    font-size: clamp(3.5rem, 19vw, 5.2rem);
-  }
-
-  .trajectory-compare {
-    grid-template-columns: 1fr;
+    font-size: clamp(3rem, 15vw, 4.2rem);
   }
 
   .workflow-grid {
@@ -894,15 +783,6 @@ footer a:hover {
   .focus-figure > figcaption span:last-child,
   .setup-findings span:last-child {
     border-bottom: 0;
-  }
-
-  .definition {
-    padding-right: 1rem;
-    padding-left: 1rem;
-  }
-
-  .definition .formula {
-    white-space: normal;
   }
 
   footer {
