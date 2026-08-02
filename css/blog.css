@@ -740,8 +740,6 @@ p {
 
 .site-footer {
   display: flex;
-  justify-content: space-between;
-  gap: 32px;
   width: min(1152px, calc(100% - 48px));
   margin: 0 auto;
   padding: 36px 0 42px;
@@ -754,11 +752,6 @@ p {
 .site-footer p {
   max-width: 520px;
   margin: 0;
-}
-
-.site-footer div p:first-child {
-  color: var(--ink);
-  font-weight: 620;
 }
 
 .site-footer a {
@@ -948,8 +941,6 @@ p {
   }
 
   .site-footer {
-    flex-direction: column;
-    gap: 18px;
     width: calc(100% - 36px);
     padding: 28px 0 34px;
   }
