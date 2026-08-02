@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta
+    name="description"
+    content="A short research note on the three-regime attention entropy transition unique to Block 1 in the baseline nanoGPT run."
+  >
+  <title>One Layer, Three Regimes — nanoGPT Observable Library</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="stylesheet" href="css/blog.css?v=1">
+</head>
+<body>
+  <header class="blog-header">
+    <a class="blog-brand" href="index.html">nanoGPT Observable Library</a>
+    <nav aria-label="Primary">
+      <a href="index.html">Home</a>
+      <a href="select.html">Explorer</a>
+      <a href="discoveries.html">Discoveries</a>
+    </nav>
+  </header>
+
+  <main>
+    <article>
+      <header class="article-hero">
+        <p class="eyebrow">Research note <span aria-hidden="true">·</span> August 2, 2026</p>
+        <h1>One layer,<br><em>three regimes.</em></h1>
+        <p class="dek">
+          In the standard 12-layer nanoGPT run, mean attention entropy in Block 1
+          does not simply decay. It pauses near 4, falls to a second plateau near
+          2, then rises toward 2.5. No other block follows the same sequence.
+        </p>
+        <p class="index-note">Block 1 is zero-indexed: it is the second transformer block.</p>
+      </header>
+
+      <section class="lead-figure" aria-labelledby="baselineHeading">
+        <div class="section-heading">
+          <div>
+            <p class="section-number">01 / The observation</p>
+            <h2 id="baselineHeading">A staircase hidden inside training</h2>
+          </div>
+          <a
+            class="curve-link"
+            href="explorer.html?run=baseline&amp;spec=attention%3A%3Atransformer.h.1.attn%3A%3A-%3A%3Aattention_entropy_mean%3A%3A-"
+          >Open this curve <span aria-hidden="true">↗</span></a>
+        </div>
+
+        <figure class="primary-plot">
+          <div class="plot-frame">
+            <img
+              src="data/baseline/curves/attention/blocks/layer_01/attn/attention_h_1_attn_attention_entropy_mean_c57f70d7.png"
+              alt="Baseline Block 1 mean attention entropy. The curve pauses near 4, drops to a plateau near 2, and later rises toward 2.5."
+              width="960"
+              height="480"
+            >
+          </div>
+          <figcaption>Baseline · Block 1 · mean attention entropy · 100,000 steps</figcaption>
+        </figure>
+
+        <div class="phase-strip" aria-label="Three observed regimes">
+          <div class="phase-card phase-one">
+            <span class="phase-index">I</span>
+            <div>
+              <strong>≈ 3.9</strong>
+              <p>An early plateau holds from roughly 2k to 10k steps.</p>
+            </div>
+          </div>
+          <div class="phase-card phase-two">
+            <span class="phase-index">II</span>
+            <div>
+              <strong>≈ 2.0</strong>
+              <p>A sharp transition settles into a lower regime through about 50k.</p>
+            </div>
+          </div>
+          <div class="phase-card phase-three">
+            <span class="phase-index">III</span>
+            <div>
+              <strong>→ 2.5</strong>
+              <p>The entropy then rises and approaches a third, higher plateau.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="definition" aria-label="Definition of mean attention entropy">
+        <p class="definition-label">What is being measured?</p>
+        <p class="formula">H̄ = E<sub>b,h,q</sub> [ −Σ<sub>k</sub> p<sub>k</sub> log p<sub>k</sub> ]</p>
+        <p>
+          Mean attention entropy measures how spread out attention is across key
+          positions, averaged over batches, heads, and query positions. Higher
+          values mean more diffuse attention; lower values mean more concentrated attention.
+        </p>
+      </aside>
+
+      <section class="comparison-section" aria-labelledby="depthHeading">
+        <div class="section-heading compact-heading">
+          <div>
+            <p class="section-number">02 / Across depth</p>
+            <h2 id="depthHeading">The other blocks do not take the same path</h2>
+          </div>
+        </div>
+        <p class="section-intro">
+          Neighboring and distant blocks mostly relax toward a single regime.
+          Their levels differ, but the baseline Block 1 staircase is the outlier.
+        </p>
+
+        <div class="curve-grid depth-grid">
+          <figure class="curve-card">
+            <img
+              src="data/baseline/curves/attention/blocks/layer_00/attn/attention_h_0_attn_attention_entropy_mean_4af82ba6.png"
+              alt="Baseline Block 0 mean attention entropy decreases smoothly toward 5.5."
+              width="960"
+              height="480"
+              loading="lazy"
+            >
+            <figcaption><strong>Block 0</strong><span>Smooth decay toward ≈ 5.5</span></figcaption>
+          </figure>
+          <figure class="curve-card">
+            <img
+              src="data/baseline/curves/attention/blocks/layer_02/attn/attention_h_2_attn_attention_entropy_mean_379e2040.png"
+              alt="Baseline Block 2 mean attention entropy rapidly decreases and then slowly approaches 2.3."
+              width="960"
+              height="480"
+              loading="lazy"
+            >
+            <figcaption><strong>Block 2</strong><span>Rapid fall, then slow drift toward ≈ 2.3</span></figcaption>
+          </figure>
+          <figure class="curve-card">
+            <img
+              src="data/baseline/curves/attention/blocks/layer_11/attn/attention_h_11_attn_attention_entropy_mean_08a9b2da.png"
+              alt="Baseline Block 11 mean attention entropy gradually decreases toward 3.2."
+              width="960"
+              height="480"
+              loading="lazy"
+            >
+            <figcaption><strong>Block 11</strong><span>Gradual relaxation toward ≈ 3.2</span></figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="comparison-section setup-section" aria-labelledby="setupHeading">
+        <div class="section-heading compact-heading">
+          <div>
+            <p class="section-number">03 / Across setups</p>
+            <h2 id="setupHeading">The phenomenon depends on the training setup</h2>
+          </div>
+        </div>
+        <p class="section-intro">
+          Hold the observable and Block 1 fixed, then change the setup. The three
+          curves are qualitatively different—not small perturbations of one shared shape.
+        </p>
+
+        <div class="curve-grid setup-grid">
+          <figure class="curve-card featured-card">
+            <div class="card-label">Reference</div>
+            <img
+              src="data/baseline/curves/attention/blocks/layer_01/attn/attention_h_1_attn_attention_entropy_mean_c57f70d7.png"
+              alt="The baseline 12-layer Block 1 curve with three regimes."
+              width="960"
+              height="480"
+              loading="lazy"
+            >
+            <figcaption>
+              <strong>12-layer baseline</strong>
+              <span>Plateau → drop → recovery</span>
+            </figcaption>
+          </figure>
+          <figure class="curve-card">
+            <img
+              src="data/6_layers_nanogpt/curves/attention/blocks/layer_01/attn/attention_h_1_attn_attention_entropy_mean_c57f70d7.png"
+              alt="In the six-layer setup, Block 1 mean attention entropy rapidly drops to 2 and remains flat."
+              width="960"
+              height="480"
+              loading="lazy"
+            >
+            <figcaption>
+              <strong>6-layer nanoGPT</strong>
+              <span>Fast collapse to ≈ 2, then nearly flat</span>
+            </figcaption>
+          </figure>
+          <figure class="curve-card">
+            <img
+              src="data/no_learning_rate_warmup/curves/attention/blocks/layer_01/attn/attention_h_1_attn_attention_entropy_mean_c57f70d7.png"
+              alt="Without learning-rate warmup, Block 1 mean attention entropy drops to 2, rebounds toward 4, then gradually drifts downward."
+              width="960"
+              height="480"
+              loading="lazy"
+            >
+            <figcaption>
+              <strong>No learning-rate warmup</strong>
+              <span>Drop → rebound near 4 → slow decline</span>
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="takeaway" aria-labelledby="takeawayHeading">
+        <p class="section-number">The question it leaves</p>
+        <h2 id="takeawayHeading">Why does Block 1 reorganize in stages?</h2>
+        <p>
+          The curve does not yet tell us the mechanism. It gives us something
+          sharper: two transition windows to investigate, around 10–20k and 50k
+          steps, and a clear test of any explanation—the same mechanism must also
+          account for why the pattern disappears when depth or warmup changes.
+        </p>
+        <a
+          class="primary-link"
+          href="explorer.html?run=baseline&amp;spec=attention%3A%3Atransformer.h.1.attn%3A%3A-%3A%3Aattention_entropy_mean%3A%3A-"
+        >Explore the full curve <span aria-hidden="true">→</span></a>
+      </section>
+    </article>
+  </main>
+
+  <footer>
+    <p>One observation from the <a href="index.html">nanoGPT Observable Library</a>.</p>
+    <p>
+      Framed in the spirit of
+      <a href="https://www.meta-circle.com/blog/ophis-a-new-paradigm-for-autoresearch" target="_blank" rel="noopener">mechanistic auto-research</a>:
+      begin with what training is actually doing inside.
+    </p>
+  </footer>
+</body>
+</html>
