@@ -8,6 +8,7 @@
     label: "#514b54",
     ice: "#7714cf",
     sand: "#998dc7",
+    gray: "#8b858e",
     coral: "#d66a5e",
     green: "#4d9871",
   };
@@ -279,7 +280,7 @@
         {
           label: "6-layer nanoGPT",
           values: chartData.runs["6_layers_nanogpt"].layers["1"],
-          color: COLORS.sand,
+          color: COLORS.gray,
           width: 2.6,
           endDot: true,
         },
@@ -298,7 +299,7 @@
         annotations: [
           { step: 7000, value: 3.93, label: "≈4 · baseline", color: COLORS.ice, dx: 8, dy: -12 },
           { step: 30000, value: 2.08, label: "≈2 · baseline", color: COLORS.ice, dx: 8, dy: -10 },
-          { step: 5000, value: 2, label: "≈2 · 6-layer", color: COLORS.sand, dx: 10, dy: 20 },
+          { step: 5000, value: 2, label: "≈2 · 6-layer", color: COLORS.gray, dx: 10, dy: 20 },
           { step: 8000, value: 3.94, label: "≈4 · no warmup", color: COLORS.coral, dx: 8, dy: 18 },
         ],
       },

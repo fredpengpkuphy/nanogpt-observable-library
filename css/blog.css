@@ -611,30 +611,6 @@ p {
   line-height: 1.55;
 }
 
-.inline-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
-  width: min(var(--media), 100%);
-  margin: 20px auto 0;
-}
-
-.inline-links a {
-  color: var(--brand);
-  font-size: 14px;
-  font-weight: 560;
-  text-decoration: none;
-}
-
-.inline-links a:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.inline-links + .prose {
-  margin-top: 96px;
-}
-
 .figure-intro {
   margin-bottom: 40px;
 }
@@ -654,7 +630,7 @@ p {
   box-shadow: 0 14px 36px rgba(41, 37, 45, 0.05);
 }
 
-.inline-links + .setup-config-shell {
+.workflow-list + .setup-config-shell {
   margin-top: 72px;
 }
 
@@ -746,7 +722,7 @@ p {
 }
 
 .swatch-secondary {
-  background: var(--brand-secondary);
+  background: #8b858e;
 }
 
 .swatch-coral {
@@ -917,8 +893,7 @@ p {
   .prose + .prose,
   .figure-section,
   .closing-section,
-  .setup-config-shell + .prose,
-  .inline-links + .prose {
+  .setup-config-shell + .prose {
     margin-top: 76px;
   }
 
