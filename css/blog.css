@@ -23,6 +23,7 @@
 }
 
 html {
+  font-size: 15px;
   scroll-behavior: smooth;
 }
 
@@ -30,6 +31,7 @@ body {
   margin: 0;
   color: var(--fog);
   font-family: var(--font-display);
+  font-size: 1rem;
   font-optical-sizing: auto;
   background:
     radial-gradient(ellipse 82% 45% at 79% -4%, rgba(126, 184, 201, 0.14), transparent 68%),
@@ -47,10 +49,10 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1.5rem;
-  max-width: 1180px;
+  gap: 1.2rem;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 1.35rem 2rem;
+  padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--line);
   font-family: var(--font-ui);
 }
@@ -59,18 +61,19 @@ a {
   color: #fff;
   font-family: var(--font-display);
   font-weight: 700;
+  font-size: 0.92rem;
   text-decoration: none;
 }
 
 .blog-header nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.2rem;
+  gap: 1rem;
 }
 
 .blog-header nav a {
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   font-weight: 700;
   text-decoration: none;
   transition: color 160ms ease;
@@ -86,15 +89,15 @@ main {
 }
 
 article {
-  max-width: 1180px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 0 2rem 6rem;
+  padding: 0 1.5rem 4.5rem;
 }
 
 .article-hero {
   position: relative;
-  max-width: 1000px;
-  padding: clamp(4.25rem, 9vw, 7rem) 0 clamp(3.5rem, 7vw, 5.5rem);
+  max-width: 880px;
+  padding: clamp(3.5rem, 7vw, 5.5rem) 0 clamp(2.75rem, 5vw, 4.25rem);
 }
 
 .article-hero::after {
@@ -104,7 +107,7 @@ article {
   top: -0.12em;
   right: -0.08em;
   color: rgba(159, 212, 228, 0.035);
-  font-size: clamp(12rem, 32vw, 24rem);
+  font-size: clamp(9rem, 25vw, 18rem);
   font-weight: 400;
   line-height: 1;
   user-select: none;
@@ -127,9 +130,9 @@ footer {
 
 .eyebrow,
 .section-number {
-  margin: 0 0 1rem;
+  margin: 0 0 0.75rem;
   color: var(--sand);
-  font-size: 0.75rem;
+  font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -151,7 +154,7 @@ h1 {
   max-width: 10ch;
   margin: 0;
   color: #fff;
-  font-size: clamp(3.3rem, 7.7vw, 6.2rem);
+  font-size: clamp(2.85rem, 6.5vw, 5.15rem);
   font-weight: 500;
   letter-spacing: -0.055em;
   line-height: 0.87;
@@ -163,10 +166,10 @@ h1 em {
 }
 
 .dek {
-  max-width: 790px;
-  margin: 2.6rem 0 0;
+  max-width: 680px;
+  margin: 1.8rem 0 0;
   color: rgba(255, 255, 255, 0.82);
-  font-size: clamp(1.05rem, 1.9vw, 1.35rem);
+  font-size: clamp(0.98rem, 1.55vw, 1.16rem);
   line-height: 1.55;
 }
 
@@ -174,21 +177,21 @@ h1 em {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 1.2rem;
-  margin-top: 2rem;
+  gap: 1rem;
+  margin-top: 1.5rem;
 }
 
 .primary-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.6rem;
-  padding: 0.92rem 1.3rem;
+  gap: 0.5rem;
+  padding: 0.78rem 1.08rem;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 3px;
   color: var(--ink);
   background: linear-gradient(135deg, #f0e0c0 0%, var(--sand) 55%, #b8955e 100%);
-  font-size: 0.84rem;
+  font-size: 0.76rem;
   font-weight: 700;
   text-decoration: none;
   transition: transform 160ms ease, filter 160ms ease;
@@ -201,7 +204,7 @@ h1 em {
 
 .text-link {
   color: var(--ice);
-  font-size: 0.8rem;
+  font-size: 0.73rem;
   font-weight: 700;
   text-decoration: none;
   border-bottom: 1px solid rgba(159, 212, 228, 0.4);
@@ -213,7 +216,7 @@ h1 em {
 }
 
 section {
-  margin-top: clamp(3.75rem, 7vw, 6rem);
+  margin-top: clamp(3rem, 5.5vw, 4.75rem);
 }
 
 .motivation-section {
@@ -221,13 +224,13 @@ section {
 }
 
 .section-heading {
-  margin-bottom: 2.3rem;
+  margin-bottom: 1.65rem;
 }
 
 .split-heading {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
-  gap: clamp(2rem, 7vw, 6rem);
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+  gap: clamp(1.5rem, 5vw, 4rem);
   align-items: end;
 }
 
@@ -237,7 +240,7 @@ section {
   max-width: 18ch;
   margin: 0;
   color: #fff;
-  font-size: clamp(1.9rem, 3.7vw, 3.05rem);
+  font-size: clamp(1.65rem, 3vw, 2.5rem);
   font-weight: 500;
   letter-spacing: -0.04em;
   line-height: 1.05;
@@ -246,21 +249,21 @@ section {
 .split-heading > p {
   margin: 0 0 0.25rem;
   color: var(--muted);
-  font-size: 0.94rem;
+  font-size: 0.84rem;
   line-height: 1.7;
 }
 
 .motivation-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .motivation-statement {
   display: flex;
   align-items: flex-end;
-  min-height: 220px;
-  padding: clamp(1.35rem, 3vw, 2.25rem);
+  min-height: 180px;
+  padding: clamp(1.15rem, 2.5vw, 1.75rem);
   border: 1px solid rgba(159, 212, 228, 0.22);
   background:
     linear-gradient(150deg, rgba(159, 212, 228, 0.1), transparent 55%),
@@ -271,7 +274,7 @@ section {
   max-width: 680px;
   margin: 0;
   color: rgba(255, 255, 255, 0.9);
-  font-size: clamp(1.05rem, 2vw, 1.35rem);
+  font-size: clamp(0.95rem, 1.55vw, 1.12rem);
   line-height: 1.5;
 }
 
@@ -288,21 +291,21 @@ section {
   display: grid;
   grid-template-columns: minmax(5rem, 0.6fr) 1fr;
   align-items: baseline;
-  gap: 1rem;
-  padding: 1.3rem 1.5rem;
+  gap: 0.8rem;
+  padding: 0.95rem 1.1rem;
   background: rgba(14, 20, 25, 0.96);
 }
 
 .site-facts dt {
   color: var(--sand);
   font-family: var(--font-display);
-  font-size: clamp(1.65rem, 3vw, 2.35rem);
+  font-size: clamp(1.4rem, 2.3vw, 1.9rem);
 }
 
 .site-facts dd {
   margin: 0;
   color: var(--muted);
-  font-size: 0.79rem;
+  font-size: 0.7rem;
   line-height: 1.4;
 }
 
@@ -317,8 +320,8 @@ section {
 }
 
 .workflow-grid li {
-  min-height: 190px;
-  padding: 1.3rem;
+  min-height: 160px;
+  padding: 1.05rem;
   border-right: 1px solid var(--line);
 }
 
@@ -328,36 +331,36 @@ section {
 
 .workflow-index {
   color: var(--sand-deep);
-  font-size: 0.68rem;
+  font-size: 0.61rem;
   font-weight: 700;
   letter-spacing: 0.1em;
 }
 
 .workflow-grid h3 {
-  margin: 2.5rem 0 0.65rem;
+  margin: 1.9rem 0 0.55rem;
   color: #fff;
   font-family: var(--font-display);
-  font-size: 1.18rem;
+  font-size: 1.03rem;
   font-weight: 600;
 }
 
 .workflow-grid p {
   margin: 0;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.76rem;
   line-height: 1.6;
 }
 
 .feature-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.9rem 1.7rem;
-  margin-top: 1.3rem;
+  gap: 0.75rem 1.4rem;
+  margin-top: 1rem;
 }
 
 .feature-links a {
   color: var(--ice);
-  font-size: 0.78rem;
+  font-size: 0.71rem;
   font-weight: 700;
   text-decoration: none;
   border-bottom: 1px solid rgba(159, 212, 228, 0.35);
@@ -373,14 +376,14 @@ section {
 
 .demo-intro {
   max-width: 850px;
-  margin-bottom: 2.5rem;
+  margin-bottom: 1.75rem;
 }
 
 .demo-intro > p:not(.section-number, .index-note) {
   max-width: 730px;
   margin: 1.5rem 0 0;
   color: var(--muted);
-  font-size: 1.02rem;
+  font-size: 0.9rem;
   line-height: 1.7;
 }
 
@@ -393,7 +396,7 @@ code {
 .index-note {
   margin: 0.9rem 0 0;
   color: var(--muted-soft);
-  font-size: 0.76rem;
+  font-size: 0.69rem;
 }
 
 figure {
@@ -416,15 +419,15 @@ figure {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 1.5rem;
-  padding: 1.25rem 1.45rem;
+  gap: 1.1rem;
+  padding: 0.95rem 1.1rem;
   border-bottom: 1px solid var(--line);
 }
 
 .figure-head p {
   margin: 0 0 0.35rem;
   color: var(--muted-soft);
-  font-size: 0.65rem;
+  font-size: 0.59rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -434,7 +437,7 @@ figure {
   margin: 0;
   color: #fff;
   font-family: var(--font-display);
-  font-size: clamp(1.1rem, 2vw, 1.45rem);
+  font-size: clamp(0.98rem, 1.65vw, 1.25rem);
   font-weight: 600;
 }
 
@@ -447,11 +450,11 @@ figure {
 .canvas-wrap canvas {
   display: block;
   width: 100%;
-  height: clamp(290px, 38vw, 420px);
+  height: clamp(260px, 33vw, 360px);
 }
 
 .canvas-wrap-large canvas {
-  height: clamp(315px, 43vw, 460px);
+  height: clamp(280px, 37vw, 400px);
 }
 
 .chart-status {
@@ -463,7 +466,7 @@ figure {
   color: var(--muted);
   background: var(--panel);
   font-family: var(--font-ui);
-  font-size: 0.82rem;
+  font-size: 0.74rem;
 }
 
 .focus-figure > figcaption {
@@ -473,10 +476,10 @@ figure {
 }
 
 .focus-figure > figcaption span {
-  padding: 1rem 1.25rem;
+  padding: 0.78rem 1rem;
   border-right: 1px solid var(--line);
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: 0.68rem;
 }
 
 .focus-figure > figcaption span:last-child {
@@ -489,13 +492,13 @@ figure {
 }
 
 .metric-note {
-  margin: 1.5rem 0 0;
-  padding: 0.9rem 1.1rem;
+  margin: 1.1rem 0 0;
+  padding: 0.75rem 0.95rem;
   border-left: 3px solid var(--sand-deep);
   background: rgba(255, 255, 255, 0.035);
   color: var(--muted);
   font-family: var(--font-ui);
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   line-height: 1.55;
 }
 
@@ -506,16 +509,16 @@ figure {
 
 .comparison-stack {
   display: grid;
-  gap: 1.25rem;
+  gap: 0.9rem;
 }
 
 .chart-legend {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 0.65rem 1rem;
+  gap: 0.5rem 0.8rem;
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: 0.64rem;
 }
 
 .chart-legend span {
@@ -549,10 +552,10 @@ figure {
 }
 
 .figure-note {
-  padding: 0.9rem 1.4rem;
+  padding: 0.7rem 1.05rem;
   border-top: 1px solid var(--line);
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: 0.68rem;
   line-height: 1.55;
 }
 
@@ -563,10 +566,10 @@ figure {
 }
 
 .setup-findings span {
-  padding: 1rem 1.25rem;
+  padding: 0.78rem 1rem;
   border-right: 1px solid var(--line);
   color: var(--muted);
-  font-size: 0.74rem;
+  font-size: 0.67rem;
   line-height: 1.5;
 }
 
@@ -583,10 +586,10 @@ figure {
 .guess-note {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 1.1rem;
+  gap: 0.9rem;
   align-items: center;
-  margin-top: 1.25rem;
-  padding: 1rem 1.15rem;
+  margin-top: 0.9rem;
+  padding: 0.8rem 0.95rem;
   border: 1px solid var(--line);
   border-left: 3px solid var(--ice);
   background: rgba(159, 212, 228, 0.045);
@@ -595,7 +598,7 @@ figure {
 
 .guess-note > span {
   color: var(--sand);
-  font-size: 0.62rem;
+  font-size: 0.58rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -604,7 +607,7 @@ figure {
 .guess-note p {
   margin: 0;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   line-height: 1.55;
 }
 
@@ -614,16 +617,16 @@ figure {
 }
 
 .processing-note {
-  margin: 1rem 0 0;
+  margin: 0.75rem 0 0;
   color: var(--muted-soft);
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   line-height: 1.55;
 }
 
 .takeaway {
   position: relative;
   overflow: hidden;
-  padding: clamp(1.75rem, 4vw, 3.25rem);
+  padding: clamp(1.5rem, 3vw, 2.5rem);
   border: 1px solid rgba(224, 192, 138, 0.3);
   background:
     radial-gradient(circle at 88% 18%, rgba(159, 212, 228, 0.16), transparent 36%),
@@ -636,7 +639,7 @@ figure {
   right: 3%;
   bottom: -0.35em;
   color: rgba(255, 255, 255, 0.035);
-  font-size: clamp(10rem, 25vw, 19rem);
+  font-size: clamp(8rem, 20vw, 14rem);
   line-height: 1;
   pointer-events: none;
 }
@@ -651,9 +654,9 @@ figure {
   position: relative;
   z-index: 1;
   max-width: 720px;
-  margin: 1.5rem 0 2rem;
+  margin: 1rem 0 1.4rem;
   color: var(--muted);
-  font-size: 1rem;
+  font-size: 0.88rem;
   line-height: 1.7;
 }
 
@@ -665,13 +668,13 @@ figure {
 footer {
   display: flex;
   justify-content: space-between;
-  gap: 2rem;
-  max-width: 1180px;
+  gap: 1.5rem;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1.35rem 1.5rem;
   border-top: 1px solid var(--line);
   color: var(--muted-soft);
-  font-size: 0.74rem;
+  font-size: 0.66rem;
   line-height: 1.6;
 }
 
@@ -716,8 +719,8 @@ footer a:hover {
   .blog-header,
   article,
   footer {
-    padding-right: 1.1rem;
-    padding-left: 1.1rem;
+    padding-right: 1rem;
+    padding-left: 1rem;
   }
 
   .blog-header {
@@ -727,11 +730,11 @@ footer a:hover {
   }
 
   .article-hero {
-    padding-top: 4.25rem;
+    padding-top: 3.25rem;
   }
 
   h1 {
-    font-size: clamp(3rem, 15vw, 4.2rem);
+    font-size: clamp(2.65rem, 13vw, 3.55rem);
   }
 
   .workflow-grid {
@@ -750,14 +753,14 @@ footer a:hover {
   }
 
   .workflow-grid h3 {
-    margin-top: 1.8rem;
+    margin-top: 1.35rem;
   }
 
   .figure-head {
     align-items: flex-start;
     flex-direction: column;
-    gap: 0.85rem;
-    padding: 1.05rem;
+    gap: 0.7rem;
+    padding: 0.85rem;
   }
 
   .chart-legend {
@@ -766,7 +769,7 @@ footer a:hover {
 
   .canvas-wrap canvas,
   .canvas-wrap-large canvas {
-    height: 310px;
+    height: 275px;
   }
 
   .focus-figure > figcaption,
