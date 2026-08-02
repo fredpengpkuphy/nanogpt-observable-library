@@ -16,7 +16,7 @@ weights, gradients, activations, and attention patterns evolve over time.
 - Zoom into curves, select step ranges, and open charts in fullscreen mode.
 - Read the mathematical definition and plain-language description of each observable.
 - Publish detailed discoveries with zoomed curve evidence and discussion.
-- Read a focused research note on the three-regime Block 1 attention-entropy transition.
+- Read an introduction to the library, with a three-regime Block 1 attention-entropy finding as a worked example.
 - Inspect each run's model, optimizer, learning-rate, and batching configuration.
 
 ## Observable Families
