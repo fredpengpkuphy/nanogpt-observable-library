@@ -362,13 +362,8 @@ p {
   line-height: 1.58;
 }
 
-.focus-figure,
-.comparison-figure {
+.focus-figure {
   margin-top: 40px;
-}
-
-.comparison-canvas-wrap canvas {
-  height: 330px;
 }
 
 .article-layout {
@@ -490,7 +485,6 @@ p {
 
 .abstract-card + .prose,
 .prose + .prose,
-.focus-figure + .prose,
 .figure-section + .prose,
 .figure-section,
 .closing-section {
@@ -988,10 +982,6 @@ p {
     height: 300px;
   }
 
-  .comparison-canvas-wrap canvas {
-    height: 280px;
-  }
-
   .hero-figure figcaption,
   .data-figure figcaption {
     grid-template-columns: 62px minmax(0, 1fr);
@@ -1019,7 +1009,6 @@ p {
 
   .abstract-card + .prose,
   .prose + .prose,
-  .focus-figure + .prose,
   .figure-section + .prose,
   .figure-section,
   .closing-section,

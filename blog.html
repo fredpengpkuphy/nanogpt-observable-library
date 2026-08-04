@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5.3.0/index.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5.3.0/index.css">
-  <link rel="stylesheet" href="css/blog.css?v=10">
+  <link rel="stylesheet" href="css/blog.css?v=11">
 </head>
 <body>
   <header class="site-header">
@@ -59,7 +59,6 @@
             <a class="is-current" href="#abstract">Abstract</a>
             <a href="#motivation">Why more observables</a>
             <a href="#observation">Attention entropy</a>
-            <a href="#blind-spot">What weight norm misses</a>
             <a href="#layers">Across layers</a>
             <a href="#setups">Across setups</a>
             <a href="#takeaway">What this reveals</a>
@@ -80,9 +79,9 @@
             </p>
             <p>
               This launch note follows one example: Block 1 attention entropy passes
-              through three distinct regimes that are not legible in a standard weight
-              norm. Comparing the signal across depth and training setups shows why a
-              broader observable vocabulary can reveal new questions about learning.
+              through three distinct regimes. Comparing the signal across depth and
+              training setups shows why a broader observable vocabulary can reveal new
+              questions about learning.
             </p>
           </aside>
 
@@ -114,9 +113,10 @@
             </p>
             <p>
               The curve therefore suggests a sequence of internal reorganizations,
-              not one smooth trend. The next comparisons ask whether this structure is
-              visible in a familiar metric, shared by other blocks, or stable across
-              training setups.
+              not one smooth trend. A standard L2 norm of Block 1's QKV projection
+              weights does not separate the same regions, so the structure is easy to
+              miss in familiar aggregate metrics. The next comparisons ask whether it
+              is shared by other blocks or stable across training setups.
             </p>
             <p class="small-note">Block 1 is zero-indexed: it is the second transformer block.</p>
           </section>
@@ -143,48 +143,14 @@
             </figcaption>
           </figure>
 
-          <section class="prose comparison-section" id="blind-spot" aria-labelledby="blindSpotTitle">
-            <p class="section-kicker">Check a familiar metric</p>
-            <h2 id="blindSpotTitle">Weight norm does not separate the same regimes.</h2>
-            <p>
-              To test whether a conventional observable tells the same story, we align
-              the attention-entropy transition boundaries with the L2 norm of Block 1's
-              QKV projection weights. The norm captures broad parameter growth, but it
-              does not mark the same plateau–drop–recovery structure.
-            </p>
-          </section>
-
-          <figure class="data-figure comparison-figure" aria-labelledby="weightNormFigureTitle">
-            <div class="figure-toolbar">
-              <div>
-                <span>Conventional view · Baseline Block 1 QKV projection</span>
-                <strong id="weightNormFigureTitle">weight_l2_norm</strong>
-              </div>
-              <span>0–100,000 steps</span>
-            </div>
-            <div class="canvas-wrap comparison-canvas-wrap">
-              <canvas
-                id="weightNormChart"
-                role="img"
-                aria-label="Block 1 QKV projection weight L2 norm. Dashed markers align with the attention-entropy transitions, but the weight norm does not reveal the same three regimes."
-              ></canvas>
-              <p class="chart-status" role="status">Loading comparison curve…</p>
-            </div>
-            <figcaption class="key-caption">
-              <span>Figure 02</span>
-              <p><strong>The same transition boundaries are not legible here.</strong> The dashed markers align with changes in attention entropy above; the QKV weight norm moves through them without separating the same three regimes.</p>
-            </figcaption>
-          </figure>
-
           <section class="figure-section" id="layers" aria-labelledby="layersTitle">
             <div class="prose figure-intro">
               <p class="section-kicker">Compare depth</p>
               <h2 id="layersTitle">The other blocks do not take the same path.</h2>
               <p>
-                The metric comparison shows that the choice of observable matters. We
-                next hold the setup and observable fixed, then overlay all 12 blocks to
-                ask whether the trajectory is shared across depth. Block 1 is highlighted;
-                the remaining blocks are drawn in neutral tones.
+                We next hold the setup and observable fixed, then overlay all 12 blocks
+                to ask whether the trajectory is shared across depth. Block 1 is
+                highlighted; the remaining blocks are drawn in neutral tones.
               </p>
             </div>
             <figure class="data-figure">
@@ -207,7 +173,7 @@
                 <p class="chart-status" role="status">Loading layer comparison…</p>
               </div>
               <figcaption>
-                <span>Figure 03</span>
+                <span>Figure 02</span>
                 <p><strong>Block 1 is the depth-wise outlier.</strong> Other blocks settle along smoother paths; none reproduces its plateau–drop–recovery sequence.</p>
               </figcaption>
             </figure>
@@ -244,7 +210,7 @@
                 <p class="chart-status" role="status">Loading setup comparison…</p>
               </div>
               <figcaption class="key-caption">
-                <span>Figure 04</span>
+                <span>Figure 03</span>
                 <p><strong>The levels are distributed across different trajectories.</strong> Baseline moves through ≈4 then ≈2; the 6-layer run settles near ≈2 early, while the no-warmup run rebounds toward ≈4.</p>
               </figcaption>
             </figure>
@@ -269,10 +235,9 @@
             <h2 id="takeawayTitle">A different observable produces a different research question.</h2>
             <p>
               Taken together, the comparisons show a three-regime trajectory that is
-              absent from the aligned weight norm, unusual across depth, and sensitive
-              to controlled changes in the training setup. They do not yet provide a
-              causal explanation—but they turn an otherwise hidden pattern into a
-              concrete question that can be tested.
+              unusual across depth and sensitive to controlled changes in the training
+              setup. They do not yet provide a causal explanation—but they turn an
+              otherwise hidden pattern into a concrete question that can be tested.
             </p>
           </section>
 
