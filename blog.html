@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5.3.0/index.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5.3.0/index.css">
-  <link rel="stylesheet" href="css/blog.css?v=8">
+  <link rel="stylesheet" href="css/blog.css?v=10">
 </head>
 <body>
   <header class="site-header">
@@ -50,28 +50,6 @@
             <a class="hero-action is-primary" href="select.html">Start exploring <span aria-hidden="true">↗</span></a>
           </div>
         </div>
-
-        <figure class="hero-figure" aria-labelledby="heroFigureTitle">
-          <div class="figure-toolbar">
-            <div>
-              <span>Baseline · Block 1</span>
-              <strong id="heroFigureTitle">attention_entropy_mean</strong>
-            </div>
-            <span>0–100,000 steps</span>
-          </div>
-          <div class="canvas-wrap hero-canvas-wrap">
-            <canvas
-              id="focusChart"
-              role="img"
-              aria-label="Processed baseline Block 1 mean attention entropy curve, showing a plateau near 4, a second plateau near 2, and a later rise toward 2.5."
-            ></canvas>
-            <p class="chart-status" role="status">Loading processed curve…</p>
-          </div>
-          <figcaption>
-            <span>Figure 01</span>
-            <p><strong>Three regimes in one less familiar observable.</strong> Block 1 pauses near 4, drops to a second regime near 2, then rises toward 2.5.</p>
-          </figcaption>
-        </figure>
       </header>
 
       <div class="article-layout">
@@ -80,9 +58,11 @@
             <p>On this page</p>
             <a class="is-current" href="#abstract">Abstract</a>
             <a href="#motivation">Why more observables</a>
-            <a href="#observation">A hidden phase structure</a>
+            <a href="#observation">Attention entropy</a>
+            <a href="#blind-spot">What weight norm misses</a>
             <a href="#layers">Across layers</a>
             <a href="#setups">Across setups</a>
+            <a href="#takeaway">What this reveals</a>
             <a href="#workflow">Explore the library</a>
             <a href="#feedback">Share what you find</a>
             <a href="#looking-forward">What comes next</a>
@@ -99,10 +79,10 @@
               statistics to the modules that produced them.
             </p>
             <p>
-              Researchers can move through the architecture, compare the same signal
-              across layers or setups, zoom into a transition, and preserve the result
-              as a public discovery. The goal is simple: gain more research intuition
-              from observables.
+              This launch note follows one example: Block 1 attention entropy passes
+              through three distinct regimes that are not legible in a standard weight
+              norm. Comparing the signal across depth and training setups shows why a
+              broader observable vocabulary can reveal new questions about learning.
             </p>
           </aside>
 
@@ -116,14 +96,65 @@
               accuracy, learning rate, and parameter norms.
             </p>
             <p>
-              Our premise is that more phenomena are waiting in observables we inspect
-              less often. Attention entropy is one example. In this run it exposes a
-              three-regime sequence in Block 1 that is not recoverable from a standard
-              weight norm alone.
+              Our premise is simple: more phenomena may be waiting in observables we
+              inspect less often. The example below starts with attention entropy and
+              asks what becomes visible when we look beyond the usual dashboard.
             </p>
           </section>
 
-          <figure class="data-figure motivation-figure" aria-labelledby="weightNormFigureTitle">
+          <section class="prose" id="observation" aria-labelledby="observationTitle">
+            <p class="section-kicker">Start with attention entropy</p>
+            <h2 id="observationTitle">Block 1 moves through three distinct regimes.</h2>
+            <p>
+              Mean attention entropy measures how spread out attention is across key
+              positions: higher values indicate more diffuse attention, while lower
+              values indicate more concentrated attention. In the baseline run, Block 1
+              first settles near 4, drops to a second plateau near 2, then gradually
+              rises toward 2.5.
+            </p>
+            <p>
+              The curve therefore suggests a sequence of internal reorganizations,
+              not one smooth trend. The next comparisons ask whether this structure is
+              visible in a familiar metric, shared by other blocks, or stable across
+              training setups.
+            </p>
+            <p class="small-note">Block 1 is zero-indexed: it is the second transformer block.</p>
+          </section>
+
+          <figure class="data-figure focus-figure" aria-labelledby="heroFigureTitle">
+            <div class="figure-toolbar">
+              <div>
+                <span>Baseline · Block 1</span>
+                <strong id="heroFigureTitle">attention_entropy_mean</strong>
+              </div>
+              <span>0–100,000 steps</span>
+            </div>
+            <div class="canvas-wrap hero-canvas-wrap">
+              <canvas
+                id="focusChart"
+                role="img"
+                aria-label="Processed baseline Block 1 mean attention entropy curve, showing a plateau near 4, a second plateau near 2, and a later rise toward 2.5."
+              ></canvas>
+              <p class="chart-status" role="status">Loading processed curve…</p>
+            </div>
+            <figcaption class="key-caption">
+              <span>Figure 01</span>
+              <p><strong>One curve, three regimes.</strong> Block 1 pauses near 4, drops to a second regime near 2, then rises toward 2.5.</p>
+            </figcaption>
+          </figure>
+
+          <section class="prose comparison-section" id="blind-spot" aria-labelledby="blindSpotTitle">
+            <p class="section-kicker">Check a familiar metric</p>
+            <h2 id="blindSpotTitle">Weight norm does not separate the same regimes.</h2>
+            <p>
+              To test whether a conventional observable tells the same story, we align
+              the attention-entropy transition boundaries with the L2 norm of Block 1's
+              QKV projection weights. The norm captures broad parameter growth, but it
+              does not mark the same plateau–drop–recovery structure.
+            </p>
+          </section>
+
+          <figure class="data-figure comparison-figure" aria-labelledby="weightNormFigureTitle">
             <div class="figure-toolbar">
               <div>
                 <span>Conventional view · Baseline Block 1 QKV projection</span>
@@ -145,26 +176,15 @@
             </figcaption>
           </figure>
 
-          <section class="prose" id="observation" aria-labelledby="observationTitle">
-            <p class="section-kicker">A hidden phase structure</p>
-            <h2 id="observationTitle">Block 1 undergoes a sequence of phase transitions.</h2>
-            <p>
-              Mean attention entropy measures how diffuse attention is across key
-              positions. In the baseline run, Block 1 first pauses near 4, drops to a
-              second plateau near 2, then rises toward 2.5. These plateau-to-plateau
-              phase transitions are unique to this block in the baseline run.
-            </p>
-            <p class="small-note">Block 1 is zero-indexed: it is the second transformer block.</p>
-          </section>
-
           <section class="figure-section" id="layers" aria-labelledby="layersTitle">
             <div class="prose figure-intro">
               <p class="section-kicker">Compare depth</p>
               <h2 id="layersTitle">The other blocks do not take the same path.</h2>
               <p>
-                Overlaying all 12 blocks on shared axes turns the unusual shape into a
-                depth-wise comparison. Block 1 is highlighted; the remaining blocks are
-                drawn in neutral tones.
+                The metric comparison shows that the choice of observable matters. We
+                next hold the setup and observable fixed, then overlay all 12 blocks to
+                ask whether the trajectory is shared across depth. Block 1 is highlighted;
+                the remaining blocks are drawn in neutral tones.
               </p>
             </div>
             <figure class="data-figure">
@@ -196,26 +216,12 @@
           <section class="figure-section" id="setups" aria-labelledby="setupsTitle">
             <div class="prose figure-intro">
               <p class="section-kicker">Compare setups</p>
-              <h2 id="setupsTitle">Warmup changes the order of the dynamics.</h2>
+              <h2 id="setupsTitle">The trajectory depends on the training setup.</h2>
               <p>
-                Hold Block 1 and the observable fixed, then change the training setup.
-                The comparison isolates two controlled changes: model depth and
+                Block 1 is the depth-wise outlier in the baseline run. The final check
+                holds the block and observable fixed while changing model depth or
                 learning-rate warmup.
               </p>
-            </div>
-            <div class="setup-config-shell">
-              <table class="setup-config-table">
-                <caption>Three controlled training setups</caption>
-                <thead>
-                  <tr><th>Setup</th><th>Layers</th><th>Warmup</th><th>Change from reference</th></tr>
-                </thead>
-                <tbody>
-                  <tr><td>Baseline</td><td>12</td><td>2,000 steps</td><td>Standard Karpathy nanoGPT</td></tr>
-                  <tr><td>6-layer nanoGPT</td><td>6</td><td>2,000 steps</td><td>Model depth only</td></tr>
-                  <tr><td>No LR warmup</td><td>12</td><td>0 steps</td><td>Warmup schedule only</td></tr>
-                </tbody>
-              </table>
-              <p>All other recorded settings follow the same reference setup where applicable.</p>
             </div>
             <figure class="data-figure">
               <div class="figure-toolbar">
@@ -242,6 +248,32 @@
                 <p><strong>The levels are distributed across different trajectories.</strong> Baseline moves through ≈4 then ≈2; the 6-layer run settles near ≈2 early, while the no-warmup run rebounds toward ≈4.</p>
               </figcaption>
             </figure>
+            <div class="setup-config-shell setup-config-after-figure">
+              <table class="setup-config-table">
+                <caption>What changes between the three lines</caption>
+                <thead>
+                  <tr><th>Setup</th><th>Layers</th><th>Warmup</th><th>Change from reference</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Baseline</td><td>12</td><td>2,000 steps</td><td>Standard Karpathy nanoGPT</td></tr>
+                  <tr><td>6-layer nanoGPT</td><td>6</td><td>2,000 steps</td><td>Model depth only</td></tr>
+                  <tr><td>No LR warmup</td><td>12</td><td>0 steps</td><td>Warmup schedule only</td></tr>
+                </tbody>
+              </table>
+              <p>All other recorded settings follow the same reference setup where applicable.</p>
+            </div>
+          </section>
+
+          <section class="prose takeaway-section" id="takeaway" aria-labelledby="takeawayTitle">
+            <p class="section-kicker">What the comparison reveals</p>
+            <h2 id="takeawayTitle">A different observable produces a different research question.</h2>
+            <p>
+              Taken together, the comparisons show a three-regime trajectory that is
+              absent from the aligned weight norm, unusual across depth, and sensitive
+              to controlled changes in the training setup. They do not yet provide a
+              causal explanation—but they turn an otherwise hidden pattern into a
+              concrete question that can be tested.
+            </p>
           </section>
 
           <section class="library-section" id="workflow" aria-labelledby="workflowTitle">
@@ -253,16 +285,6 @@
                 to move from a training setup to a module, inspect an observable, and
                 compare the pattern across depth or experimental conditions.
               </p>
-            </div>
-
-            <div class="facts-table" aria-label="Observable Library dataset summary">
-              <p class="table-caption">Karpathy nanoGPT, measured end to end</p>
-              <dl>
-                <div><dt>Reference setup</dt><dd>Standard Karpathy nanoGPT GPT-2 training on OpenWebText</dd></div>
-                <div><dt>Architecture</dt><dd>12 layers · 12 heads · 768 embedding dimensions · 1,024-token context</dd></div>
-                <div><dt>Training</dt><dd>AdamW · 2,000-step warmup · cosine learning-rate decay</dd></div>
-                <div><dt>Coverage</dt><dd>1,820 curves recorded through step 100,000</dd></div>
-              </dl>
             </div>
 
             <ol class="workflow-list">
@@ -287,6 +309,16 @@
                 <p>Overlay layers or setups on shared axes, focus a step range, and preserve an annotated finding as a discovery.</p>
               </li>
             </ol>
+
+            <div class="facts-table" aria-label="Observable Library dataset summary">
+              <p class="table-caption">The current reference dataset</p>
+              <dl>
+                <div><dt>Reference setup</dt><dd>Standard Karpathy nanoGPT GPT-2 training on OpenWebText</dd></div>
+                <div><dt>Architecture</dt><dd>12 layers · 12 heads · 768 embedding dimensions · 1,024-token context</dd></div>
+                <div><dt>Training</dt><dd>AdamW · 2,000-step warmup · cosine learning-rate decay</dd></div>
+                <div><dt>Coverage</dt><dd>1,820 curves recorded through step 100,000</dd></div>
+              </dl>
+            </div>
           </section>
 
           <section class="feedback-section" id="feedback" aria-labelledby="feedbackTitle">

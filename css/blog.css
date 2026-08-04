@@ -142,7 +142,7 @@ a {
 
 .launch-hero {
   overflow: hidden;
-  padding: 28px 0 88px;
+  padding: 28px 0 64px;
   background: var(--paper-bright);
 }
 
@@ -362,7 +362,8 @@ p {
   line-height: 1.58;
 }
 
-.motivation-figure {
+.focus-figure,
+.comparison-figure {
   margin-top: 40px;
 }
 
@@ -377,7 +378,7 @@ p {
   gap: 44px;
   width: min(1328px, calc(100vw - 64px));
   margin: 0 auto;
-  padding: 96px 0 120px;
+  padding: 80px 0 120px;
 }
 
 .contents {
@@ -489,7 +490,8 @@ p {
 
 .abstract-card + .prose,
 .prose + .prose,
-.motivation-figure + .prose,
+.focus-figure + .prose,
+.figure-section + .prose,
 .figure-section,
 .closing-section {
   margin-top: 96px;
@@ -687,6 +689,11 @@ p {
   font-family: var(--mono);
   font-size: 10px;
   line-height: 1.5;
+}
+
+.setup-config-after-figure {
+  margin-top: 38px;
+  margin-bottom: 0;
 }
 
 .figure-legend {
@@ -933,7 +940,7 @@ p {
 
   .launch-hero {
     padding-top: 22px;
-    padding-bottom: 68px;
+    padding-bottom: 48px;
   }
 
   .article-meta {
@@ -993,7 +1000,7 @@ p {
 
   .article-layout {
     width: calc(100vw - 36px);
-    padding: 76px 0 88px;
+    padding: 64px 0 88px;
   }
 
   .abstract-card {
@@ -1012,7 +1019,8 @@ p {
 
   .abstract-card + .prose,
   .prose + .prose,
-  .motivation-figure + .prose,
+  .focus-figure + .prose,
+  .figure-section + .prose,
   .figure-section,
   .closing-section,
   .library-section {
