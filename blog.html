@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5.3.0/index.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5.3.0/index.css">
-  <link rel="stylesheet" href="css/blog.css?v=11">
+  <link rel="stylesheet" href="css/blog.css?v=12">
 </head>
 <body>
   <header class="site-header">
@@ -143,6 +143,28 @@
             </figcaption>
           </figure>
 
+          <figure class="data-figure supporting-figure" aria-labelledby="weightNormFigureTitle">
+            <div class="figure-toolbar">
+              <div>
+                <span>Supporting comparison · Block 1 QKV projection</span>
+                <strong id="weightNormFigureTitle">weight_l2_norm</strong>
+              </div>
+              <span>0–100,000 steps</span>
+            </div>
+            <div class="canvas-wrap supporting-canvas-wrap">
+              <canvas
+                id="weightNormChart"
+                role="img"
+                aria-label="Block 1 QKV projection weight L2 norm. The curve does not separate the same three regions visible in attention entropy."
+              ></canvas>
+              <p class="chart-status" role="status">Loading supporting curve…</p>
+            </div>
+            <figcaption>
+              <span>Figure 02</span>
+              <p><strong>A supporting comparison.</strong> The QKV weight norm captures a broad trend, but not the same three regions visible in attention entropy.</p>
+            </figcaption>
+          </figure>
+
           <section class="figure-section" id="layers" aria-labelledby="layersTitle">
             <div class="prose figure-intro">
               <p class="section-kicker">Compare depth</p>
@@ -173,7 +195,7 @@
                 <p class="chart-status" role="status">Loading layer comparison…</p>
               </div>
               <figcaption>
-                <span>Figure 02</span>
+                <span>Figure 03</span>
                 <p><strong>Block 1 is the depth-wise outlier.</strong> Other blocks settle along smoother paths; none reproduces its plateau–drop–recovery sequence.</p>
               </figcaption>
             </figure>
@@ -210,7 +232,7 @@
                 <p class="chart-status" role="status">Loading setup comparison…</p>
               </div>
               <figcaption class="key-caption">
-                <span>Figure 03</span>
+                <span>Figure 04</span>
                 <p><strong>The levels are distributed across different trajectories.</strong> Baseline moves through ≈4 then ≈2; the 6-layer run settles near ≈2 early, while the no-warmup run rebounds toward ≈4.</p>
               </figcaption>
             </figure>

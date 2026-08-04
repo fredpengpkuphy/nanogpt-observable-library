@@ -366,6 +366,15 @@ p {
   margin-top: 40px;
 }
 
+.supporting-figure {
+  width: min(760px, 100%);
+  margin-top: 34px;
+}
+
+.supporting-canvas-wrap canvas {
+  height: 260px;
+}
+
 .article-layout {
   display: grid;
   grid-template-columns: minmax(150px, 190px) minmax(0, 900px) minmax(150px, 190px);
@@ -980,6 +989,10 @@ p {
   .canvas-wrap canvas,
   .hero-canvas-wrap canvas {
     height: 300px;
+  }
+
+  .supporting-canvas-wrap canvas {
+    height: 240px;
   }
 
   .hero-figure figcaption,
