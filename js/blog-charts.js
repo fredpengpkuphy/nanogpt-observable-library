@@ -200,7 +200,7 @@
     ctx.save();
     ctx.translate(13, (plot.top + plot.bottom) / 2);
     ctx.rotate(-Math.PI / 2);
-    ctx.fillText("mean entropy", 0, 0);
+    ctx.fillText(options.yLabel || "mean entropy", 0, 0);
     ctx.restore();
   }
 
@@ -263,6 +263,31 @@
     });
   }
 
+  function renderWeightNormChart() {
+    const canvas = document.getElementById("weightNormChart");
+    const comparison = chartData.conventional_comparison;
+    if (!canvas || !comparison) return;
+    drawChart(
+      canvas,
+      comparison.steps,
+      [{
+        label: comparison.label,
+        values: comparison.values,
+        color: COLORS.gray,
+        width: 2.8,
+        endDot: true,
+        smoothingRadius: 4,
+      }],
+      {
+        yMin: 24,
+        yMax: 87,
+        yTicks: [30, 40, 50, 60, 70, 80],
+        yLabel: "weight L2 norm",
+        transitions: [12000, 50000],
+      },
+    );
+  }
+
   function renderSetupChart() {
     const canvas = document.getElementById("setupChart");
     if (!canvas) return;
@@ -309,6 +334,7 @@
   function renderAll() {
     if (!chartData) return;
     renderFocusChart();
+    renderWeightNormChart();
     renderLayerChart();
     renderSetupChart();
   }
@@ -347,7 +373,7 @@
     : Promise.resolve();
 
   Promise.all([
-    fetch("data/blog-attention-entropy.json").then((response) => {
+    fetch("data/blog-attention-entropy.json?v=2").then((response) => {
       if (!response.ok) throw new Error(`Curve data request failed: ${response.status}`);
       return response.json();
     }),

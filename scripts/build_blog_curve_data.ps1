@@ -69,6 +69,51 @@ function Get-AttentionEntropyRecords {
   return $records
 }
 
+function Get-ObservableRecord {
+  param(
+    [string]$ManifestPath,
+    [string]$Id
+  )
+
+  $reader = [System.IO.StreamReader]::new($ManifestPath)
+  try {
+    $capturing = $false
+    $depth = 0
+    $builder = $null
+
+    while (($line = $reader.ReadLine()) -ne $null) {
+      if (-not $capturing) {
+        $match = [regex]::Match($line, '^\s*"id": "([^"]+)"')
+        if (-not $match.Success -or $match.Groups[1].Value -ne $Id) {
+          continue
+        }
+
+        $capturing = $true
+        $depth = 1
+        $builder = [System.Text.StringBuilder]::new()
+        [void]$builder.AppendLine("{")
+      }
+
+      [void]$builder.AppendLine($line)
+      $depth += ([regex]::Matches($line, '\{')).Count
+      $depth -= ([regex]::Matches($line, '\}')).Count
+
+      if ($depth -ne 0) { continue }
+
+      $json = $builder.ToString().TrimEnd()
+      if ($json.EndsWith(",")) {
+        $json = $json.Substring(0, $json.Length - 1)
+      }
+      return $json | ConvertFrom-Json
+    }
+  }
+  finally {
+    $reader.Dispose()
+  }
+
+  throw "Missing observable record $Id in $ManifestPath"
+}
+
 function Get-RoundedNumbers {
   param([object[]]$Values)
   $result = [System.Collections.Generic.List[double]]::new()
@@ -101,6 +146,7 @@ $output = [ordered]@{
   recorded_through_step = 100000
   steps = $null
   runs = [ordered]@{}
+  conventional_comparison = $null
 }
 
 foreach ($run in $runDefinitions) {
@@ -124,6 +170,17 @@ foreach ($run in $runDefinitions) {
     label = $run.label
     layers = $layerValues
   }
+}
+
+$baselineManifest = Join-Path $projectRoot "data/baseline/manifest.json"
+$weightNormRecord = Get-ObservableRecord `
+  -ManifestPath $baselineManifest `
+  -Id "weight::transformer.h.1.attn.c_attn.weight::-::l2_norm::-"
+$output.conventional_comparison = [ordered]@{
+  metric = "weight_l2_norm"
+  label = "Block 1 QKV projection weight L2 norm"
+  steps = Get-RoundedNumbers -Values $weightNormRecord.series.steps
+  values = Get-RoundedNumbers -Values $weightNormRecord.series.values
 }
 
 $resolvedOutput = Join-Path $projectRoot $OutputPath
