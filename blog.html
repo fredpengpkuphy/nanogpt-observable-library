@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5.3.0/index.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5.3.0/index.css">
-  <link rel="stylesheet" href="css/blog.css?v=7">
+  <link rel="stylesheet" href="css/blog.css?v=8">
 </head>
 <body>
   <header class="site-header">
@@ -43,9 +43,8 @@
           </p>
           <h1 id="pageTitle">Observe learning<br>in full.</h1>
           <p class="hero-deck">
-            Grokking and scaling laws taught us that learning can change regimes.
-            But familiar curves show only part of the story. This library opens up
-            the less familiar signals where more of those changes may be hiding.
+            A visual library for navigating nanoGPT from its architecture to the
+            internal signals that change while it learns.
           </p>
           <div class="hero-actions">
             <a class="hero-action is-primary" href="select.html">Start exploring <span aria-hidden="true">↗</span></a>
@@ -81,10 +80,10 @@
             <p>On this page</p>
             <a class="is-current" href="#abstract">Abstract</a>
             <a href="#motivation">Why more observables</a>
-            <a href="#workflow">Explore the library</a>
             <a href="#observation">A hidden phase structure</a>
             <a href="#layers">Across layers</a>
             <a href="#setups">Across setups</a>
+            <a href="#workflow">Explore the library</a>
             <a href="#feedback">Share what you find</a>
             <a href="#looking-forward">What comes next</a>
           </div>
@@ -146,54 +145,6 @@
             </figcaption>
           </figure>
 
-          <div class="facts-table" aria-label="Observable Library dataset summary">
-            <p class="table-caption">Karpathy nanoGPT, measured end to end</p>
-            <dl>
-              <div><dt>Reference setup</dt><dd>Standard Karpathy nanoGPT GPT-2 training on OpenWebText</dd></div>
-              <div><dt>Architecture</dt><dd>12 layers · 12 heads · 768 embedding dimensions · 1,024-token context</dd></div>
-              <div><dt>Training</dt><dd>AdamW · 2,000-step warmup · cosine learning-rate decay</dd></div>
-              <div><dt>Coverage</dt><dd>1,820 curves recorded through step 100,000</dd></div>
-            </dl>
-          </div>
-
-          <ol class="workflow-list" id="workflow">
-            <li>
-              <span>01</span>
-              <h3>Choose a setup</h3>
-              <p>Open the exact model, optimizer, and schedule configuration for every recorded run.</p>
-            </li>
-            <li>
-              <span>02</span>
-              <h3>Navigate the model</h3>
-              <p>Move through embeddings, every transformer block and submodule, layer normalization, and the output head.</p>
-            </li>
-            <li>
-              <span>03</span>
-              <h3>Inspect a signal</h3>
-              <p>Read definitions and recorded histories for weights, gradients, updates, activations, attention, and loss.</p>
-            </li>
-            <li>
-              <span>04</span>
-              <h3>Compare and share</h3>
-              <p>Overlay layers or setups on shared axes, focus a step range, and preserve an annotated finding as a discovery.</p>
-            </li>
-          </ol>
-
-          <div class="setup-config-shell">
-            <table class="setup-config-table">
-              <caption>Three controlled training setups</caption>
-              <thead>
-                <tr><th>Setup</th><th>Layers</th><th>Warmup</th><th>Change from reference</th></tr>
-              </thead>
-              <tbody>
-                <tr><td>Baseline</td><td>12</td><td>2,000 steps</td><td>Standard Karpathy nanoGPT</td></tr>
-                <tr><td>6-layer nanoGPT</td><td>6</td><td>2,000 steps</td><td>Model depth only</td></tr>
-                <tr><td>No LR warmup</td><td>12</td><td>0 steps</td><td>Warmup schedule only</td></tr>
-              </tbody>
-            </table>
-            <p>All other recorded settings follow the same reference setup where applicable.</p>
-          </div>
-
           <section class="prose" id="observation" aria-labelledby="observationTitle">
             <p class="section-kicker">A hidden phase structure</p>
             <h2 id="observationTitle">Block 1 undergoes a sequence of phase transitions.</h2>
@@ -252,6 +203,20 @@
                 learning-rate warmup.
               </p>
             </div>
+            <div class="setup-config-shell">
+              <table class="setup-config-table">
+                <caption>Three controlled training setups</caption>
+                <thead>
+                  <tr><th>Setup</th><th>Layers</th><th>Warmup</th><th>Change from reference</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Baseline</td><td>12</td><td>2,000 steps</td><td>Standard Karpathy nanoGPT</td></tr>
+                  <tr><td>6-layer nanoGPT</td><td>6</td><td>2,000 steps</td><td>Model depth only</td></tr>
+                  <tr><td>No LR warmup</td><td>12</td><td>0 steps</td><td>Warmup schedule only</td></tr>
+                </tbody>
+              </table>
+              <p>All other recorded settings follow the same reference setup where applicable.</p>
+            </div>
             <figure class="data-figure">
               <div class="figure-toolbar">
                 <div>
@@ -277,6 +242,51 @@
                 <p><strong>The levels are distributed across different trajectories.</strong> Baseline moves through ≈4 then ≈2; the 6-layer run settles near ≈2 early, while the no-warmup run rebounds toward ≈4.</p>
               </figcaption>
             </figure>
+          </section>
+
+          <section class="library-section" id="workflow" aria-labelledby="workflowTitle">
+            <div class="prose library-intro">
+              <p class="section-kicker">Explore the library</p>
+              <h2 id="workflowTitle">Follow a signal from first glance to a shared finding.</h2>
+              <p>
+                The example above is one path through the library. Use the same tools
+                to move from a training setup to a module, inspect an observable, and
+                compare the pattern across depth or experimental conditions.
+              </p>
+            </div>
+
+            <div class="facts-table" aria-label="Observable Library dataset summary">
+              <p class="table-caption">Karpathy nanoGPT, measured end to end</p>
+              <dl>
+                <div><dt>Reference setup</dt><dd>Standard Karpathy nanoGPT GPT-2 training on OpenWebText</dd></div>
+                <div><dt>Architecture</dt><dd>12 layers · 12 heads · 768 embedding dimensions · 1,024-token context</dd></div>
+                <div><dt>Training</dt><dd>AdamW · 2,000-step warmup · cosine learning-rate decay</dd></div>
+                <div><dt>Coverage</dt><dd>1,820 curves recorded through step 100,000</dd></div>
+              </dl>
+            </div>
+
+            <ol class="workflow-list">
+              <li>
+                <span>01</span>
+                <h3>Choose a setup</h3>
+                <p>Open the exact model, optimizer, and schedule configuration for every recorded run.</p>
+              </li>
+              <li>
+                <span>02</span>
+                <h3>Navigate the model</h3>
+                <p>Move through embeddings, every transformer block and submodule, layer normalization, and the output head.</p>
+              </li>
+              <li>
+                <span>03</span>
+                <h3>Inspect a signal</h3>
+                <p>Read definitions and recorded histories for weights, gradients, updates, activations, attention, and loss.</p>
+              </li>
+              <li>
+                <span>04</span>
+                <h3>Compare and share</h3>
+                <p>Overlay layers or setups on shared axes, focus a step range, and preserve an annotated finding as a discovery.</p>
+              </li>
+            </ol>
           </section>
 
           <section class="feedback-section" id="feedback" aria-labelledby="feedbackTitle">
