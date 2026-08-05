@@ -226,9 +226,9 @@
         yTicks: [2, 3, 4, 5, 6],
         transitions: [12000, 50000],
         bands: [
-          { start: 1500, end: 12000, label: ["plateau around 4", "(baseline)"], fill: "rgba(153, 141, 199, 0.10)", text: COLORS.sand },
-          { start: 18000, end: 50000, label: ["plateau around 2", "(baseline)"], fill: "rgba(119, 20, 207, 0.07)", text: COLORS.ice },
-          { start: 50000, end: 100000, label: ["rises toward 2.5", "(baseline)"], fill: "rgba(77, 152, 113, 0.07)", text: COLORS.green },
+          { start: 1500, end: 12000, label: "plateau around 4", fill: "rgba(153, 141, 199, 0.10)", text: COLORS.sand },
+          { start: 18000, end: 50000, label: "plateau around 2", fill: "rgba(119, 20, 207, 0.07)", text: COLORS.ice },
+          { start: 50000, end: 100000, label: "rises toward 2.5", fill: "rgba(77, 152, 113, 0.07)", text: COLORS.green },
         ],
       },
     );
