@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5.3.0/index.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5.3.0/index.css">
-  <link rel="stylesheet" href="css/blog.css?v=13">
+  <link rel="stylesheet" href="css/blog.css?v=14">
 </head>
 <body>
   <header class="site-header">
@@ -296,6 +296,66 @@
                 <p>Overlay layers or setups on shared axes, focus a step range, and preserve an annotated finding as a discovery.</p>
               </li>
             </ol>
+
+            <figure class="library-product-figure">
+              <div class="interface-shot explorer-interface-shot" aria-hidden="true">
+                <div class="explorer-shot-header">
+                  <div>
+                    <strong>nanoGPT Observable Explorer</strong>
+                    <span>Baseline · 1,820 observables</span>
+                  </div>
+                  <div class="shot-actions"><span>Training config</span><span>Formulas</span><span>Discoveries</span></div>
+                </div>
+                <div class="explorer-shot-body">
+                  <aside class="explorer-shot-nav">
+                    <div class="explorer-shot-nav-head"><strong>Model architecture</strong><span>12 blocks</span></div>
+                    <div class="explorer-shot-node"><i></i><span>Token embeddings</span></div>
+                    <div class="explorer-shot-node"><i></i><span>Position embeddings</span></div>
+                    <div class="explorer-shot-block is-active">
+                      <div><b>01</b><strong>Transformer block</strong></div>
+                      <span>Layer norm</span>
+                      <span class="is-selected">Attention</span>
+                      <span>MLP</span>
+                    </div>
+                    <div class="explorer-shot-block"><div><b>02</b><strong>Transformer block</strong></div></div>
+                    <div class="explorer-shot-block"><div><b>03</b><strong>Transformer block</strong></div></div>
+                    <div class="explorer-shot-fade">· &nbsp; · &nbsp; ·</div>
+                  </aside>
+                  <div class="explorer-shot-detail">
+                    <div class="explorer-shot-title">
+                      <div><strong>Block 1 · Attention</strong><span>transformer.h.1.attn</span></div>
+                      <span class="explorer-shot-chip">Attention</span>
+                    </div>
+                    <div class="explorer-shot-observables">
+                      <span class="is-active">Mean attention entropy</span>
+                      <span>Attention sink</span>
+                      <span>Maximum attention</span>
+                    </div>
+                    <div class="explorer-shot-chart-head">
+                      <div><strong>attention_entropy_mean</strong><span>Mean entropy across attention heads and token positions</span></div>
+                      <div class="shot-actions"><span>Linear</span><span>Step</span><span>Expand</span></div>
+                    </div>
+                    <div class="explorer-shot-chart">
+                      <svg viewBox="0 0 720 250" preserveAspectRatio="none">
+                        <g class="shot-grid">
+                          <path d="M52 20V212M52 212H704M52 164H704M52 116H704M52 68H704M215 20V212M378 20V212M541 20V212M704 20V212" />
+                        </g>
+                        <path class="shot-curve" d="M52 47 C90 36 132 38 174 46 S220 80 250 120 S312 167 367 169 S466 164 518 150 S606 133 704 128" />
+                        <circle cx="704" cy="128" r="5" />
+                      </svg>
+                      <div class="explorer-shot-y-axis"><span>2</span><span>4</span><span>6</span></div>
+                      <div class="explorer-shot-x-axis"><span>0</span><span>25k</span><span>50k</span><span>75k</span><span>100k</span></div>
+                    </div>
+                    <p class="explorer-shot-hint">Scroll to zoom · Alt+drag to pan · double-click to reset</p>
+                  </div>
+                </div>
+              </div>
+              <figcaption>
+                <span>Explorer interface</span>
+                <p>Navigate from a transformer module to its recorded observables, then inspect the complete curve on shared training-step axes.</p>
+                <a href="explorer.html?run=baseline&amp;spec=attention%3A%3Atransformer.h.1.attn%3A%3A-%3A%3Aattention_entropy_mean%3A%3A-">Open this curve <span aria-hidden="true">↗</span></a>
+              </figcaption>
+            </figure>
 
             <div class="facts-table" aria-label="Observable Library dataset summary">
               <p class="table-caption">The current reference dataset</p>

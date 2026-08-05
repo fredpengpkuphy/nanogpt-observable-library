@@ -760,6 +760,283 @@ p {
   margin-top: 54px;
 }
 
+.library-product-figure {
+  width: 100%;
+  margin: 32px 0 0;
+}
+
+.explorer-interface-shot {
+  min-height: 430px;
+}
+
+.explorer-shot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 58px;
+  padding: 11px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(10, 16, 20, 0.96);
+}
+
+.explorer-shot-header > div:first-child,
+.explorer-shot-title > div,
+.explorer-shot-chart-head > div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.explorer-shot-header strong,
+.explorer-shot-title strong,
+.explorer-shot-chart-head strong {
+  overflow: hidden;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.explorer-shot-header span,
+.explorer-shot-title span,
+.explorer-shot-chart-head span,
+.explorer-shot-hint {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 8px;
+}
+
+.explorer-shot-body {
+  display: grid;
+  grid-template-columns: 185px minmax(0, 1fr);
+  min-height: 370px;
+}
+
+.explorer-shot-nav {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 10px;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(18, 26, 33, 0.92);
+}
+
+.explorer-shot-nav-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 4px;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.explorer-shot-node,
+.explorer-shot-block > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.explorer-shot-node,
+.explorer-shot-block {
+  padding: 7px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.66);
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 7px;
+}
+
+.explorer-shot-node i {
+  width: 7px;
+  height: 7px;
+  border: 1px solid #e0c08a;
+  border-radius: 2px;
+}
+
+.explorer-shot-block {
+  display: grid;
+  gap: 4px;
+}
+
+.explorer-shot-block b {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #0a1014;
+  background: #9fd4e4;
+  font-size: 7px;
+}
+
+.explorer-shot-block strong {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 7px;
+}
+
+.explorer-shot-block > span {
+  margin-left: 25px;
+  padding: 3px 5px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.explorer-shot-block.is-active {
+  border-color: rgba(159, 212, 228, 0.36);
+  background: rgba(159, 212, 228, 0.06);
+}
+
+.explorer-shot-block .is-selected {
+  border-left-color: #e0c08a;
+  color: #fff;
+  background: rgba(224, 192, 138, 0.09);
+}
+
+.explorer-shot-fade {
+  color: rgba(255, 255, 255, 0.32);
+  text-align: center;
+}
+
+.explorer-shot-detail {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 14px;
+  background: #0e151a;
+}
+
+.explorer-shot-title,
+.explorer-shot-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.explorer-shot-chip {
+  padding: 4px 7px;
+  border: 1px solid rgba(159, 212, 228, 0.32);
+  border-radius: 999px;
+  color: #9fd4e4 !important;
+  background: rgba(159, 212, 228, 0.08);
+}
+
+.explorer-shot-observables {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 13px 0;
+}
+
+.explorer-shot-observables span {
+  padding: 5px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 7px;
+}
+
+.explorer-shot-observables .is-active {
+  border-color: rgba(224, 192, 138, 0.42);
+  color: #fff;
+  background: rgba(224, 192, 138, 0.1);
+}
+
+.explorer-shot-chart-head {
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: rgba(18, 26, 33, 0.92);
+}
+
+.explorer-shot-chart {
+  position: relative;
+  flex: 1;
+  min-height: 210px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0 0 6px 6px;
+  background: rgba(7, 12, 16, 0.72);
+}
+
+.explorer-shot-chart svg {
+  display: block;
+  width: 100%;
+  height: 220px;
+  padding: 4px 8px 9px;
+}
+
+.explorer-shot-y-axis {
+  position: absolute;
+  top: 22px;
+  bottom: 40px;
+  left: 12px;
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: space-between;
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 7px;
+}
+
+.explorer-shot-x-axis {
+  position: absolute;
+  right: 12px;
+  bottom: 9px;
+  left: 42px;
+  display: flex;
+  justify-content: space-between;
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 7px;
+}
+
+.explorer-shot-hint {
+  margin: 7px 0 0;
+  text-align: right;
+}
+
+.library-product-figure figcaption {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 18px;
+  padding: 14px 2px 0;
+}
+
+.library-product-figure figcaption > span {
+  color: var(--brand);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.library-product-figure figcaption p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.library-product-figure figcaption a {
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 620;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.library-product-figure figcaption a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .feedback-section {
   width: min(var(--media), 100%);
   margin: 112px auto 0;
@@ -1355,6 +1632,19 @@ p {
     grid-column: 2;
   }
 
+  .explorer-shot-body {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
+  .library-product-figure figcaption {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .library-product-figure figcaption a {
+    justify-self: start;
+  }
+
   .figure-intro {
     margin-bottom: 30px;
   }
@@ -1400,6 +1690,26 @@ p {
   .notes-shot-body,
   .shot-discovery-grid {
     grid-template-columns: 1fr;
+  }
+
+  .explorer-shot-body {
+    grid-template-columns: 1fr;
+  }
+
+  .explorer-shot-nav {
+    display: none;
+  }
+
+  .explorer-shot-detail {
+    padding: 10px;
+  }
+
+  .explorer-shot-observables span:not(.is-active) {
+    display: none;
+  }
+
+  .explorer-shot-chart svg {
+    height: 180px;
   }
 
   .shot-chart svg {
