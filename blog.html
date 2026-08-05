@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5.3.0/index.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5.3.0/index.css">
-  <link rel="stylesheet" href="css/blog.css?v=15">
+  <link rel="stylesheet" href="css/blog.css?v=16">
 </head>
 <body>
   <header class="site-header">
@@ -135,7 +135,8 @@
         <aside class="contents" aria-label="On this page">
           <div>
             <p>On this page</p>
-            <a class="is-current" href="#abstract">Abstract</a>
+            <a class="is-current" href="#authors">Authors</a>
+            <a href="#abstract">Abstract</a>
             <a href="#motivation">Why more observables</a>
             <a href="#observation">Attention entropy</a>
             <a href="#layers">Across layers</a>
@@ -148,6 +149,18 @@
         </aside>
 
         <div class="article-main">
+          <section class="authors-section" id="authors" aria-labelledby="authorsTitle">
+            <h2 id="authorsTitle">Authors</h2>
+            <p class="author-names">
+              <span>Zirui Peng<sup>*</sup></span>
+              <span>Ziming Liu<sup>&dagger;</sup></span>
+            </p>
+            <p class="author-roles">
+              <span><sup>*</sup> Core contributor</span>
+              <span><sup>&dagger;</sup> Corresponding author</span>
+            </p>
+          </section>
+
           <aside class="abstract-card" id="abstract">
             <h2>Abstract</h2>
             <p>
@@ -574,11 +587,6 @@
   </main>
 
   <footer class="site-footer">
-    <div class="footer-authors">
-      <p class="footer-label">Author list</p>
-      <p class="author-names"><span>Zirui Peng<sup>*</sup></span><span>Ziming Liu<sup>&dagger;</sup></span></p>
-      <p class="author-roles"><span><sup>*</sup> Core contributor</span><span><sup>&dagger;</sup> Corresponding author</span></p>
-    </div>
     <div class="footer-contact">
       <p class="footer-label">Contact</p>
       <a href="mailto:fredpengphy@stu.pku.edu.cn">fredpengphy@stu.pku.edu.cn</a>
