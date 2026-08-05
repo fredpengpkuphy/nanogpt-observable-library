@@ -773,20 +773,29 @@ p {
 
 .feedback-paths {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: 1fr;
+  gap: 24px;
   margin-top: 42px;
 }
 
 .feedback-paths article {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1.45fr);
+  align-items: center;
+  gap: 30px;
   min-width: 0;
-  flex-direction: column;
   padding: 28px;
   border: 1px solid var(--rule);
   border-radius: 8px;
   background: var(--surface);
   box-shadow: 0 14px 36px rgba(41, 37, 45, 0.05);
+}
+
+.feedback-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-self: stretch;
 }
 
 .feedback-number {
@@ -827,7 +836,7 @@ p {
   font-weight: 620;
 }
 
-.feedback-paths article > a {
+.feedback-copy > a {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
@@ -839,13 +848,292 @@ p {
   text-decoration: none;
 }
 
-.feedback-paths article > a:hover {
+.feedback-copy > a:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-.feedback-paths article > a span {
+.feedback-copy > a span {
   font-size: 11px;
+}
+
+.interface-shot {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  color: #fff;
+  background: #0e151a;
+  box-shadow: 0 18px 42px rgba(26, 22, 30, 0.22);
+  font-family: "Geist Variable", "Segoe UI", sans-serif;
+  pointer-events: none;
+  user-select: none;
+}
+
+.shot-toolbar,
+.shot-page-head,
+.shot-rail-head,
+.shot-publish-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.shot-toolbar {
+  min-height: 54px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(18, 26, 33, 0.96);
+}
+
+.shot-toolbar > div:first-child,
+.shot-page-head > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.shot-toolbar strong,
+.shot-page-head strong {
+  overflow: hidden;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shot-toolbar span,
+.shot-page-head span,
+.shot-publish-row span {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 8px;
+}
+
+.shot-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.shot-actions span,
+.shot-note-row b,
+.shot-publish-row b {
+  padding: 4px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.notes-shot-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(145px, 0.9fr);
+  min-height: 246px;
+  padding: 10px;
+  gap: 8px;
+}
+
+.shot-chart {
+  position: relative;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(7, 12, 16, 0.7);
+}
+
+.shot-chart svg {
+  display: block;
+  width: 100%;
+  height: 208px;
+  padding: 7px;
+}
+
+.shot-grid {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1;
+}
+
+.shot-curve {
+  fill: none;
+  stroke: #9fd4e4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.shot-chart circle {
+  fill: #e0c08a;
+}
+
+.shot-chart-label {
+  position: absolute;
+  top: 23px;
+  bottom: 49px;
+  left: 10px;
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: space-between;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 7px;
+}
+
+.shot-chart > p {
+  position: absolute;
+  right: 11px;
+  bottom: 7px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 7px;
+}
+
+.shot-notes-rail {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 6px;
+  background: #182229;
+}
+
+.shot-rail-head strong {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.shot-rail-head span,
+.shot-notes-rail p {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 7px;
+}
+
+.shot-notes-rail label,
+.discovery-interface-shot label {
+  display: grid;
+  gap: 3px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 7px;
+  font-weight: 600;
+}
+
+.shot-notes-rail em,
+.discovery-interface-shot em {
+  color: rgba(255, 255, 255, 0.42);
+  font-style: normal;
+  font-weight: 400;
+}
+
+.shot-input,
+.shot-textarea {
+  display: block;
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.44);
+  background: rgba(7, 12, 16, 0.72);
+  font-size: 7px;
+  font-weight: 400;
+}
+
+.shot-notes-rail > .shot-textarea {
+  min-height: 47px;
+}
+
+.shot-attach {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.shot-note-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.53);
+  font-size: 7px;
+}
+
+.shot-note-row b,
+.shot-publish-row b {
+  border-color: rgba(159, 212, 228, 0.4);
+  color: #fff;
+  background: rgba(159, 212, 228, 0.14);
+}
+
+.shot-notes-rail p {
+  margin: 1px 0 0;
+  line-height: 1.4;
+}
+
+.discovery-interface-shot {
+  display: grid;
+  gap: 9px;
+  padding: 14px;
+}
+
+.shot-page-head {
+  align-items: flex-start;
+  padding-bottom: 2px;
+}
+
+.shot-page-head > div {
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+.shot-page-head strong {
+  font-family: Georgia, serif;
+  font-size: 15px;
+}
+
+.shot-page-head > div span {
+  color: #e0c08a;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.discovery-interface-shot > label > .shot-textarea {
+  min-height: 51px;
+  font-family: Georgia, serif;
+  line-height: 1.45;
+}
+
+.discovery-interface-shot fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 9px;
+  border: 1px solid rgba(159, 212, 228, 0.24);
+  border-radius: 7px;
+  background: rgba(159, 212, 228, 0.035);
+}
+
+.discovery-interface-shot legend {
+  padding: 0 4px;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.shot-discovery-grid {
+  display: grid;
+  grid-template-columns: 0.8fr 1.1fr 1fr;
+  gap: 6px;
+}
+
+.shot-publish-row b {
+  padding: 6px 8px;
 }
 
 .feedback-aside {
@@ -1090,7 +1378,12 @@ p {
   }
 
   .feedback-paths article {
+    grid-template-columns: 1fr;
     padding: 23px 21px;
+  }
+
+  .notes-shot-body {
+    grid-template-columns: minmax(0, 1.45fr) minmax(138px, 0.85fr);
   }
 
   .closing-section {
@@ -1100,6 +1393,21 @@ p {
   .site-footer {
     width: calc(100% - 36px);
     padding: 28px 0 34px;
+  }
+}
+
+@media (max-width: 480px) {
+  .notes-shot-body,
+  .shot-discovery-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .shot-chart svg {
+    height: 170px;
+  }
+
+  .shot-actions span:nth-child(-n + 2) {
+    display: none;
   }
 }
 

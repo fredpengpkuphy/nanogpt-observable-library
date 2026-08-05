@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5.3.0/index.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5.3.0/index.css">
-  <link rel="stylesheet" href="css/blog.css?v=12">
+  <link rel="stylesheet" href="css/blog.css?v=13">
 </head>
 <body>
   <header class="site-header">
@@ -233,7 +233,7 @@
               </div>
               <figcaption class="key-caption">
                 <span>Figure 04</span>
-                <p><strong>The levels are distributed across different trajectories.</strong> Baseline moves through ≈4 then ≈2; the 6-layer run settles near ≈2 early, while the no-warmup run rebounds toward ≈4.</p>
+                <p><strong>The levels are distributed across different trajectories.</strong> The baseline plateaus around 4 and then around 2; the 6-layer run plateaus around 2 early, while the no-warmup run rebounds toward 4.</p>
               </figcaption>
             </figure>
             <div class="setup-config-shell setup-config-after-figure">
@@ -321,24 +321,76 @@
 
             <div class="feedback-paths">
               <article>
-                <span class="feedback-number">01 · Quick signal</span>
-                <h3>Leave a note on the curve</h3>
-                <ol>
-                  <li>Open a curve in the Explorer and expand the chart.</li>
-                  <li>Use the <strong>Notes</strong> panel to tag the whole curve, one step, or a step range.</li>
-                  <li>Post the observation. Others can jump to the same region and reply in place.</li>
-                </ol>
+                <div class="feedback-copy">
+                  <span class="feedback-number">01 · Quick signal</span>
+                  <h3>Leave a note on the curve</h3>
+                  <ol>
+                    <li>Open a curve in the Explorer and expand the chart.</li>
+                    <li>Use the <strong>Notes</strong> panel to tag the whole curve, one step, or a step range.</li>
+                    <li>Post the observation. Others can jump to the same region and reply in place.</li>
+                  </ol>
+                  <a href="explorer.html?run=baseline&amp;spec=attention%3A%3Atransformer.h.1.attn%3A%3A-%3A%3Aattention_entropy_mean%3A%3A-&amp;focus=1">Open the Notes interface <span aria-hidden="true">↗</span></a>
+                </div>
+                <div class="interface-shot notes-interface-shot" aria-hidden="true">
+                  <div class="shot-toolbar">
+                    <div>
+                      <strong>attention_entropy_mean</strong>
+                      <span>Baseline · Block 1 attention</span>
+                    </div>
+                    <div class="shot-actions"><span>Linear</span><span>Step</span><span>Note</span><span>Reset</span></div>
+                  </div>
+                  <div class="notes-shot-body">
+                    <div class="shot-chart">
+                      <svg viewBox="0 0 420 210" preserveAspectRatio="none">
+                        <g class="shot-grid">
+                          <path d="M38 18V182M38 182H406M38 142H406M38 102H406M38 62H406M130 18V182M222 18V182M314 18V182M406 18V182" />
+                        </g>
+                        <path class="shot-curve" d="M38 44 C64 35 88 34 112 43 S140 78 158 108 S196 142 224 143 S277 139 304 128 S354 113 406 110" />
+                        <circle cx="224" cy="143" r="4" />
+                      </svg>
+                      <div class="shot-chart-label"><span>2</span><span>4</span><span>6</span></div>
+                      <p>Click the curve to tag a step</p>
+                    </div>
+                    <div class="shot-notes-rail">
+                      <div class="shot-rail-head"><strong>Notes</strong><span>⤢ &nbsp; ↻</span></div>
+                      <div class="shot-textarea">Leave a note on this curve…</div>
+                      <label>Leave your name <em>(optional)</em><span class="shot-input">Your name</span></label>
+                      <label class="shot-attach">Attach to <span class="shot-input">Step range⌄</span></label>
+                      <div class="shot-note-row"><span>18,000 — 50,000</span><b>Post</b></div>
+                      <p>No notes yet. Write one above, or click the chart to tag a step.</p>
+                    </div>
+                  </div>
+                </div>
               </article>
 
               <article>
-                <span class="feedback-number">02 · Developed finding</span>
-                <h3>Publish a discovery</h3>
-                <ol>
-                  <li>Open <strong>Discoveries</strong> and describe what you found and why it matters.</li>
-                  <li>Add up to six curve regions across setups, layers, or observables as evidence.</li>
-                  <li>Publish it to the research log, where the evidence and discussion stay together.</li>
-                </ol>
-                <a href="discoveries.html">Document a discovery <span aria-hidden="true">↗</span></a>
+                <div class="feedback-copy">
+                  <span class="feedback-number">02 · Developed finding</span>
+                  <h3>Publish a discovery</h3>
+                  <ol>
+                    <li>Open <strong>Discoveries</strong> and describe what you found and why it matters.</li>
+                    <li>Add up to six curve regions across setups, layers, or observables as evidence.</li>
+                    <li>Publish it to the research log, where the evidence and discussion stay together.</li>
+                  </ol>
+                  <a href="discoveries.html">Document a discovery <span aria-hidden="true">↗</span></a>
+                </div>
+                <div class="interface-shot discovery-interface-shot" aria-hidden="true">
+                  <div class="shot-page-head">
+                    <div><strong>Document a discovery</strong><span>Share a finding</span></div>
+                    <span>Up to 6 curves per chart</span>
+                  </div>
+                  <label>Title<span class="shot-input">A concise statement of the finding</span></label>
+                  <label>Detailed finding<span class="shot-textarea">Describe what you found, why it matters, and how the evidence supports it…</span></label>
+                  <fieldset>
+                    <legend>Add curves to one chart <em>(optional)</em></legend>
+                    <div class="shot-discovery-grid">
+                      <label>Setup<span class="shot-input">Baseline⌄</span></label>
+                      <label>Layer / module<span class="shot-input">Block 1 · Attention⌄</span></label>
+                      <label>Observable<span class="shot-input">Attention entropy⌄</span></label>
+                    </div>
+                  </fieldset>
+                  <div class="shot-publish-row"><span>Discoveries and replies are public.</span><b>Publish discovery</b></div>
+                </div>
               </article>
             </div>
 
@@ -372,6 +424,6 @@
     <p>For inquiries, reach us at <a href="mailto:zmliu@tsinghua.edu.cn">zmliu@tsinghua.edu.cn</a></p>
   </footer>
 
-  <script src="js/blog-charts.js?v=5"></script>
+  <script src="js/blog-charts.js?v=6"></script>
 </body>
 </html>

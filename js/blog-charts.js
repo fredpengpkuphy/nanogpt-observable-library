@@ -77,7 +77,10 @@
       ctx.fillStyle = band.text;
       ctx.font = `650 ${compact ? 10 : 11}px "Geist Mono Variable", monospace`;
       ctx.textAlign = "center";
-      ctx.fillText(band.label, (left + right) / 2, plot.top + 18);
+      const labelLines = Array.isArray(band.label) ? band.label : [band.label];
+      labelLines.forEach((line, index) => {
+        ctx.fillText(line, (left + right) / 2, plot.top + 18 + index * (compact ? 12 : 13));
+      });
     });
 
     const xTicks = compact ? [0, 50000, 100000] : [0, 25000, 50000, 75000, 100000];
@@ -223,9 +226,9 @@
         yTicks: [2, 3, 4, 5, 6],
         transitions: [12000, 50000],
         bands: [
-          { start: 1500, end: 12000, label: "≈ 4 plateau", fill: "rgba(153, 141, 199, 0.10)", text: COLORS.sand },
-          { start: 18000, end: 50000, label: "≈ 2 plateau", fill: "rgba(119, 20, 207, 0.07)", text: COLORS.ice },
-          { start: 50000, end: 100000, label: "toward 2.5", fill: "rgba(77, 152, 113, 0.07)", text: COLORS.green },
+          { start: 1500, end: 12000, label: ["plateau around 4", "(baseline)"], fill: "rgba(153, 141, 199, 0.10)", text: COLORS.sand },
+          { start: 18000, end: 50000, label: ["plateau around 2", "(baseline)"], fill: "rgba(119, 20, 207, 0.07)", text: COLORS.ice },
+          { start: 50000, end: 100000, label: ["rises toward 2.5", "(baseline)"], fill: "rgba(77, 152, 113, 0.07)", text: COLORS.green },
         ],
       },
     );
@@ -322,10 +325,10 @@
         yMax: 6.1,
         yTicks: [2, 3, 4, 5, 6],
         annotations: [
-          { step: 7000, value: 3.93, label: "≈4 · baseline", color: COLORS.ice, dx: 8, dy: -12 },
-          { step: 30000, value: 2.08, label: "≈2 · baseline", color: COLORS.ice, dx: 8, dy: -10 },
-          { step: 5000, value: 2, label: "≈2 · 6-layer", color: COLORS.gray, dx: 10, dy: 20 },
-          { step: 8000, value: 3.94, label: "≈4 · no warmup", color: COLORS.coral, dx: 8, dy: 18 },
+          { step: 7000, value: 3.93, label: "plateau around 4 (baseline)", color: COLORS.ice, dx: 8, dy: -12 },
+          { step: 30000, value: 2.08, label: "plateau around 2 (baseline)", color: COLORS.ice, dx: 8, dy: -10 },
+          { step: 5000, value: 2, label: "plateau around 2 (6-layer)", color: COLORS.gray, dx: 10, dy: 20 },
+          { step: 8000, value: 3.94, label: "rebounds toward 4 (no warmup)", color: COLORS.coral, dx: 8, dy: 18 },
         ],
       },
     );
