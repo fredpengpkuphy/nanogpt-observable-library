@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5.3.0/index.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5.3.0/index.css">
-  <link rel="stylesheet" href="css/blog.css?v=14">
+  <link rel="stylesheet" href="css/blog.css?v=15">
 </head>
 <body>
   <header class="site-header">
@@ -46,6 +46,85 @@
             A visual library for navigating nanoGPT from its architecture to the
             internal signals that change while it learns.
           </p>
+          <figure class="hero-observable-art" aria-label="An abstract composition of interwoven observable curves">
+            <svg viewBox="0 0 960 300" role="img" aria-labelledby="observableArtTitle observableArtDesc">
+              <title id="observableArtTitle">A field of observable curves</title>
+              <desc id="observableArtDesc">Dozens of colorful training curves cross, converge, and diverge to form an abstract landscape.</desc>
+              <defs>
+                <linearGradient id="observableViolet" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#bba6ed" stop-opacity=".16"/>
+                  <stop offset=".45" stop-color="#7714cf" stop-opacity=".92"/>
+                  <stop offset="1" stop-color="#a575dc" stop-opacity=".24"/>
+                </linearGradient>
+                <linearGradient id="observableCoral" x1="0" y1="1" x2="1" y2="0">
+                  <stop offset="0" stop-color="#d66a5e" stop-opacity=".08"/>
+                  <stop offset=".55" stop-color="#d66a5e" stop-opacity=".66"/>
+                  <stop offset="1" stop-color="#e7aa8f" stop-opacity=".16"/>
+                </linearGradient>
+                <linearGradient id="observableGreen" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#4d9871" stop-opacity=".08"/>
+                  <stop offset=".48" stop-color="#4d9871" stop-opacity=".62"/>
+                  <stop offset="1" stop-color="#a1cbb2" stop-opacity=".12"/>
+                </linearGradient>
+                <radialGradient id="observableGlow">
+                  <stop offset="0" stop-color="#d4c2fc" stop-opacity=".38"/>
+                  <stop offset="1" stop-color="#d4c2fc" stop-opacity="0"/>
+                </radialGradient>
+                <filter id="curveGlow" x="-20%" y="-40%" width="140%" height="180%">
+                  <feGaussianBlur stdDeviation="5"/>
+                </filter>
+                <clipPath id="observableClip">
+                  <rect x="1" y="1" width="958" height="298" rx="28"/>
+                </clipPath>
+              </defs>
+
+              <g clip-path="url(#observableClip)">
+                <rect width="960" height="300" fill="#fbfafc"/>
+                <ellipse cx="486" cy="148" rx="292" ry="184" fill="url(#observableGlow)"/>
+                <g class="observable-grid">
+                  <path d="M0 60H960M0 120H960M0 180H960M0 240H960"/>
+                  <path d="M120 0V300M240 0V300M360 0V300M480 0V300M600 0V300M720 0V300M840 0V300"/>
+                </g>
+                <g class="observable-halo" filter="url(#curveGlow)">
+                  <path d="M-30 244 C88 232 112 72 226 92 S359 254 471 177 S603 19 703 103 S836 264 990 77"/>
+                  <path d="M-15 86 C108 33 185 258 306 201 S454 40 565 95 S706 255 982 155"/>
+                </g>
+                <g class="observable-curves is-neutral">
+                  <path d="M-20 225 C86 209 105 142 184 151 S273 240 361 218 S463 72 561 103 S686 239 980 210"/>
+                  <path d="M-20 193 C78 171 141 41 231 75 S339 257 440 212 S521 28 639 78 S770 239 980 142"/>
+                  <path d="M-20 107 C102 151 166 236 272 216 S391 76 497 87 S622 215 733 202 S870 74 980 63"/>
+                  <path d="M-20 255 C96 242 144 211 225 221 S331 275 424 223 S496 92 604 119 S707 270 980 230"/>
+                  <path d="M-20 54 C82 79 131 170 224 160 S344 36 443 57 S534 210 648 190 S791 38 980 93"/>
+                  <path d="M-20 143 C102 99 166 115 259 151 S423 246 524 194 S632 70 735 97 S833 182 980 173"/>
+                  <path d="M-20 270 C96 278 183 101 278 126 S387 268 493 235 S591 55 711 82 S842 249 980 259"/>
+                  <path d="M-20 31 C97 21 179 204 279 181 S409 23 518 55 S629 219 742 175 S849 16 980 44"/>
+                </g>
+                <g class="observable-curves is-green">
+                  <path d="M-20 246 C76 236 159 53 259 89 S362 257 469 205 S552 38 669 73 S801 232 980 187"/>
+                  <path d="M-20 158 C100 182 165 260 272 229 S386 51 488 77 S606 255 723 219 S855 71 980 113"/>
+                  <path d="M-20 76 C92 54 150 243 251 203 S367 24 472 63 S577 248 690 206 S819 36 980 81"/>
+                </g>
+                <g class="observable-curves is-coral">
+                  <path d="M-20 207 C84 249 180 205 253 149 S356 61 450 102 S552 246 657 203 S755 48 980 121"/>
+                  <path d="M-20 122 C84 82 163 273 269 228 S377 34 482 86 S578 268 701 214 S828 73 980 104"/>
+                  <path d="M-20 279 C114 231 130 32 253 74 S365 272 485 207 S579 16 701 79 S823 263 980 232"/>
+                </g>
+                <g class="observable-curves is-violet">
+                  <path d="M-20 235 C101 219 140 62 241 83 S350 249 466 191 S561 20 678 81 S810 248 980 190"/>
+                  <path d="M-20 88 C102 39 169 250 279 211 S395 43 501 78 S604 244 717 211 S836 64 980 94"/>
+                  <path d="M-20 174 C91 119 183 112 271 157 S412 248 508 184 S604 58 718 104 S843 205 980 157"/>
+                </g>
+                <g class="observable-nodes">
+                  <circle cx="241" cy="83" r="4"/>
+                  <circle cx="466" cy="191" r="4"/>
+                  <circle cx="678" cy="81" r="4"/>
+                  <circle cx="717" cy="211" r="4"/>
+                </g>
+                <text class="observable-label" x="28" y="274">1,820 observable trajectories</text>
+                <text class="observable-axis-label" x="932" y="274" text-anchor="end">training →</text>
+              </g>
+            </svg>
+          </figure>
           <div class="hero-actions">
             <a class="hero-action is-primary" href="select.html">Start exploring <span aria-hidden="true">↗</span></a>
           </div>
@@ -83,6 +162,20 @@
               training setups shows why a broader observable vocabulary can reveal new
               questions about learning.
             </p>
+            <dl class="abstract-stats" aria-label="Observable Library at a glance">
+              <div>
+                <dt>1,820</dt>
+                <dd>observable curves</dd>
+              </div>
+              <div>
+                <dt>100k</dt>
+                <dd>training steps</dd>
+              </div>
+              <div>
+                <dt>12</dt>
+                <dd>transformer blocks</dd>
+              </div>
+            </dl>
           </aside>
 
           <section class="prose motivation-section" id="motivation" aria-labelledby="motivationTitle">
@@ -481,7 +574,15 @@
   </main>
 
   <footer class="site-footer">
-    <p>For inquiries, reach us at <a href="mailto:zmliu@tsinghua.edu.cn">zmliu@tsinghua.edu.cn</a></p>
+    <div class="footer-authors">
+      <p class="footer-label">Author list</p>
+      <p class="author-names"><span>Zirui Peng<sup>*</sup></span><span>Ziming Liu<sup>&dagger;</sup></span></p>
+      <p class="author-roles"><span><sup>*</sup> Core contributor</span><span><sup>&dagger;</sup> Corresponding author</span></p>
+    </div>
+    <div class="footer-contact">
+      <p class="footer-label">Contact</p>
+      <a href="mailto:fredpengphy@stu.pku.edu.cn">fredpengphy@stu.pku.edu.cn</a>
+    </div>
   </footer>
 
   <script src="js/blog-charts.js?v=7"></script>
