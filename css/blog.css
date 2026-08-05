@@ -275,28 +275,18 @@ p {
   stroke-width: 2;
 }
 
-.observable-axes text {
+.observable-label,
+.observable-axis-label {
   fill: rgba(81, 75, 84, 0.72);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 570;
   letter-spacing: 0.045em;
   text-transform: uppercase;
 }
 
-.observable-axes path {
-  fill: none;
-  stroke: rgba(41, 37, 45, 0.28);
-  stroke-linecap: round;
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
-.observable-axes .observable-x-title,
-.observable-axes .observable-y-title {
-  fill: rgba(81, 75, 84, 0.54);
-  font-size: 9px;
-  font-weight: 640;
+.observable-axis-label {
+  fill: rgba(81, 75, 84, 0.46);
 }
 
 .hero-actions {
@@ -583,16 +573,22 @@ p {
 }
 
 .abstract-stats {
-  display: block;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 27px 0 0;
   padding: 24px 0 0;
   border-top: 1px solid rgba(119, 20, 207, 0.18);
 }
 
 .abstract-stats > div {
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
+  min-width: 0;
+  padding: 0 22px;
+  border-left: 1px solid rgba(119, 20, 207, 0.15);
+}
+
+.abstract-stats > div:first-child {
+  padding-left: 0;
+  border-left: 0;
 }
 
 .abstract-stats dt {
@@ -1770,6 +1766,10 @@ p {
     font-size: 28px;
   }
 
+  .abstract-stats > div {
+    padding: 0 14px;
+  }
+
   .abstract-stats dd {
     font-size: 9px;
   }
@@ -1890,6 +1890,14 @@ p {
 
   .hero-observable-art {
     overflow: hidden;
+  }
+
+  .observable-label {
+    font-size: 12px;
+  }
+
+  .abstract-stats > div {
+    padding: 0 12px;
   }
 
   .abstract-stats dd {
