@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5.3.0/index.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5.3.0/index.css">
-  <link rel="stylesheet" href="css/blog.css?v=16">
+  <link rel="stylesheet" href="css/blog.css?v=17">
 </head>
 <body>
   <header class="site-header">
@@ -42,6 +42,10 @@
             <span>5 min read</span>
           </p>
           <h1 id="pageTitle">Observe learning<br>in full.</h1>
+          <div class="hero-authors" id="authors" aria-label="Authors">
+            <p class="byline-names"><span>Zirui Peng<sup>*</sup></span><span>Ziming Liu<sup>&dagger;</sup></span></p>
+            <p class="byline-roles"><span><sup>*</sup> Core contributor</span><i aria-hidden="true">·</i><span><sup>&dagger;</sup> Corresponding author</span></p>
+          </div>
           <p class="hero-deck">
             A visual library for navigating nanoGPT from its architecture to the
             internal signals that change while it learns.
@@ -135,8 +139,7 @@
         <aside class="contents" aria-label="On this page">
           <div>
             <p>On this page</p>
-            <a class="is-current" href="#authors">Authors</a>
-            <a href="#abstract">Abstract</a>
+            <a class="is-current" href="#abstract">Abstract</a>
             <a href="#motivation">Why more observables</a>
             <a href="#observation">Attention entropy</a>
             <a href="#layers">Across layers</a>
@@ -149,18 +152,6 @@
         </aside>
 
         <div class="article-main">
-          <section class="authors-section" id="authors" aria-labelledby="authorsTitle">
-            <h2 id="authorsTitle">Authors</h2>
-            <p class="author-names">
-              <span>Zirui Peng<sup>*</sup></span>
-              <span>Ziming Liu<sup>&dagger;</sup></span>
-            </p>
-            <p class="author-roles">
-              <span><sup>*</sup> Core contributor</span>
-              <span><sup>&dagger;</sup> Corresponding author</span>
-            </p>
-          </section>
-
           <aside class="abstract-card" id="abstract">
             <h2>Abstract</h2>
             <p>
