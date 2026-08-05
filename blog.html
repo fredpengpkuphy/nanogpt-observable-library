@@ -120,8 +120,18 @@
                   <circle cx="678" cy="81" r="4"/>
                   <circle cx="717" cy="211" r="4"/>
                 </g>
-                <text class="observable-label" x="28" y="274">1,820 observable trajectories</text>
-                <text class="observable-axis-label" x="932" y="274" text-anchor="end">training →</text>
+                <g class="observable-axes" aria-hidden="true">
+                  <path d="M62 30V258H920"/>
+                  <path d="M56 78H68M56 138H68M56 198H68M270 252V264M478 252V264M686 252V264M894 252V264"/>
+                  <text x="47" y="82" text-anchor="end">high</text>
+                  <text x="47" y="202" text-anchor="end">low</text>
+                  <text x="270" y="278" text-anchor="middle">25k</text>
+                  <text x="478" y="278" text-anchor="middle">50k</text>
+                  <text x="686" y="278" text-anchor="middle">75k</text>
+                  <text x="894" y="278" text-anchor="middle">100k</text>
+                  <text class="observable-y-title" x="18" y="144" text-anchor="middle" transform="rotate(-90 18 144)">observable value</text>
+                  <text class="observable-x-title" x="920" y="294" text-anchor="end">training step →</text>
+                </g>
               </g>
             </svg>
           </figure>
@@ -166,14 +176,6 @@
               <div>
                 <dt>1,820</dt>
                 <dd>observable curves</dd>
-              </div>
-              <div>
-                <dt>100k</dt>
-                <dd>training steps</dd>
-              </div>
-              <div>
-                <dt>12</dt>
-                <dd>transformer blocks</dd>
               </div>
             </dl>
           </aside>
