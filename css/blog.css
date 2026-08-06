@@ -232,6 +232,22 @@ p {
   font-style: normal;
 }
 
+.byline-contact {
+  margin: 7px 0 0;
+  color: var(--brand);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.byline-contact a {
+  text-decoration: none;
+}
+
+.byline-contact a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .hero-authors sup {
   color: var(--brand);
   font-size: 0.7em;
